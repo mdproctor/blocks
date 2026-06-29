@@ -1,0 +1,75 @@
+package io.casehub.blocks.conversation;
+
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
+public record ConversationRendererConfig(
+        Map<String, String> statusEmoji,
+        Map<Priority, String> priorityLabel,
+        Map<String, String> entryTypeLabel,
+        Map<String, String> roleLabel,
+        Set<String> resolvedStatuses,
+        Set<String> escalatedStatuses) {
+
+    public ConversationRendererConfig {
+        statusEmoji = Map.copyOf(statusEmoji);
+        priorityLabel = Map.copyOf(priorityLabel);
+        entryTypeLabel = Map.copyOf(entryTypeLabel);
+        roleLabel = Map.copyOf(roleLabel);
+        resolvedStatuses = Set.copyOf(resolvedStatuses);
+        escalatedStatuses = Set.copyOf(escalatedStatuses);
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static final class Builder {
+        private Map<String, String> statusEmoji = Map.of();
+        private Map<Priority, String> priorityLabel = Map.of();
+        private Map<String, String> entryTypeLabel = Map.of();
+        private Map<String, String> roleLabel = Map.of();
+        private Set<String> resolvedStatuses = Set.of();
+        private Set<String> escalatedStatuses = Set.of();
+
+        private Builder() {}
+
+        public Builder statusEmoji(Map<String, String> statusEmoji) {
+            this.statusEmoji = new HashMap<>(statusEmoji);
+            return this;
+        }
+
+        public Builder priorityLabel(Map<Priority, String> priorityLabel) {
+            this.priorityLabel = new HashMap<>(priorityLabel);
+            return this;
+        }
+
+        public Builder entryTypeLabel(Map<String, String> entryTypeLabel) {
+            this.entryTypeLabel = new HashMap<>(entryTypeLabel);
+            return this;
+        }
+
+        public Builder roleLabel(Map<String, String> roleLabel) {
+            this.roleLabel = new HashMap<>(roleLabel);
+            return this;
+        }
+
+        public Builder resolvedStatuses(Set<String> resolvedStatuses) {
+            this.resolvedStatuses = new HashSet<>(resolvedStatuses);
+            return this;
+        }
+
+        public Builder escalatedStatuses(Set<String> escalatedStatuses) {
+            this.escalatedStatuses = new HashSet<>(escalatedStatuses);
+            return this;
+        }
+
+        public ConversationRendererConfig build() {
+            return new ConversationRendererConfig(
+                    statusEmoji, priorityLabel, entryTypeLabel, roleLabel,
+                    resolvedStatuses, escalatedStatuses);
+        }
+    }
+}
