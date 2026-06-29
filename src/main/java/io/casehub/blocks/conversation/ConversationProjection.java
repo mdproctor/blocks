@@ -121,15 +121,7 @@ public abstract class ConversationProjection implements ChannelProjection<Conver
         int round = ChannelMessageMeta.parseInt(meta, ConversationProtocol.ROUND);
         String body = ChannelMessageMeta.bodyContent(sentinel(), message.content());
 
-        var thread = new ArrayList<ThreadEntry>();
-        thread.add(new ThreadEntry(pointId, role, round, entryType, body));
-        var point = new ConversationPoint(pointId, classification, thread, ConversationProtocol.STATUS_OPEN);
-
-        var points = new LinkedHashMap<>(state.points());
-        points.put(pointId, point);
-
-        return new ConversationState(points, new ArrayList<>(state.humanFlags()),
-                new ArrayList<>(state.memos()), new LinkedHashMap<>(state.subTaskFindings()));
+        return ConversationFold.createPoint(state, pointId, classification, role, round, entryType, body);
     }
 
     private ConversationState handlePointResponse(ConversationState state, MessageView message,
@@ -143,22 +135,11 @@ public abstract class ConversationProjection implements ChannelProjection<Conver
             return state;
         }
 
-        ConversationPoint existing = state.points().get(targetId);
         int round = ChannelMessageMeta.parseInt(meta, ConversationProtocol.ROUND);
         String body = ChannelMessageMeta.bodyContent(sentinel(), message.content());
 
-        var thread = new ArrayList<>(existing.thread());
-        thread.add(new ThreadEntry(null, role, round, entryType, body));
-
-        String newStatus = statusAfter(entryType);
-        String resolvedStatus = newStatus != null ? newStatus : existing.status();
-        var updated = new ConversationPoint(existing.id(), existing.classification(), thread, resolvedStatus);
-
-        var points = new LinkedHashMap<>(state.points());
-        points.put(targetId, updated);
-
-        return new ConversationState(points, new ArrayList<>(state.humanFlags()),
-                new ArrayList<>(state.memos()), new LinkedHashMap<>(state.subTaskFindings()));
+        return ConversationFold.respondToPoint(state, targetId, role, round, entryType, body,
+                statusAfter(entryType));
     }
 
     // ── infrastructure handlers ─────────────────────────────────────────────
@@ -168,10 +149,7 @@ public abstract class ConversationProjection implements ChannelProjection<Conver
         String role = meta.getOrDefault(ConversationProtocol.ROLE, "UNKNOWN");
         int round = ChannelMessageMeta.parseInt(meta, ConversationProtocol.ROUND);
         String content = ChannelMessageMeta.bodyContent(sentinel(), message.content());
-        var memos = new ArrayList<>(state.memos());
-        memos.add(new RoundMemo(role, round, content));
-        return new ConversationState(state.points(), new ArrayList<>(state.humanFlags()),
-                memos, new LinkedHashMap<>(state.subTaskFindings()));
+        return ConversationFold.addMemo(state, role, round, content);
     }
 
     private ConversationState handleSubTaskRequest(ConversationState state, MessageView message,
@@ -182,12 +160,7 @@ public abstract class ConversationProjection implements ChannelProjection<Conver
         String requestingRole = meta.getOrDefault(ConversationProtocol.ROLE, "UNKNOWN");
         String pointId = meta.get(ConversationProtocol.POINT_ID);
 
-        var findings = new LinkedHashMap<>(state.subTaskFindings());
-        findings.put(subTaskId, new SubTaskFinding(subTaskId, taskType, requestingRole,
-                pointId, null, null, SubTaskStatus.PENDING));
-
-        return new ConversationState(state.points(), new ArrayList<>(state.humanFlags()),
-                new ArrayList<>(state.memos()), findings);
+        return ConversationFold.requestSubTask(state, subTaskId, taskType, requestingRole, pointId);
     }
 
     private ConversationState handleSubTaskFinding(ConversationState state, MessageView message,
@@ -199,18 +172,7 @@ public abstract class ConversationProjection implements ChannelProjection<Conver
         String pointId = meta.get(ConversationProtocol.POINT_ID);
         String finding = ChannelMessageMeta.bodyContent(sentinel(), message.content());
 
-        var findings = new LinkedHashMap<>(state.subTaskFindings());
-        SubTaskFinding existing = findings.get(subTaskId);
-
-        // Bug fix R2-03: preserve requestedBy from the original REQUEST
-        String requestedBy = existing != null ? existing.requestedBy() : role;
-        String resolvedPointId = existing != null && existing.pointId() != null ? existing.pointId() : pointId;
-
-        findings.put(subTaskId, new SubTaskFinding(subTaskId, taskType, requestedBy,
-                resolvedPointId, finding, null, SubTaskStatus.COMPLETE));
-
-        return new ConversationState(state.points(), new ArrayList<>(state.humanFlags()),
-                new ArrayList<>(state.memos()), findings);
+        return ConversationFold.completeSubTask(state, subTaskId, taskType, role, pointId, finding);
     }
 
     private ConversationState handleSubTaskError(ConversationState state, MessageView message,
@@ -221,18 +183,7 @@ public abstract class ConversationProjection implements ChannelProjection<Conver
         String role = meta.getOrDefault(ConversationProtocol.ROLE, "UNKNOWN");
         String reason = ChannelMessageMeta.bodyContent(sentinel(), message.content());
 
-        var findings = new LinkedHashMap<>(state.subTaskFindings());
-        SubTaskFinding existing = findings.get(subTaskId);
-
-        // Bug fix R2-03: preserve requestedBy from the original REQUEST
-        String requestedBy = existing != null ? existing.requestedBy() : role;
-        String resolvedPointId = existing != null ? existing.pointId() : null;
-
-        findings.put(subTaskId, new SubTaskFinding(subTaskId, taskType, requestedBy,
-                resolvedPointId, null, reason, SubTaskStatus.ERROR));
-
-        return new ConversationState(state.points(), new ArrayList<>(state.humanFlags()),
-                new ArrayList<>(state.memos()), findings);
+        return ConversationFold.errorSubTask(state, subTaskId, taskType, role, reason);
     }
 
     private ConversationState handleFlagHuman(ConversationState state, MessageView message,
@@ -246,21 +197,7 @@ public abstract class ConversationProjection implements ChannelProjection<Conver
             return state;
         }
 
-        var points = new LinkedHashMap<>(state.points());
-        String targetId = message.correlationId();
-        if (targetId != null && points.containsKey(targetId)) {
-            ConversationPoint p = points.get(targetId);
-            var thread = new ArrayList<>(p.thread());
-            thread.add(new ThreadEntry(null, role, round, ConversationProtocol.FLAG_HUMAN, content));
-            points.put(targetId, new ConversationPoint(p.id(), p.classification(),
-                    thread, ConversationProtocol.STATUS_ESCALATED));
-        }
-
-        var flags = new ArrayList<>(state.humanFlags());
-        flags.add(new FlagEntry(null, round, role, content));
-
-        return new ConversationState(points, flags,
-                new ArrayList<>(state.memos()), new LinkedHashMap<>(state.subTaskFindings()));
+        return ConversationFold.flagHuman(state, message.correlationId(), role, round, content);
     }
 
     // ── utility ─────────────────────────────────────────────────────────────
