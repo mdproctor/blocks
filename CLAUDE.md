@@ -105,6 +105,11 @@ No Quarkus runtime — plain JUnit 5 tests with Mockito. No CDI container in tes
 | `ContextTracker` | Incremental LLM context window usage tracking via atomic counters. Thread-safe. |
 | `ContextSnapshot` | Immutable record of context state: contribution chars, window size, effective %, threshold exceeded |
 | `BoundedProjectionDecorator<S>` | Generic decorator wrapping any qhorus `ChannelProjection<S>` — skips messages past a configurable bound. Consumer supplies the value extraction function. |
+| `ChannelAgentHandler` | SPI interface for sub-task handlers: `handles()`, `prepareTask()`, `buildResponse()`. First-match routing. |
+| `ChannelAgentDispatcher` | First-match handler routing + agent invocation. Takes `Function<AgentTask, String>` (agent provider) and `Consumer<MessageDispatch>` (message sink). Subclass to override `onError()`. |
+| `ChannelAgentRequest` | Record: channelId, correlationId, message (the sub-task trigger) |
+| `AgentTask` | Record: systemPrompt, assembledInput (what to send to the LLM) |
+| `AgentResultParseException` | Unchecked exception for handler parse failures |
 
 ## Dependencies
 
@@ -115,11 +120,11 @@ No Quarkus runtime — plain JUnit 5 tests with Mockito. No CDI container in tes
 
 | Repo | What it uses |
 |------|-------------|
-| casehub-drafthouse | All three channel blocks — DebateProtocol delegates to ChannelMessageMeta, DebateSession uses ContextTracker, RoundBoundedProjection extends BoundedProjectionDecorator |
+| casehub-drafthouse | All channel blocks — DebateProtocol delegates to ChannelMessageMeta, DebateSession uses ContextTracker, RoundBoundedProjection extends BoundedProjectionDecorator, ChannelAgentDispatcher subclass with debate-specific error dispatch |
 
 ## Extraction Plan
 
-Full extraction plan with prioritisation: [casehubio/parent#310 comment](https://github.com/casehubio/parent/issues/310#issuecomment-4795440229). Next: P4 (channel agent dispatch), P5 (structured conversation protocol).
+Full extraction plan with prioritisation: [casehubio/parent#310 comment](https://github.com/casehubio/parent/issues/310#issuecomment-4795440229). Next: P5 (structured conversation protocol).
 
 ## Writing Style Guide
 

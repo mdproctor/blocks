@@ -47,12 +47,16 @@ Channel utility blocks — foundational patterns for LLM-mediated channel commun
 | `ContextTracker` | Incremental LLM context window usage tracking with threshold warnings. Thread-safe via atomic counters. | DraftHouse `ContextTracker` |
 | `ContextSnapshot` | Immutable record of context state at a point in time. | DraftHouse `ContextSnapshot` |
 | `BoundedProjectionDecorator<S>` | Generic decorator wrapping any qhorus `ChannelProjection<S>` — skips messages where an extracted value exceeds a bound. Consumer supplies the extraction function. | DraftHouse `RoundBoundedProjection` |
+| `ChannelAgentHandler` | SPI for sub-task handlers: `handles()` predicate, `prepareTask()` assembles LLM input, `buildResponse()` builds qhorus MessageDispatch from LLM output. First-match routing. | DraftHouse `ChannelAgentHandler` |
+| `ChannelAgentDispatcher` | First-match handler routing + agent invocation. Agent provider via `Function<AgentTask, String>`, message sink via `Consumer<MessageDispatch>`. Subclass `onError()` for app-specific error encoding. CDI-friendly (protected no-args constructor). | DraftHouse `ChannelAgentDispatcher` |
+| `ChannelAgentRequest` | Sub-task trigger record: channelId, correlationId, OutboundMessage. | DraftHouse `ChannelAgentRequest` |
+| `AgentTask` | LLM input record: systemPrompt, assembledInput. | DraftHouse `AgentTask` |
+| `AgentResultParseException` | Unchecked exception signalling handler parse failure — dispatcher catches and routes to `onError()`. | DraftHouse `AgentResultParseException` |
 
 ### Planned packages (per parent#310)
 
 | Package | What it will contain | Priority |
 |---------|---------------------|----------|
-| `io.casehub.blocks.channel` (additions) | Channel agent dispatch SPI + dispatcher | P4 |
 | `io.casehub.blocks.conversation` | Structured conversation protocol — round-based multi-agent deliberation with point lifecycle, human escalation, sub-task dispatch | P5 |
 | `io.casehub.blocks.gate` | Oversight gate lifecycle — risk classification → approval gate → commitment → decision | P6 (from openclaw) |
 
@@ -67,3 +71,7 @@ Channel utility blocks — foundational patterns for LLM-mediated channel commun
 ### BoundedProjectionDecorator uses a value extractor function
 
 Rather than hardcoding "round number" as the bound concept, the decorator takes a `ToIntFunction<MessageView>` that extracts the bound value from each message. DraftHouse passes `msg -> DebateProtocol.parseRound(parseMeta(msg.content()))`. Other apps can bound on sequence number, timestamp, or any integer field.
+
+### ChannelAgentDispatcher uses Consumer/Function, not MessageService
+
+The dispatcher takes `Function<AgentTask, String>` for agent invocation and `Consumer<MessageDispatch>` for message posting — not the qhorus runtime `MessageService` directly. This keeps blocks at the API dependency level (qhorus-api only, not qhorus runtime). Apps pass `messageService::dispatch` and `agentProvider::analyse` as method references. Error dispatch is a protected `onError()` method that apps override to encode errors in their protocol format.
