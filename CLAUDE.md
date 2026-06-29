@@ -88,7 +88,38 @@ mvn --batch-mode test
 
 ## Testing
 
-No Quarkus runtime — plain JUnit 5 tests with CDI via Jandex indexing.
+No Quarkus runtime — plain JUnit 5 tests with Mockito. No CDI container in tests.
+
+## Key Directories
+
+| Path | Contents |
+|------|----------|
+| `src/main/java/io/casehub/blocks/channel/` | Channel utility blocks — message meta, context tracking, bounded projection |
+| `src/test/java/io/casehub/blocks/channel/` | Tests for channel blocks |
+
+## Package: `io.casehub.blocks.channel`
+
+| Class | What it does |
+|-------|-------------|
+| `ChannelMessageMeta` | Sentinel-prefixed key=value metadata headers in message bodies. Apps choose their own sentinel. Methods: `parseMeta()`, `bodyContent()`, `encode()`, `parseInt()` |
+| `ContextTracker` | Incremental LLM context window usage tracking via atomic counters. Thread-safe. |
+| `ContextSnapshot` | Immutable record of context state: contribution chars, window size, effective %, threshold exceeded |
+| `BoundedProjectionDecorator<S>` | Generic decorator wrapping any qhorus `ChannelProjection<S>` — skips messages past a configurable bound. Consumer supplies the value extraction function. |
+
+## Dependencies
+
+**Compile:** `casehub-qhorus-api`, `casehub-work-api`, `casehub-engine-api`
+**Test:** `casehub-qhorus`, `casehub-qhorus-testing`, `casehub-engine`, `casehub-engine-testing`, `assertj`, `mockito`, `awaitility`
+
+## Consumers
+
+| Repo | What it uses |
+|------|-------------|
+| casehub-drafthouse | All three channel blocks — DebateProtocol delegates to ChannelMessageMeta, DebateSession uses ContextTracker, RoundBoundedProjection extends BoundedProjectionDecorator |
+
+## Extraction Plan
+
+Full extraction plan with prioritisation: [casehubio/parent#310 comment](https://github.com/casehubio/parent/issues/310#issuecomment-4795440229). Next: P4 (channel agent dispatch), P5 (structured conversation protocol).
 
 ## Writing Style Guide
 
