@@ -53,6 +53,23 @@ Channel utility blocks — foundational patterns for LLM-mediated channel commun
 | `AgentTask` | LLM input record: systemPrompt, assembledInput. | DraftHouse `AgentTask` |
 | `AgentResultParseException` | Unchecked exception signalling handler parse failure — dispatcher catches and routes to `onError()`. | DraftHouse `AgentResultParseException` |
 
+### Package: `io.casehub.blocks.agentic`
+
+Compositional agentic orchestration framework — five SPIs for agent selection, task decomposition, activation, result aggregation, and termination, with execution drivers and pre-composed pattern builders.
+
+| Sub-package | What it contains |
+|-------------|-----------------|
+| `io.casehub.blocks.agentic` | Foundation types: `AgentRef` (sealed, 5 variants), `AgentResult`, `RoutingCandidate`, `FailurePolicy` |
+| `io.casehub.blocks.agentic.routing` | Routing SPI: `RoutingStrategy<T>`, `RoutingDecision` (sealed), `FirstMatchRouting`, `RoundRobinRouting`, `SequentialRouting` |
+| `io.casehub.blocks.agentic.decomposition` | Decomposition SPI: `DecompositionStrategy<T>`, `TaskNode` (sealed), `IdentityDecomposition`, `StaticDecomposition` |
+| `io.casehub.blocks.agentic.activation` | Activation SPI: `ActivationRule<T>`, `OnExplicitDispatch`, `MaxIterationsGuard` |
+| `io.casehub.blocks.agentic.aggregation` | Aggregation SPI: `AggregationStrategy<T>`, `AggregationResult` (sealed), `PassThrough`, `CollectAll`, `MajorityVote` |
+| `io.casehub.blocks.agentic.termination` | Termination SPI: `TerminationCondition<T>`, `TerminationDecision` (sealed), `GoalReached`, `MaxIterationsTermination` |
+| `io.casehub.blocks.agentic.model` | Execution model: `ExecutionModel<T>`, `ExecutionDriver<T>`, `OrchestratedDriver`, `ChoreographedDriver`, `ExecutionResult` (sealed), `ExecutionState` (sealed), `ExecutionEventListener` |
+| `io.casehub.blocks.agentic.pattern` | Pattern DSL: `Patterns` entry point, 8 builders (Supervisor, Sequence, Loop, Parallel, Voting, Debate, Conditional, HTN) |
+
+**Implementation epic:** casehubio/blocks#595
+
 ### Planned packages (per parent#310)
 
 | Package | What it will contain | Priority |

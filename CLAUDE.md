@@ -96,6 +96,8 @@ No Quarkus runtime — plain JUnit 5 tests with Mockito. No CDI container in tes
 |------|----------|
 | `src/main/java/io/casehub/blocks/channel/` | Channel utility blocks — message meta, context tracking, bounded projection |
 | `src/test/java/io/casehub/blocks/channel/` | Tests for channel blocks |
+| `src/main/java/io/casehub/blocks/agentic/` | Compositional agentic orchestration — five SPIs, execution drivers, pattern builders |
+| `src/test/java/io/casehub/blocks/agentic/` | Tests for agentic orchestration blocks |
 
 ## Package: `io.casehub.blocks.channel`
 
@@ -111,9 +113,25 @@ No Quarkus runtime — plain JUnit 5 tests with Mockito. No CDI container in tes
 | `AgentTask` | Record: systemPrompt, assembledInput (what to send to the LLM) |
 | `AgentResultParseException` | Unchecked exception for handler parse failures |
 
+## Package: `io.casehub.blocks.agentic`
+
+Compositional agentic orchestration framework — eight sub-packages implementing five SPIs for routing, decomposition, activation, aggregation, and termination, plus execution drivers and pre-composed pattern builders.
+
+| Sub-package | What it contains |
+|-------------|-----------------|
+| `agentic` | Foundation types: `AgentRef` (sealed: WorkerAgent, ChannelAgent, HumanAgent, ExternalAgent, ComposedAgent), `AgentResult`, `RoutingCandidate`, `FailurePolicy` |
+| `agentic.routing` | Routing SPI: `RoutingStrategy<T>`, `RoutingDecision` (sealed: Selected, Unresolvable, Escalate), `FirstMatchRouting`, `RoundRobinRouting`, `SequentialRouting` |
+| `agentic.decomposition` | Decomposition SPI: `DecompositionStrategy<T>`, `TaskNode` (sealed: PrimitiveTask, CompoundTask), `DecompositionMethod`, `IdentityDecomposition`, `StaticDecomposition` |
+| `agentic.activation` | Activation SPI: `ActivationRule<T>`, `ActivationContext`, `OnExplicitDispatch`, `MaxIterationsGuard` |
+| `agentic.aggregation` | Aggregation SPI: `AggregationStrategy<T>`, `AggregationResult` (sealed: Resolved, Partial, Deadlocked), `PassThrough`, `CollectAll`, `MajorityVote` |
+| `agentic.termination` | Termination SPI: `TerminationCondition<T>`, `TerminationDecision` (sealed: Continue, Complete, Failed, Escalate), `GoalReached`, `MaxIterationsTermination` |
+| `agentic.model` | Execution model: `ExecutionModel<T>`, `ExecutionDriver<T>`, `OrchestratedDriver`, `ChoreographedDriver`, `ExecutionResult` (sealed: Completed, Failed, Escalated, Cancelled), `ExecutionState` (sealed: Idle, Running, WaitingForAgent, WaitingForEvent, Complete, Faulted, Cancelled), `ExecutionEventListener` |
+| `agentic.pattern` | Pattern DSL: `Patterns` entry point, `AbstractPatternBuilder`, 8 builders (Supervisor, Sequence, Loop, Parallel, Voting, Debate, Conditional, HTN) |
+
 ## Dependencies
 
-**Compile:** `casehub-qhorus-api`, `casehub-work-api`, `casehub-engine-api`
+**Compile:** `casehub-qhorus-api`, `casehub-work-api`, `casehub-engine-api`, `casehub-eidos-api`, `casehub-worker-api`
+**Provided:** `io.smallrye.reactive:mutiny`
 **Test:** `casehub-qhorus`, `casehub-qhorus-testing`, `casehub-engine`, `casehub-engine-testing`, `assertj`, `mockito`, `awaitility`
 
 ## Consumers
@@ -124,7 +142,7 @@ No Quarkus runtime — plain JUnit 5 tests with Mockito. No CDI container in tes
 
 ## Extraction Plan
 
-Full extraction plan with prioritisation: [casehubio/parent#310 comment](https://github.com/casehubio/parent/issues/310#issuecomment-4795440229). Next: P5 (structured conversation protocol).
+Full extraction plan with prioritisation: [casehubio/parent#310 comment](https://github.com/casehubio/parent/issues/310#issuecomment-4795440229). P1–P5 complete. Next: P6 (oversight gate lifecycle).
 
 ## Writing Style Guide
 
