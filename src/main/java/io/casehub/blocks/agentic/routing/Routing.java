@@ -14,4 +14,8 @@ public final class Routing {
     public static <T> RoundRobinRouting<T> roundRobin() {
         return new RoundRobinRouting<>();
     }
+
+    public static <T> SequentialRouting<T> sequential() {
+        return new SequentialRouting<>();
+    }
 }
