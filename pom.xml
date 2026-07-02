@@ -52,6 +52,13 @@
       <scope>provided</scope>
     </dependency>
 
+    <!-- Provided — preference system (consumer brings the runtime) -->
+    <dependency>
+      <groupId>io.casehub</groupId>
+      <artifactId>casehub-platform-api</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
     <!-- Provided — LLM abstraction (consumer brings the AgentProvider implementation) -->
     <dependency>
       <groupId>io.casehub</groupId>
