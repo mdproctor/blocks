@@ -98,6 +98,8 @@ No Quarkus runtime — plain JUnit 5 tests with Mockito. No CDI container in tes
 | `src/test/java/io/casehub/blocks/channel/` | Tests for channel blocks |
 | `src/main/java/io/casehub/blocks/agentic/` | Compositional agentic orchestration — five SPIs, execution drivers, pattern builders |
 | `src/test/java/io/casehub/blocks/agentic/` | Tests for agentic orchestration blocks |
+| `src/main/java/io/casehub/blocks/conversation/` | Structured conversation protocol — projections, fold state, rendering, point classification |
+| `src/test/java/io/casehub/blocks/conversation/` | Tests for conversation blocks |
 | `src/main/java/io/casehub/blocks/routing/` | Trust routing utilities — shared preference keys, policy resolver, compliance records |
 | `src/test/java/io/casehub/blocks/routing/` | Tests for routing utilities |
 
@@ -114,6 +116,27 @@ No Quarkus runtime — plain JUnit 5 tests with Mockito. No CDI container in tes
 | `ChannelAgentRequest` | Record: channelId, correlationId, message (the sub-task trigger) |
 | `AgentTask` | Record: systemPrompt, assembledInput (what to send to the LLM) |
 | `AgentResultParseException` | Unchecked exception for handler parse failures |
+
+## Package: `io.casehub.blocks.conversation`
+
+Structured conversation protocol — reusable infrastructure for multi-agent deliberation channels. Extracted from drafthouse via casehubio/drafthouse#79, #80, #81, #83.
+
+| Class | What it does |
+|-------|-------------|
+| `ConversationProtocol` | Sentinel-based metadata encoding/decoding for structured conversation messages. Defines entry types, round markers, status transitions. |
+| `ConversationProjection` | Incremental projection over conversation messages — maintains fold state, tracks rounds, classifies points. |
+| `ConversationFold` | Fold operations for typed-message projections — accumulates conversation state from a message stream. |
+| `ConversationState` | Immutable snapshot of conversation state: points by thread, round boundaries, flags, sub-task status. |
+| `ConversationPoint` | Individual point in a conversation thread — classification, priority, content, agent attribution. |
+| `ConversationRenderer` | Pluggable markdown rendering of conversation state — round-by-round or thread-by-thread views. |
+| `ConversationRendererConfig` | Configuration for renderer: section ordering, inclusion filters, format options. |
+| `ThreadEntry` | Entry within a conversation thread — point + responses + sub-task findings. |
+| `PointClassification` | Open type system for classifying conversation points (replaces drafthouse's closed `EntryType` enum). |
+| `Priority` | Priority level for conversation points — used in rendering and attention ordering. |
+| `RoundMemo` | Summary memo for a completed conversation round — key outcomes, unresolved points. |
+| `FlagEntry` | Flag raised during conversation — attention markers for moderators or supervisors. |
+| `SubTaskFinding` | Result from a sub-agent task (verify, analyse, etc.) attached to a conversation point. |
+| `SubTaskStatus` | Status tracking for dispatched sub-agent tasks within a conversation. |
 
 ## Package: `io.casehub.blocks.agentic`
 
@@ -155,7 +178,7 @@ Shared trust routing utilities — eliminates duplicated preference-to-policy bo
 
 | Repo | What it uses |
 |------|-------------|
-| casehub-drafthouse | All channel blocks — DebateProtocol delegates to ChannelMessageMeta, DebateSession uses ContextTracker, RoundBoundedProjection extends BoundedProjectionDecorator, ChannelAgentDispatcher subclass with debate-specific error dispatch |
+| casehub-drafthouse | Channel + conversation blocks — DebateProtocol delegates to `ConversationProtocol`, DebateChannelProjection extends `ConversationProjection`, ReviewChannelProjection uses `ConversationFold`/`ConversationState`, `ChannelAgentDispatcher` subclass with debate-specific error dispatch, `BoundedProjectionDecorator` for round bounding, `ContextTracker` for LLM window tracking |
 | casehub-aml | Routing: `TrustRoutingPolicyKeys`, `TrustRoutingPolicyResolver`, `DoublePreference`, `IntPreference` |
 | casehub-devtown | Routing: `TrustRoutingPolicyKeys`, `TrustRoutingPolicyResolver.collectFloors()`, `DoublePreference` |
 | casehub-life | Routing: `TrustRoutingPolicyKeys`, `TrustRoutingPolicyResolver.collectFloors()`, `DoublePreference` |
@@ -193,7 +216,7 @@ Epic #28 tracks extraction of shared patterns from domain repos into blocks. Eac
 | # | Title | Scale | Complexity | Ready? | Destination | Migrates from | Downstream consumers |
 |---|-------|-------|------------|--------|-------------|---------------|---------------------|
 | #17 | Trust routing YAML | M | Med | **Done** | blocks | aml, devtown, clinical, life, ops, soc | aml, devtown, clinical, life, ops, soc, fsitrading |
-| #22 | Debate channel infrastructure | L | High | Yes but large | blocks | drafthouse | drafthouse, devtown, clinical, aml |
+| #22 | Debate channel infrastructure | L | High | **Done** | blocks | drafthouse | drafthouse, devtown, clinical, aml, claudony |
 | #23 | Oversight gate lifecycle + risk classification | L | High | Yes but large | blocks | openclaw, engine-api | openclaw, aml, soc, life, devtown, clinical, iot, claudony |
 | #24 | Universal pluggable routing strategy | L | High | Design-first | blocks | engine, work | engine, work, qhorus, eidos |
 | #25 | Worker data coordination (DataExchange/DataChannel) | L | High | Blocked on engine#528 | blocks | engine | engine, workers, desiredstate |
