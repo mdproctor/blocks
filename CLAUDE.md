@@ -98,6 +98,8 @@ No Quarkus runtime — plain JUnit 5 tests with Mockito. No CDI container in tes
 | `src/test/java/io/casehub/blocks/channel/` | Tests for channel blocks |
 | `src/main/java/io/casehub/blocks/agentic/` | Compositional agentic orchestration — five SPIs, execution drivers, pattern builders |
 | `src/test/java/io/casehub/blocks/agentic/` | Tests for agentic orchestration blocks |
+| `src/main/java/io/casehub/blocks/routing/` | Trust routing utilities — shared preference keys, policy resolver, compliance records |
+| `src/test/java/io/casehub/blocks/routing/` | Tests for routing utilities |
 
 ## Package: `io.casehub.blocks.channel`
 
@@ -129,10 +131,24 @@ Compositional agentic orchestration framework — eight sub-packages implementin
 | `agentic.listener` | Accountability listeners: `OrchestrationEventType`, `EventLogListener` (operational audit via EventSink), `LedgerExecutionListener` (compliance audit via LedgerSink) |
 | `agentic.pattern` | Pattern DSL: `Patterns` entry point, `AbstractPatternBuilder`, 8 builders (Supervisor, Sequence, Loop, Parallel, Voting, Debate, Conditional, HTN) |
 
+## Package: `io.casehub.blocks.routing`
+
+Shared trust routing utilities — eliminates duplicated preference-to-policy boilerplate across domain repos.
+
+| Class | What it does |
+|-------|-------------|
+| `DoublePreference` | `SingleValuePreference` record for double-typed preference values. Replaces copies in aml, devtown, life. |
+| `IntPreference` | `SingleValuePreference` record for int-typed preference values. Replaces copies in aml, devtown. |
+| `TrustRoutingPolicyKeys` | Parameterised `PreferenceKey` definitions — scope prefix + 4 universal keys (threshold, minimum-observations, borderline-margin, blend-factor) + builder for domain-specific quality floor keys. |
+| `TrustRoutingPolicyResolver` | Stateless utility: `resolve(Preferences, TrustRoutingPolicyKeys)` → `TrustRoutingPolicy`. Also exposes `collectFloors()` for hybrid providers that read some fields from a domain registry. |
+| `RoutingDecisionRecord` | Compliance audit record for trust-weighted routing decisions: capabilityTag, workerId, trustScoreAtRouting, thresholdApplied, evidenceEntryId. |
+| `TrustRoutingRequirement` | Compliance evidence wrapper: requirementId, citation, mechanism, status, decisions. |
+| `RequirementStatus` | Enum: CLOSED, PARTIAL, BREACHED, GAP. |
+
 ## Dependencies
 
 **Compile:** `casehub-qhorus-api`, `casehub-work-api`, `casehub-engine-api`, `casehub-eidos-api`, `casehub-worker-api`, `org.jspecify:jspecify`
-**Provided:** `io.smallrye.reactive:mutiny`, `casehub-platform-agent-api`
+**Provided:** `io.smallrye.reactive:mutiny`, `casehub-platform-agent-api`, `casehub-platform-api`
 **Test:** `casehub-qhorus`, `casehub-qhorus-testing`, `casehub-engine`, `casehub-engine-testing`, `assertj`, `mockito`, `awaitility`
 
 ## Consumers
@@ -140,10 +156,68 @@ Compositional agentic orchestration framework — eight sub-packages implementin
 | Repo | What it uses |
 |------|-------------|
 | casehub-drafthouse | All channel blocks — DebateProtocol delegates to ChannelMessageMeta, DebateSession uses ContextTracker, RoundBoundedProjection extends BoundedProjectionDecorator, ChannelAgentDispatcher subclass with debate-specific error dispatch |
+| casehub-aml | Routing: `TrustRoutingPolicyKeys`, `TrustRoutingPolicyResolver`, `DoublePreference`, `IntPreference` |
+| casehub-devtown | Routing: `TrustRoutingPolicyKeys`, `TrustRoutingPolicyResolver.collectFloors()`, `DoublePreference` |
+| casehub-life | Routing: `TrustRoutingPolicyKeys`, `TrustRoutingPolicyResolver.collectFloors()`, `DoublePreference` |
+
+## Blocks Scope Criteria
+
+A pattern belongs in blocks if it meets at least one of these criteria:
+1. **Needs an LLM in the loop** — the pattern involves LLM invocation, prompt construction, or LLM-driven decision-making
+2. **Uses classical AI** — classical planning, Bayesian reasoning, CEP (complex event processing), or similar
+3. **Requires integration with foundational platform parts** — the pattern composes across qhorus, engine, work, or eidos APIs in a way that would otherwise be duplicated by every consumer
+
+**What does NOT belong in blocks:**
+- Small isolated utilities (backoff computation, rate limiters, CloudEvent adapters) → stay in platform or engine
+- Pure SPI unifications (e.g. ProvisionerConfigRegistry) → stay in the API module that owns the provisioning lifecycle (engine-api)
+- Domain-specific logic that happens to be duplicated but doesn't involve AI or foundational integration
+
+**The test:** if removing the LLM/AI/integration aspect leaves a generic utility, it belongs in platform. If removing the domain-specific aspect leaves a reusable AI-integration pattern, it belongs in blocks.
+
+## Trust Routing Architecture
+
+The trust routing system spans three layers — blocks owns policy configuration, not score computation or strategy execution.
+
+| Layer | Owner | What it does |
+|-------|-------|-------------|
+| Score computation | **ledger** | `TrustScoreRoutingPublisher` computes trust scores from ledger entries and publishes them. The `trust-score-routing` package owns all score payloads and events. |
+| Policy configuration | **blocks** (routing package) + **engine-api** (`TrustRoutingPolicyProvider` SPI) | `TrustRoutingPolicyKeys` + `TrustRoutingPolicyResolver` provide the shared preference-to-policy loading. Domain repos implement `TrustRoutingPolicyProvider` using these utilities. |
+| Strategy execution | **engine** | `TrustWeightedAgentStrategy` applies trust scores against policy thresholds and quality floors. `SemanticAgentRoutingStrategy` adds embedding-based re-ranking. |
+
+Domain repos (aml, devtown, clinical, life, ops) implement `TrustRoutingPolicyProvider` from engine-api — they configure policy parameters, not compute scores or execute routing.
+
+## Consolidation Epic
+
+Epic #28 tracks extraction of shared patterns from domain repos into blocks. Each child issue covers a distinct pattern duplicated across 2+ repos.
+
+| # | Title | Scale | Complexity | Ready? | Destination | Migrates from | Downstream consumers |
+|---|-------|-------|------------|--------|-------------|---------------|---------------------|
+| #17 | Trust routing YAML | M | Med | **Done** | blocks | aml, devtown, clinical, life, ops, soc | aml, devtown, clinical, life, ops, soc, fsitrading |
+| #22 | Debate channel infrastructure | L | High | Yes but large | blocks | drafthouse | drafthouse, devtown, clinical, aml |
+| #23 | Oversight gate lifecycle + risk classification | L | High | Yes but large | blocks | openclaw, engine-api | openclaw, aml, soc, life, devtown, clinical, iot, claudony |
+| #24 | Universal pluggable routing strategy | L | High | Design-first | blocks | engine, work | engine, work, qhorus, eidos |
+| #25 | Worker data coordination (DataExchange/DataChannel) | L | High | Blocked on engine#528 | blocks | engine | engine, workers, desiredstate |
+| #27 | Layered event summarisation | M | Med | Not yet — quarkmind still baking | blocks | quarkmind | quarkmind, iot, aml, clinical |
+
+## Cross-Repo Scanning
+
+To scan all CaseHub repos for shared patterns, use `ide_open_workspace` with the parent directory:
+```
+ide_open_workspace(path="/Users/mdproctor/claude/casehub")
+```
+This opens all 26 repos in a single IntelliJ window with full cross-project code intelligence. Use `ide_find_class`, `ide_search_text`, and `ide_find_references` with the workspace `project_path` for cross-repo analysis.
+
+## Cross-Repo Consolidation Commits
+
+When implementing consolidation work (epic #28), commits to peer repos (aml, devtown, life, etc.) on main are expected and approved. This is an exception to the normal "do not commit to peer repos" rule — consolidation by definition spans repos. Always:
+- Verify all affected repos are on main before starting
+- Install blocks to local Maven repo before compiling consumers (`mvn install -DskipTests`)
+- Commit each repo separately with meaningful messages tagged with the blocks issue (`Refs casehubio/blocks#N`)
+- Push all repos after all commits succeed
 
 ## Extraction Plan
 
-Full extraction plan with prioritisation: [casehubio/parent#310 comment](https://github.com/casehubio/parent/issues/310#issuecomment-4795440229). P1–P5 complete. Next: P6 (oversight gate lifecycle).
+Full extraction plan with prioritisation: [casehubio/parent#310 comment](https://github.com/casehubio/parent/issues/310#issuecomment-4795440229). P1–P5 complete. Consolidation epic #28 tracks remaining extractions.
 
 ## Writing Style Guide
 
