@@ -104,6 +104,8 @@ No Quarkus runtime — plain JUnit 5 tests with Mockito. No CDI container in tes
 | `src/test/java/io/casehub/blocks/oversight/` | Tests for oversight blocks |
 | `src/main/java/io/casehub/blocks/routing/` | Trust routing utilities — shared preference keys, policy resolver, compliance records |
 | `src/test/java/io/casehub/blocks/routing/` | Tests for routing utilities |
+| `src/main/java/io/casehub/blocks/routing/agent/` | AI-powered AgentRoutingStrategy implementations — LLM-reasoned and CBR-evidence agent selection |
+| `src/test/java/io/casehub/blocks/routing/agent/` | Tests for AI routing strategies |
 
 ## Package: `io.casehub.blocks.channel`
 
@@ -186,10 +188,20 @@ Shared trust routing utilities — eliminates duplicated preference-to-policy bo
 | `TrustRoutingRequirement` | Compliance evidence wrapper: requirementId, citation, mechanism, status, decisions. |
 | `RequirementStatus` | Enum: CLOSED, PARTIAL, BREACHED, GAP. |
 
+## Package: `io.casehub.blocks.routing.agent`
+
+AI-powered `AgentRoutingStrategy` implementations for the engine's routing pipeline. Selected by name via `StrategyResolver` (engine#634). Optional trust classification via `Instance<T>` — activates when engine-ledger is on the consumer's classpath.
+
+| Class | What it does |
+|-------|-------------|
+| `LlmAgentRoutingStrategy` | `AgentRoutingStrategy` (id: `"llm"`). Asks an LLM via `AgentProvider` to reason about which candidate best fits the task. Optional trust classification filters EXCLUDED candidates before the LLM sees them. Worker pool offloading for blocking LLM calls. |
+| `CbrAgentRoutingStrategy` | `AgentRoutingStrategy` (id: `"cbr"`). Uses `CbrCaseMemoryStore` to retrieve similar past cases and analyse worker success rates from `PlanTrace` entries. Falls back to `AgentGraphQuery.topAgentsByOutcome()` when CBR store unavailable. Optional trust classification. |
+| `LlmRoutingSupport` | Package-private utility — shared prompt building, response parsing, and `AgentProvider` invocation. Used by `LlmAgentRoutingStrategy` and (future) `LlmSelectedRouting` refactoring. |
+
 ## Dependencies
 
 **Compile:** `casehub-qhorus-api`, `casehub-work-api`, `casehub-engine-api`, `casehub-eidos-api`, `casehub-worker-api`, `org.jspecify:jspecify`
-**Provided:** `io.smallrye.reactive:mutiny`, `casehub-platform-agent-api`, `casehub-platform-api`
+**Provided:** `io.smallrye.reactive:mutiny`, `casehub-platform-agent-api`, `casehub-platform-api`, `casehub-engine-ledger`, `casehub-ledger-api`, `casehub-neocortex-memory-api`
 **Test:** `casehub-qhorus`, `casehub-qhorus-testing`, `casehub-engine`, `casehub-engine-testing`, `assertj`, `mockito`, `awaitility`
 
 ## Consumers
@@ -222,13 +234,14 @@ A pattern belongs in blocks if it meets at least one of these criteria:
 
 ## Trust Routing Architecture
 
-The trust routing system spans three layers — blocks owns policy configuration, not score computation or strategy execution.
+The trust routing system spans four layers — blocks owns policy configuration AND AI-powered routing strategies.
 
 | Layer | Owner | What it does |
 |-------|-------|-------------|
 | Score computation | **ledger** | `TrustScoreRoutingPublisher` computes trust scores from ledger entries and publishes them. The `trust-score-routing` package owns all score payloads and events. |
 | Policy configuration | **blocks** (routing package) + **engine-api** (`TrustRoutingPolicyProvider` SPI) | `TrustRoutingPolicyKeys` + `TrustRoutingPolicyResolver` provide the shared preference-to-policy loading. Domain repos implement `TrustRoutingPolicyProvider` using these utilities. |
-| Strategy execution | **engine** | `TrustWeightedAgentStrategy` applies trust scores against policy thresholds and quality floors. `SemanticAgentRoutingStrategy` adds embedding-based re-ranking. |
+| Classical strategy execution | **engine** | `TrustWeightedAgentStrategy` (engine-ledger) applies trust scores. `SemanticAgentRoutingStrategy` (engine-ai) adds embedding-based re-ranking. Strategies stay where their differentiating dependency lives. |
+| AI-powered strategy execution | **blocks** (routing.agent package) | `LlmAgentRoutingStrategy` (LLM reasoning) and `CbrAgentRoutingStrategy` (case-based evidence). Both optionally compose with trust classification via `Instance<TrustCandidateClassifier>`. |
 
 Domain repos (aml, devtown, clinical, life, ops) implement `TrustRoutingPolicyProvider` from engine-api — they configure policy parameters, not compute scores or execute routing.
 
@@ -242,7 +255,7 @@ Epic #28 tracks extraction of shared patterns from domain repos into blocks. Eac
 | #22 | Debate channel infrastructure | L | High | **Done** | blocks | drafthouse | drafthouse, devtown, clinical, aml, claudony |
 | #23 | Oversight gate lifecycle + risk classification | L | High | **Done** | blocks | openclaw, engine-api | openclaw, aml, soc, life, devtown, clinical, iot, claudony |
 | #24 | Universal pluggable routing strategy | L | High | **Moved → engine#634** | engine | engine, work | engine, work, qhorus, eidos |
-| #30 | AI routing strategy impls (trust, LLM, CBR) | M | Med | Blocked on engine#634 | blocks | — | engine, domain repos |
+| #30 | AI routing strategy impls (trust, LLM, CBR) | M | Med | **Done** | blocks | — | engine, domain repos |
 | #25 | Worker data coordination (DataExchange/DataChannel) | L | High | **Moved → engine#633** | engine | engine | engine, workers, desiredstate |
 | #27 | Layered event summarisation | M | Med | Not yet — quarkmind still baking | blocks | quarkmind | quarkmind, iot, aml, clinical |
 

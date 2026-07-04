@@ -1,0 +1,237 @@
+package io.casehub.blocks.routing.agent;
+
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.NullNode;
+import io.casehub.api.spi.routing.AgentAssignment;
+import io.casehub.api.spi.routing.AgentCandidate;
+import io.casehub.api.spi.routing.AgentHealth;
+import io.casehub.api.spi.routing.AgentRoutingContext;
+import io.casehub.api.spi.routing.EscalationReason;
+import io.casehub.api.spi.routing.TrustRoutingPolicy;
+import io.casehub.api.spi.routing.TrustRoutingPolicyProvider;
+import io.casehub.eidos.api.AgentCapability;
+import io.casehub.eidos.api.AgentDescriptor;
+import io.casehub.ledger.api.spi.TrustScoreSource;
+import io.casehub.ledger.routing.TrustCandidateClassifier;
+import io.casehub.platform.agent.AgentEvent;
+import io.casehub.platform.agent.AgentProvider;
+import io.casehub.platform.agent.AgentSessionConfig;
+import io.smallrye.mutiny.Multi;
+import jakarta.enterprise.inject.Instance;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.List;
+import java.util.Map;
+import java.util.OptionalDouble;
+import java.util.Set;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class LlmAgentRoutingStrategyTest {
+
+    @Mock AgentProvider agentProvider;
+    @Mock TrustCandidateClassifier classifier;
+    @Mock TrustScoreSource scoreSource;
+    @Mock TrustRoutingPolicyProvider policyProvider;
+
+    private AgentRoutingContext context(String capability) {
+        return new AgentRoutingContext(UUID.randomUUID(), capability, NullNode.instance, "test-tenant");
+    }
+
+    private AgentCandidate candidate(String id) {
+        return candidate(id, "Does " + id);
+    }
+
+    private AgentCandidate candidate(String id, String briefing) {
+        var descriptor = AgentDescriptor.builder()
+                .agentId(id).name(id).slot("agent").tenancyId("test")
+                .capabilities(List.of(AgentCapability.builder().name("analysis").build()))
+                .briefing(briefing).build();
+        return new AgentCandidate(id, Set.of("analysis"), 0, AgentHealth.READY, descriptor);
+    }
+
+    private void agentReturns(String text) {
+        when(agentProvider.invoke(any(AgentSessionConfig.class)))
+                .thenReturn(Multi.createFrom().item(new AgentEvent.TextDelta(text)));
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> Instance<T> presentInstance(T value) {
+        var inst = mock(Instance.class);
+        when(inst.isUnsatisfied()).thenReturn(false);
+        when(inst.get()).thenReturn(value);
+        return inst;
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> Instance<T> absentInstance() {
+        var inst = mock(Instance.class);
+        when(inst.isUnsatisfied()).thenReturn(true);
+        return inst;
+    }
+
+    @Test
+    void idIsLlm() {
+        var strategy = new LlmAgentRoutingStrategy(
+                presentInstance(agentProvider), absentInstance(), absentInstance(), absentInstance());
+        assertThat(strategy.id()).isEqualTo("llm");
+    }
+
+    @Nested
+    class WithoutTrust {
+        private LlmAgentRoutingStrategy strategy;
+
+        @BeforeEach
+        void setUp() {
+            strategy = new LlmAgentRoutingStrategy(
+                    presentInstance(agentProvider), absentInstance(), absentInstance(), absentInstance());
+        }
+
+        @Test
+        void selectsAgentByLlmResponse() {
+            agentReturns("{\"agent\": \"agent-b\", \"reason\": \"best fit\"}");
+            var result = strategy.select(context("analysis"),
+                    List.of(candidate("agent-a"), candidate("agent-b"))).await().indefinitely();
+            assertThat(result).isInstanceOf(AgentAssignment.Assigned.class);
+            assertThat(((AgentAssignment.Assigned) result).workerId()).isEqualTo("agent-b");
+        }
+
+        @Test
+        void emptyCandidatesReturnsUnresolvable() {
+            var result = strategy.select(context("analysis"), List.of()).await().indefinitely();
+            assertThat(result).isInstanceOf(AgentAssignment.Unresolvable.class);
+        }
+
+        @Test
+        void unknownAgentReturnsUnresolvable() {
+            agentReturns("{\"agent\": \"ghost\", \"reason\": \"?\"}");
+            var result = strategy.select(context("analysis"),
+                    List.of(candidate("agent-a"))).await().indefinitely();
+            assertThat(result).isInstanceOf(AgentAssignment.Unresolvable.class);
+        }
+
+        @Test
+        void unparseableResponseReturnsUnresolvable() {
+            agentReturns("not json");
+            var result = strategy.select(context("analysis"),
+                    List.of(candidate("agent-a"))).await().indefinitely();
+            assertThat(result).isInstanceOf(AgentAssignment.Unresolvable.class);
+        }
+
+        @Test
+        void providerFailureReturnsUnresolvable() {
+            when(agentProvider.invoke(any(AgentSessionConfig.class)))
+                    .thenReturn(Multi.createFrom().failure(new RuntimeException("LLM down")));
+            var result = strategy.select(context("analysis"),
+                    List.of(candidate("agent-a"))).await().indefinitely();
+            assertThat(result).isInstanceOf(AgentAssignment.Unresolvable.class);
+        }
+
+        @Test
+        void neverReturnsEscalateWithoutTrust() {
+            agentReturns("{\"agent\": \"agent-a\", \"reason\": \"ok\"}");
+            var result = strategy.select(context("analysis"),
+                    List.of(candidate("agent-a"))).await().indefinitely();
+            assertThat(result).isNotInstanceOf(AgentAssignment.EscalateToOversight.class);
+        }
+    }
+
+    @Nested
+    class WithTrust {
+        private LlmAgentRoutingStrategy strategy;
+        private TrustRoutingPolicy policy;
+
+        @BeforeEach
+        void setUp() {
+            policy = new TrustRoutingPolicy(0.7, 5, 0.1, 0.5, Map.of(), false, null);
+            lenient().when(policyProvider.forCapability(anyString())).thenReturn(policy);
+            strategy = new LlmAgentRoutingStrategy(
+                    presentInstance(agentProvider), presentInstance(classifier),
+                    presentInstance(scoreSource), presentInstance(policyProvider));
+        }
+
+        @Test
+        void excludedCandidatesFilteredBeforeLlm() {
+            var good = candidate("qualified-agent");
+            var bad = candidate("excluded-agent");
+            var classified = List.of(
+                    new TrustCandidateClassifier.ClassifiedCandidate(
+                            good, TrustCandidateClassifier.Phase.QUALIFIED,
+                            OptionalDouble.of(0.9), 1.0),
+                    new TrustCandidateClassifier.ClassifiedCandidate(
+                            bad, TrustCandidateClassifier.Phase.EXCLUDED_PHASE2B,
+                            OptionalDouble.of(0.3), 1.0));
+            when(classifier.classify(any(), eq("analysis"), eq(policy), eq(scoreSource)))
+                    .thenReturn(classified);
+            agentReturns("{\"agent\": \"qualified-agent\", \"reason\": \"only option\"}");
+
+            var result = strategy.select(context("analysis"),
+                    List.of(good, bad)).await().indefinitely();
+            assertThat(result).isInstanceOf(AgentAssignment.Assigned.class);
+            assertThat(((AgentAssignment.Assigned) result).workerId()).isEqualTo("qualified-agent");
+        }
+
+        @Test
+        void borderlineOnlyPoolEscalates() {
+            var a = candidate("borderline-a");
+            var classified = List.of(
+                    new TrustCandidateClassifier.ClassifiedCandidate(
+                            a, TrustCandidateClassifier.Phase.BORDERLINE,
+                            OptionalDouble.of(0.65), 1.0));
+            when(classifier.classify(any(), eq("analysis"), eq(policy), eq(scoreSource)))
+                    .thenReturn(classified);
+            when(classifier.decide(any(), any(), eq("analysis")))
+                    .thenReturn(AgentAssignment.escalate("analysis", EscalationReason.BORDERLINE_STALEMATE, "all borderline"));
+
+            var result = strategy.select(context("analysis"), List.of(a)).await().indefinitely();
+            assertThat(result).isInstanceOf(AgentAssignment.EscalateToOversight.class);
+            assertThat(((AgentAssignment.EscalateToOversight) result).reason())
+                    .isEqualTo(EscalationReason.BORDERLINE_STALEMATE);
+        }
+
+        @Test
+        void bootstrapGuardEscalatesWhenPolicyRequires() {
+            var bootstrapPolicy = new TrustRoutingPolicy(0.7, 5, 0.1, 0.5, Map.of(), true, null);
+            when(policyProvider.forCapability("analysis")).thenReturn(bootstrapPolicy);
+            var a = candidate("bootstrap-agent");
+            var classified = List.of(
+                    new TrustCandidateClassifier.ClassifiedCandidate(
+                            a, TrustCandidateClassifier.Phase.BOOTSTRAP,
+                            OptionalDouble.empty(), 1.0));
+            when(classifier.classify(any(), eq("analysis"), eq(bootstrapPolicy), eq(scoreSource)))
+                    .thenReturn(classified);
+
+            var result = strategy.select(context("analysis"), List.of(a)).await().indefinitely();
+            assertThat(result).isInstanceOf(AgentAssignment.EscalateToOversight.class);
+            assertThat(((AgentAssignment.EscalateToOversight) result).reason())
+                    .isEqualTo(EscalationReason.NO_QUALIFIED_AGENT);
+        }
+    }
+
+    @Nested
+    class InertWhenNoProvider {
+        @Test
+        void returnsUnresolvableWhenAgentProviderAbsent() {
+            var strategy = new LlmAgentRoutingStrategy(
+                    absentInstance(), absentInstance(), absentInstance(), absentInstance());
+            var result = strategy.select(context("analysis"),
+                    List.of(candidate("agent-a"))).await().indefinitely();
+            assertThat(result).isInstanceOf(AgentAssignment.Unresolvable.class);
+        }
+    }
+}

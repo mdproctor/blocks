@@ -1,0 +1,320 @@
+/*
+ * Copyright 2026-Present The Case Hub Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.casehub.blocks.routing.agent;
+
+import io.casehub.api.spi.routing.AgentAssignment;
+import io.casehub.api.spi.routing.AgentCandidate;
+import io.casehub.api.spi.routing.AgentRoutingContext;
+import io.casehub.api.spi.routing.AgentRoutingStrategy;
+import io.casehub.api.spi.routing.EscalationReason;
+import io.casehub.api.spi.routing.TrustRoutingPolicy;
+import io.casehub.api.spi.routing.TrustRoutingPolicyProvider;
+import io.casehub.eidos.api.AgentGraphQuery;
+import io.casehub.ledger.api.spi.TrustScoreSource;
+import io.casehub.ledger.routing.TrustCandidateClassifier;
+import io.casehub.ledger.routing.TrustCandidateClassifier.ClassifiedCandidate;
+import io.casehub.ledger.routing.TrustCandidateClassifier.Phase;
+import io.casehub.ledger.routing.TrustCandidateClassifier.ScoredCandidate;
+import io.casehub.neocortex.memory.MemoryDomain;
+import io.casehub.neocortex.memory.cbr.CbrCase;
+import io.casehub.neocortex.memory.cbr.CbrCaseMemoryStore;
+import io.casehub.neocortex.memory.cbr.CbrQuery;
+import io.casehub.neocortex.memory.cbr.PlanCbrCase;
+import io.casehub.neocortex.memory.cbr.PlanTrace;
+import io.casehub.neocortex.memory.cbr.ScoredCbrCase;
+import io.smallrye.mutiny.Uni;
+import io.smallrye.mutiny.infrastructure.Infrastructure;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Instance;
+import jakarta.inject.Inject;
+import org.jspecify.annotations.Nullable;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/**
+ * {@link AgentRoutingStrategy} that uses case-based reasoning (CBR) to select agents based on
+ * historical success patterns, with optional trust-based classification and filtering.
+ *
+ * <h3>Operation modes</h3>
+ *
+ * <ul>
+ *   <li><b>CBR mode</b>: when {@link CbrCaseMemoryStore} is available, retrieves similar past
+ *       cases and analyses worker success rates from plan traces.
+ *   <li><b>Graph fallback mode</b>: when CBR produces no match but {@link AgentGraphQuery} is
+ *       available, delegates to graph-based outcome ranking.
+ *   <li><b>Trust-filtered mode</b>: when {@link TrustCandidateClassifier}, {@link
+ *       TrustScoreSource}, and {@link TrustRoutingPolicyProvider} are available, applies
+ *       trust-based pre-screening before CBR analysis.
+ * </ul>
+ *
+ * <h3>Trust classification flow</h3>
+ *
+ * When trust services are present, follows the four-phase trust maturity model:
+ *
+ * <ol>
+ *   <li>Classify all candidates via {@link TrustCandidateClassifier}.
+ *   <li>Apply bootstrap guard: if {@code bootstrapEscalationRequired} is {@code true} and only
+ *       BOOTSTRAP candidates exist, escalate with {@link EscalationReason#NO_QUALIFIED_AGENT}.
+ *   <li>Filter eligible candidates: exclude BORDERLINE, EXCLUDED_PHASE2B, and EXCLUDED_PHASE3.
+ *       Also exclude BOOTSTRAP when {@code bootstrapEscalationRequired} is {@code true}.
+ *   <li>If eligible pool is empty after filtering, delegate escalation decision to {@link
+ *       TrustCandidateClassifier#decide}.
+ *   <li>Otherwise, proceed with CBR analysis using the filtered pool.
+ * </ol>
+ *
+ * <h3>CBR analysis</h3>
+ *
+ * <p>Queries {@link CbrCaseMemoryStore} with the current capability and case context. Analyses
+ * retrieved cases by type:
+ *
+ * <ul>
+ *   <li><b>PlanCbrCase</b>: extracts worker success rates from {@link PlanTrace} entries matching
+ *       the current capability. Selects the worker with the highest success rate (ties broken by
+ *       total observation count).
+ *   <li><b>TextualCbrCase / FeatureVectorCbrCase</b>: lack worker identity, produce no match.
+ * </ul>
+ *
+ * <h3>Fallback chain</h3>
+ *
+ * <p>If CBR produces no match:
+ *
+ * <ol>
+ *   <li>Try {@link AgentGraphQuery#topAgentsByOutcome} if available — returns first graph-ranked
+ *       agent that appears in the eligible pool.
+ *   <li>If trust classified and graph also failed, delegate to {@link
+ *       TrustCandidateClassifier#decide}.
+ *   <li>Otherwise, return {@link AgentAssignment#unresolvable}.
+ * </ol>
+ *
+ * <p>All blocking work runs on {@code Infrastructure.getDefaultWorkerPool()} via {@code
+ * Uni.emitOn()}.
+ */
+@ApplicationScoped
+public class CbrAgentRoutingStrategy implements AgentRoutingStrategy {
+
+  private static final System.Logger LOG =
+      System.getLogger(CbrAgentRoutingStrategy.class.getName());
+  private static final int DEFAULT_TOP_K = 10;
+
+  private final @Nullable CbrCaseMemoryStore cbrStore;
+  private final @Nullable AgentGraphQuery graphQuery;
+  private final @Nullable TrustCandidateClassifier classifier;
+  private final @Nullable TrustScoreSource scoreSource;
+  private final @Nullable TrustRoutingPolicyProvider policyProvider;
+
+  @Inject
+  public CbrAgentRoutingStrategy(
+      final Instance<CbrCaseMemoryStore> cbrStore,
+      final Instance<AgentGraphQuery> graphQuery,
+      final Instance<TrustCandidateClassifier> classifier,
+      final Instance<TrustScoreSource> scoreSource,
+      final Instance<TrustRoutingPolicyProvider> policyProvider) {
+    this.cbrStore = cbrStore.isUnsatisfied() ? null : cbrStore.get();
+    this.graphQuery = graphQuery.isUnsatisfied() ? null : graphQuery.get();
+    this.classifier = classifier.isUnsatisfied() ? null : classifier.get();
+    this.scoreSource = scoreSource.isUnsatisfied() ? null : scoreSource.get();
+    this.policyProvider = policyProvider.isUnsatisfied() ? null : policyProvider.get();
+  }
+
+  @Override
+  public String id() {
+    return "cbr";
+  }
+
+  @Override
+  public Uni<AgentAssignment> select(
+      final AgentRoutingContext context, final List<AgentCandidate> candidates) {
+    if (candidates.isEmpty()) {
+      return Uni.createFrom().item(AgentAssignment.unresolvable("no candidates available"));
+    }
+    if (cbrStore == null && graphQuery == null) {
+      return Uni.createFrom()
+          .item(AgentAssignment.unresolvable("CBR and graph query both unavailable"));
+    }
+
+    return Uni.createFrom()
+        .item(() -> doSelect(context, candidates))
+        .emitOn(Infrastructure.getDefaultWorkerPool());
+  }
+
+  private AgentAssignment doSelect(
+      final AgentRoutingContext context, final List<AgentCandidate> candidates) {
+    List<AgentCandidate> eligible = candidates;
+    List<ClassifiedCandidate> classified = null;
+
+    // Trust classification path
+    if (classifier != null && scoreSource != null && policyProvider != null) {
+      final TrustRoutingPolicy policy = policyProvider.forCapability(context.capabilityName());
+      classified = classifier.classify(candidates, context.capabilityName(), policy, scoreSource);
+
+      // Bootstrap guard: pre-screen before CBR analysis
+      if (policy.bootstrapEscalationRequired()) {
+        final boolean hasQualified =
+            classified.stream().anyMatch(c -> c.phase() == Phase.QUALIFIED);
+        final boolean hasBootstrap =
+            classified.stream().anyMatch(c -> c.phase() == Phase.BOOTSTRAP);
+        if (!hasQualified && hasBootstrap) {
+          return AgentAssignment.escalate(
+              context.capabilityName(),
+              EscalationReason.NO_QUALIFIED_AGENT,
+              "bootstrap only — no qualified agents for capability '%s'"
+                  .formatted(context.capabilityName()));
+        }
+      }
+
+      // Filter eligible candidates
+      eligible =
+          classified.stream()
+              .filter(c -> !c.isExcluded())
+              .filter(c -> !policy.bootstrapEscalationRequired() || c.phase() != Phase.BOOTSTRAP)
+              .map(ClassifiedCandidate::candidate)
+              .toList();
+
+      // If no eligible candidates remain, delegate to classifier.decide
+      if (eligible.isEmpty()) {
+        final List<ScoredCandidate> scored =
+            classified.stream()
+                .map(c -> new ScoredCandidate(c, 0.0, "excluded by trust filter"))
+                .toList();
+        return classifier.decide(classified, scored, context.capabilityName());
+      }
+    }
+
+    final Set<String> eligibleIds =
+        eligible.stream().map(AgentCandidate::workerId).collect(Collectors.toSet());
+
+    // Try CBR store first
+    if (cbrStore != null) {
+      final String cbrResult = tryCbrStore(context, eligibleIds);
+      if (cbrResult != null) {
+        return AgentAssignment.assign(
+            cbrResult, "CBR selected based on historical success rate");
+      }
+    }
+
+    // Fallback to graph query
+    if (graphQuery != null) {
+      final String graphResult = tryGraphQuery(context, eligibleIds);
+      if (graphResult != null) {
+        return AgentAssignment.assign(graphResult, "graph query fallback — CBR produced no match");
+      }
+    }
+
+    // Neither source produced a match — if trust classified, delegate decision
+    if (classified != null) {
+      final List<ScoredCandidate> scored =
+          classified.stream().map(c -> new ScoredCandidate(c, 0.0, "no CBR or graph match")).toList();
+      return classifier.decide(classified, scored, context.capabilityName());
+    }
+
+    return AgentAssignment.unresolvable("no CBR or graph match found");
+  }
+
+  private @Nullable String tryCbrStore(
+      final AgentRoutingContext context, final Set<String> eligibleIds) {
+    try {
+      CbrQuery query =
+          CbrQuery.of(
+              context.tenancyId(),
+              new MemoryDomain(context.capabilityName()),
+              "agent-routing",
+              Map.of(),
+              DEFAULT_TOP_K);
+      final String caseContextText =
+          context.caseContext() != null ? context.caseContext().toString() : null;
+      if (caseContextText != null && !caseContextText.isBlank()) {
+        query = query.withProblem(caseContextText);
+      }
+
+      final List<ScoredCbrCase<CbrCase>> results = cbrStore.retrieveSimilar(query, CbrCase.class);
+      if (results.isEmpty()) {
+        return null;
+      }
+
+      return analyseByType(results, eligibleIds, context.capabilityName());
+    } catch (final Exception e) {
+      LOG.log(System.Logger.Level.WARNING, "CBR store query failed", e);
+      return null;
+    }
+  }
+
+  private @Nullable String analyseByType(
+      final List<ScoredCbrCase<CbrCase>> results,
+      final Set<String> eligibleIds,
+      final String capabilityName) {
+    // Tally worker success rates from plan traces
+    final Map<String, int[]> workerStats = new HashMap<>(); // [successes, total]
+
+    for (final var scored : results) {
+      final var cbrCase = scored.cbrCase();
+      if (cbrCase instanceof PlanCbrCase planCase) {
+        for (final PlanTrace trace : planCase.planTrace()) {
+          if (capabilityName.equals(trace.capabilityName())
+              && trace.workerName() != null
+              && eligibleIds.contains(trace.workerName())) {
+            final var stats = workerStats.computeIfAbsent(trace.workerName(), k -> new int[] {0, 0});
+            stats[1]++;
+            if ("SUCCESS".equals(trace.stepOutcome())) {
+              stats[0]++;
+            }
+          }
+        }
+      }
+      // TextualCbrCase and FeatureVectorCbrCase lack worker identity — skip
+    }
+
+    if (workerStats.isEmpty()) {
+      return null;
+    }
+
+    // Pick worker with highest success rate (ties broken by total count)
+    String bestWorker = null;
+    double bestRate = -1;
+    int bestCount = 0;
+    for (final var entry : workerStats.entrySet()) {
+      final int successes = entry.getValue()[0];
+      final int total = entry.getValue()[1];
+      final double rate = (double) successes / total;
+      if (rate > bestRate || (rate == bestRate && total > bestCount)) {
+        bestRate = rate;
+        bestCount = total;
+        bestWorker = entry.getKey();
+      }
+    }
+    return bestWorker;
+  }
+
+  private @Nullable String tryGraphQuery(
+      final AgentRoutingContext context, final Set<String> eligibleIds) {
+    try {
+      final var ranked =
+          graphQuery.topAgentsByOutcome(context.capabilityName(), null, null, DEFAULT_TOP_K);
+      for (final var agentId : ranked) {
+        if (eligibleIds.contains(agentId)) {
+          return agentId;
+        }
+      }
+      return null;
+    } catch (final Exception e) {
+      LOG.log(System.Logger.Level.WARNING, "AgentGraphQuery failed", e);
+      return null;
+    }
+  }
+}
