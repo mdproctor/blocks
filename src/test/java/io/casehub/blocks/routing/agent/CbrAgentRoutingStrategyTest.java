@@ -9,6 +9,7 @@ import io.casehub.api.spi.routing.EscalationReason;
 import io.casehub.api.spi.routing.TrustRoutingPolicy;
 import io.casehub.api.spi.routing.TrustRoutingPolicyProvider;
 import io.casehub.eidos.api.AgentGraphQuery;
+import io.casehub.eidos.api.MatchDegree;
 import io.casehub.ledger.api.spi.TrustScoreSource;
 import io.casehub.ledger.routing.TrustCandidateClassifier;
 import io.casehub.neocortex.memory.MemoryDomain;
@@ -39,6 +40,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -55,7 +57,7 @@ class CbrAgentRoutingStrategyTest {
     }
 
     private AgentCandidate candidate(String id) {
-        return new AgentCandidate(id, Set.of("analysis"), 0, AgentHealth.READY, null);
+        return new AgentCandidate(id, Set.of("analysis"), 0, AgentHealth.READY, null, new MatchDegree.None());
     }
 
     @SuppressWarnings("unchecked")
@@ -76,6 +78,7 @@ class CbrAgentRoutingStrategyTest {
     @Test
     void idIsCbr() {
         var strategy = new CbrAgentRoutingStrategy(
+                10, 0.5,
                 absentInstance(), absentInstance(), absentInstance(), absentInstance(), absentInstance());
         assertThat(strategy.id()).isEqualTo("cbr");
     }
@@ -87,6 +90,7 @@ class CbrAgentRoutingStrategyTest {
         @BeforeEach
         void setUp() {
             strategy = new CbrAgentRoutingStrategy(
+                    10, 0.5,
                     presentInstance(cbrStore), presentInstance(graphQuery),
                     absentInstance(), absentInstance(), absentInstance());
         }
@@ -130,6 +134,38 @@ class CbrAgentRoutingStrategyTest {
             // Falls through to AgentGraphQuery or Unresolvable
             assertThat(result).isNotNull();
         }
+
+        @Test
+        void usesConfiguredTopKAndMinSimilarity() {
+            var customStrategy = new CbrAgentRoutingStrategy(
+                    5, 0.8,
+                    presentInstance(cbrStore), presentInstance(graphQuery),
+                    absentInstance(), absentInstance(), absentInstance());
+
+            when(cbrStore.retrieveSimilar(any(CbrQuery.class), eq(CbrCase.class)))
+                    .thenReturn(List.of());
+            when(graphQuery.topAgentsByOutcome(eq("analysis"), any(), any(), eq(5)))
+                    .thenReturn(List.of("agent-a"));
+
+            var result = customStrategy.select(context("analysis"),
+                    List.of(candidate("agent-a"))).await().indefinitely();
+
+            assertThat(result).isInstanceOf(AgentAssignment.Assigned.class);
+        }
+
+        @Test
+        void nullNodeCaseContextBuildsQueryWithoutProblem() {
+            when(cbrStore.retrieveSimilar(any(CbrQuery.class), eq(CbrCase.class)))
+                    .thenReturn(List.of());
+            when(graphQuery.topAgentsByOutcome(eq("analysis"), any(), any(), eq(10)))
+                    .thenReturn(List.of("agent-a"));
+
+            var nullContext = new AgentRoutingContext(
+                    UUID.randomUUID(), "analysis", NullNode.instance, "test-tenant");
+            var result = strategy.select(nullContext,
+                    List.of(candidate("agent-a"))).await().indefinitely();
+            assertThat(result).isInstanceOf(AgentAssignment.Assigned.class);
+        }
     }
 
     @Nested
@@ -141,6 +177,7 @@ class CbrAgentRoutingStrategyTest {
                     .thenReturn(List.of(new ScoredCbrCase<>(textCase, 0.9)));
 
             var strategy = new CbrAgentRoutingStrategy(
+                    10, 0.5,
                     presentInstance(cbrStore), presentInstance(graphQuery),
                     absentInstance(), absentInstance(), absentInstance());
 
@@ -159,6 +196,7 @@ class CbrAgentRoutingStrategyTest {
                     .thenReturn(List.of("agent-b", "agent-a"));
 
             var strategy = new CbrAgentRoutingStrategy(
+                    10, 0.5,
                     absentInstance(), presentInstance(graphQuery),
                     absentInstance(), absentInstance(), absentInstance());
 
@@ -171,6 +209,7 @@ class CbrAgentRoutingStrategyTest {
         @Test
         void bothSourcesUnavailableReturnsUnresolvable() {
             var strategy = new CbrAgentRoutingStrategy(
+                    10, 0.5,
                     absentInstance(), absentInstance(),
                     absentInstance(), absentInstance(), absentInstance());
             var result = strategy.select(context("analysis"),
@@ -181,6 +220,7 @@ class CbrAgentRoutingStrategyTest {
         @Test
         void emptyCandidatesReturnsUnresolvable() {
             var strategy = new CbrAgentRoutingStrategy(
+                    10, 0.5,
                     presentInstance(cbrStore), absentInstance(),
                     absentInstance(), absentInstance(), absentInstance());
             var result = strategy.select(context("analysis"), List.of()).await().indefinitely();
@@ -209,6 +249,7 @@ class CbrAgentRoutingStrategyTest {
                     .thenReturn(List.of("qualified"));
 
             var strategy = new CbrAgentRoutingStrategy(
+                    10, 0.5,
                     absentInstance(), presentInstance(graphQuery),
                     presentInstance(classifier), presentInstance(scoreSource),
                     presentInstance(policyProvider));
@@ -217,6 +258,127 @@ class CbrAgentRoutingStrategyTest {
                     List.of(good, bad)).await().indefinitely();
             assertThat(result).isInstanceOf(AgentAssignment.Assigned.class);
             assertThat(((AgentAssignment.Assigned) result).workerId()).isEqualTo("qualified");
+        }
+
+        @Test
+        void qualifiedPlusBorderlineFiltersOnlyBorderline() {
+            var policy = new TrustRoutingPolicy(0.7, 5, 0.1, 0.5, Map.of(), false, null);
+            when(policyProvider.forCapability("analysis")).thenReturn(policy);
+            var qualified = candidate("qual-agent");
+            var borderline = candidate("border-agent");
+            var classified = List.of(
+                    new TrustCandidateClassifier.ClassifiedCandidate(
+                            qualified, TrustCandidateClassifier.Phase.QUALIFIED,
+                            OptionalDouble.of(0.9), 1.0),
+                    new TrustCandidateClassifier.ClassifiedCandidate(
+                            borderline, TrustCandidateClassifier.Phase.BORDERLINE,
+                            OptionalDouble.of(0.65), 1.0));
+            when(classifier.classify(any(), eq("analysis"), eq(policy), eq(scoreSource)))
+                    .thenReturn(classified);
+            when(graphQuery.topAgentsByOutcome(eq("analysis"), any(), any(), eq(10)))
+                    .thenReturn(List.of("qual-agent"));
+
+            var strategy = new CbrAgentRoutingStrategy(
+                    10, 0.5,
+                    absentInstance(), presentInstance(graphQuery),
+                    presentInstance(classifier), presentInstance(scoreSource),
+                    presentInstance(policyProvider));
+
+            var result = strategy.select(context("analysis"),
+                    List.of(qualified, borderline)).await().indefinitely();
+            assertThat(result).isInstanceOf(AgentAssignment.Assigned.class);
+            assertThat(((AgentAssignment.Assigned) result).workerId()).isEqualTo("qual-agent");
+        }
+
+        @Test
+        void qualifiedPlusBootstrapGuardOnFiltersBootstrap() {
+            var bootstrapPolicy = new TrustRoutingPolicy(0.7, 5, 0.1, 0.5, Map.of(), true, null);
+            when(policyProvider.forCapability("analysis")).thenReturn(bootstrapPolicy);
+            var qualified = candidate("qual-agent");
+            var bootstrap = candidate("boot-agent");
+            var classified = List.of(
+                    new TrustCandidateClassifier.ClassifiedCandidate(
+                            qualified, TrustCandidateClassifier.Phase.QUALIFIED,
+                            OptionalDouble.of(0.9), 1.0),
+                    new TrustCandidateClassifier.ClassifiedCandidate(
+                            bootstrap, TrustCandidateClassifier.Phase.BOOTSTRAP,
+                            OptionalDouble.empty(), 1.0));
+            when(classifier.classify(any(), eq("analysis"), eq(bootstrapPolicy), eq(scoreSource)))
+                    .thenReturn(classified);
+            when(graphQuery.topAgentsByOutcome(eq("analysis"), any(), any(), eq(10)))
+                    .thenReturn(List.of("qual-agent"));
+
+            var strategy = new CbrAgentRoutingStrategy(
+                    10, 0.5,
+                    absentInstance(), presentInstance(graphQuery),
+                    presentInstance(classifier), presentInstance(scoreSource),
+                    presentInstance(policyProvider));
+
+            var result = strategy.select(context("analysis"),
+                    List.of(qualified, bootstrap)).await().indefinitely();
+            assertThat(result).isInstanceOf(AgentAssignment.Assigned.class);
+            assertThat(((AgentAssignment.Assigned) result).workerId()).isEqualTo("qual-agent");
+        }
+
+        @Test
+        void qualifiedPlusBootstrapGuardOffPassesBothThrough() {
+            var policy = new TrustRoutingPolicy(0.7, 5, 0.1, 0.5, Map.of(), false, null);
+            when(policyProvider.forCapability("analysis")).thenReturn(policy);
+            var qualified = candidate("qual-agent");
+            var bootstrap = candidate("boot-agent");
+            var classified = List.of(
+                    new TrustCandidateClassifier.ClassifiedCandidate(
+                            qualified, TrustCandidateClassifier.Phase.QUALIFIED,
+                            OptionalDouble.of(0.9), 1.0),
+                    new TrustCandidateClassifier.ClassifiedCandidate(
+                            bootstrap, TrustCandidateClassifier.Phase.BOOTSTRAP,
+                            OptionalDouble.empty(), 1.0));
+            when(classifier.classify(any(), eq("analysis"), eq(policy), eq(scoreSource)))
+                    .thenReturn(classified);
+            when(graphQuery.topAgentsByOutcome(eq("analysis"), any(), any(), eq(10)))
+                    .thenReturn(List.of("boot-agent", "qual-agent"));
+
+            var strategy = new CbrAgentRoutingStrategy(
+                    10, 0.5,
+                    absentInstance(), presentInstance(graphQuery),
+                    presentInstance(classifier), presentInstance(scoreSource),
+                    presentInstance(policyProvider));
+
+            var result = strategy.select(context("analysis"),
+                    List.of(qualified, bootstrap)).await().indefinitely();
+            assertThat(result).isInstanceOf(AgentAssignment.Assigned.class);
+            assertThat(((AgentAssignment.Assigned) result).workerId()).isEqualTo("boot-agent");
+        }
+
+        @Test
+        void noMatchFallsBackToClassifierDecideWhenTrustPresent() {
+            var policy = new TrustRoutingPolicy(0.7, 5, 0.1, 0.5, Map.of(), false, null);
+            when(policyProvider.forCapability("analysis")).thenReturn(policy);
+            var candidate = candidate("qualified");
+            var classified = List.of(
+                    new TrustCandidateClassifier.ClassifiedCandidate(
+                            candidate, TrustCandidateClassifier.Phase.QUALIFIED,
+                            OptionalDouble.of(0.9), 1.0));
+            when(classifier.classify(any(), eq("analysis"), eq(policy), eq(scoreSource)))
+                    .thenReturn(classified);
+            // CBR returns empty, graph returns no match
+            when(cbrStore.retrieveSimilar(any(CbrQuery.class), eq(CbrCase.class)))
+                    .thenReturn(List.of());
+            when(graphQuery.topAgentsByOutcome(eq("analysis"), any(), any(), eq(10)))
+                    .thenReturn(List.of());
+            when(classifier.decide(any(), any(), eq("analysis")))
+                    .thenReturn(AgentAssignment.assign("qualified", "classifier fallback"));
+
+            var strategy = new CbrAgentRoutingStrategy(
+                    10, 0.5,
+                    presentInstance(cbrStore), presentInstance(graphQuery),
+                    presentInstance(classifier), presentInstance(scoreSource),
+                    presentInstance(policyProvider));
+
+            var result = strategy.select(context("analysis"),
+                    List.of(candidate)).await().indefinitely();
+            assertThat(result).isInstanceOf(AgentAssignment.Assigned.class);
+            verify(classifier).decide(any(), any(), eq("analysis"));
         }
     }
 }

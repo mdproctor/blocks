@@ -20,13 +20,10 @@ import io.casehub.api.spi.routing.AgentCandidate;
 import io.casehub.api.spi.routing.AgentRoutingContext;
 import io.casehub.api.spi.routing.AgentRoutingStrategy;
 import io.casehub.api.spi.routing.EscalationReason;
-import io.casehub.api.spi.routing.TrustRoutingPolicy;
 import io.casehub.api.spi.routing.TrustRoutingPolicyProvider;
 import io.casehub.eidos.api.AgentGraphQuery;
 import io.casehub.ledger.api.spi.TrustScoreSource;
 import io.casehub.ledger.routing.TrustCandidateClassifier;
-import io.casehub.ledger.routing.TrustCandidateClassifier.ClassifiedCandidate;
-import io.casehub.ledger.routing.TrustCandidateClassifier.Phase;
 import io.casehub.ledger.routing.TrustCandidateClassifier.ScoredCandidate;
 import io.casehub.neocortex.memory.MemoryDomain;
 import io.casehub.neocortex.memory.cbr.CbrCase;
@@ -40,6 +37,7 @@ import io.smallrye.mutiny.infrastructure.Infrastructure;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jspecify.annotations.Nullable;
 
 import java.util.HashMap;
@@ -111,8 +109,9 @@ public class CbrAgentRoutingStrategy implements AgentRoutingStrategy {
 
   private static final System.Logger LOG =
       System.getLogger(CbrAgentRoutingStrategy.class.getName());
-  private static final int DEFAULT_TOP_K = 10;
 
+  private final int topK;
+  private final double minSimilarity;
   private final @Nullable CbrCaseMemoryStore cbrStore;
   private final @Nullable AgentGraphQuery graphQuery;
   private final @Nullable TrustCandidateClassifier classifier;
@@ -121,11 +120,16 @@ public class CbrAgentRoutingStrategy implements AgentRoutingStrategy {
 
   @Inject
   public CbrAgentRoutingStrategy(
+      @ConfigProperty(name = "casehub.blocks.cbr.top-k", defaultValue = "10") final int topK,
+      @ConfigProperty(name = "casehub.blocks.cbr.min-similarity",
+                      defaultValue = "0.5") final double minSimilarity,
       final Instance<CbrCaseMemoryStore> cbrStore,
       final Instance<AgentGraphQuery> graphQuery,
       final Instance<TrustCandidateClassifier> classifier,
       final Instance<TrustScoreSource> scoreSource,
       final Instance<TrustRoutingPolicyProvider> policyProvider) {
+    this.topK = topK;
+    this.minSimilarity = minSimilarity;
     this.cbrStore = cbrStore.isUnsatisfied() ? null : cbrStore.get();
     this.graphQuery = graphQuery.isUnsatisfied() ? null : graphQuery.get();
     this.classifier = classifier.isUnsatisfied() ? null : classifier.get();
@@ -156,47 +160,15 @@ public class CbrAgentRoutingStrategy implements AgentRoutingStrategy {
 
   private AgentAssignment doSelect(
       final AgentRoutingContext context, final List<AgentCandidate> candidates) {
-    List<AgentCandidate> eligible = candidates;
-    List<ClassifiedCandidate> classified = null;
+    final var trustOutcome = RoutingSupport.applyTrustFilter(
+        classifier, scoreSource, policyProvider, context, candidates);
 
-    // Trust classification path
-    if (classifier != null && scoreSource != null && policyProvider != null) {
-      final TrustRoutingPolicy policy = policyProvider.forCapability(context.capabilityName());
-      classified = classifier.classify(candidates, context.capabilityName(), policy, scoreSource);
-
-      // Bootstrap guard: pre-screen before CBR analysis
-      if (policy.bootstrapEscalationRequired()) {
-        final boolean hasQualified =
-            classified.stream().anyMatch(c -> c.phase() == Phase.QUALIFIED);
-        final boolean hasBootstrap =
-            classified.stream().anyMatch(c -> c.phase() == Phase.BOOTSTRAP);
-        if (!hasQualified && hasBootstrap) {
-          return AgentAssignment.escalate(
-              context.capabilityName(),
-              EscalationReason.NO_QUALIFIED_AGENT,
-              "bootstrap only — no qualified agents for capability '%s'"
-                  .formatted(context.capabilityName()));
-        }
-      }
-
-      // Filter eligible candidates
-      eligible =
-          classified.stream()
-              .filter(c -> !c.isExcluded())
-              .filter(c -> !policy.bootstrapEscalationRequired() || c.phase() != Phase.BOOTSTRAP)
-              .map(ClassifiedCandidate::candidate)
-              .toList();
-
-      // If no eligible candidates remain, delegate to classifier.decide
-      if (eligible.isEmpty()) {
-        final List<ScoredCandidate> scored =
-            classified.stream()
-                .map(c -> new ScoredCandidate(c, 0.0, "excluded by trust filter"))
-                .toList();
-        return classifier.decide(classified, scored, context.capabilityName());
-      }
+    if (trustOutcome instanceof RoutingSupport.TrustFilterOutcome.Decided decided) {
+      return decided.assignment();
     }
 
+    final var proceed = (RoutingSupport.TrustFilterOutcome.Proceed) trustOutcome;
+    final var eligible = proceed.eligible();
     final Set<String> eligibleIds =
         eligible.stream().map(AgentCandidate::workerId).collect(Collectors.toSet());
 
@@ -218,10 +190,12 @@ public class CbrAgentRoutingStrategy implements AgentRoutingStrategy {
     }
 
     // Neither source produced a match — if trust classified, delegate decision
-    if (classified != null) {
+    if (proceed.classified() != null) {
       final List<ScoredCandidate> scored =
-          classified.stream().map(c -> new ScoredCandidate(c, 0.0, "no CBR or graph match")).toList();
-      return classifier.decide(classified, scored, context.capabilityName());
+          proceed.classified().stream()
+              .map(c -> new ScoredCandidate(c, 0.0, "no CBR or graph match"))
+              .toList();
+      return classifier.decide(proceed.classified(), scored, context.capabilityName());
     }
 
     return AgentAssignment.unresolvable("no CBR or graph match found");
@@ -236,9 +210,11 @@ public class CbrAgentRoutingStrategy implements AgentRoutingStrategy {
               new MemoryDomain(context.capabilityName()),
               "agent-routing",
               Map.of(),
-              DEFAULT_TOP_K);
+              topK)
+              .withMinSimilarity(minSimilarity);
       final String caseContextText =
-          context.caseContext() != null ? context.caseContext().toString() : null;
+          context.caseContext() != null && !context.caseContext().isNull()
+          ? context.caseContext().toString() : null;
       if (caseContextText != null && !caseContextText.isBlank()) {
         query = query.withProblem(caseContextText);
       }
@@ -305,7 +281,7 @@ public class CbrAgentRoutingStrategy implements AgentRoutingStrategy {
       final AgentRoutingContext context, final Set<String> eligibleIds) {
     try {
       final var ranked =
-          graphQuery.topAgentsByOutcome(context.capabilityName(), null, null, DEFAULT_TOP_K);
+          graphQuery.topAgentsByOutcome(context.capabilityName(), null, null, topK);
       for (final var agentId : ranked) {
         if (eligibleIds.contains(agentId)) {
           return agentId;

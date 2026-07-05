@@ -15,8 +15,19 @@
  */
 package io.casehub.blocks.routing.agent;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.casehub.api.spi.routing.AgentAssignment;
 import io.casehub.api.spi.routing.AgentCandidate;
+import io.casehub.api.spi.routing.AgentRoutingContext;
+import io.casehub.api.spi.routing.EscalationReason;
+import io.casehub.api.spi.routing.TrustRoutingPolicy;
+import io.casehub.api.spi.routing.TrustRoutingPolicyProvider;
 import io.casehub.eidos.api.AgentCapability;
+import io.casehub.ledger.api.spi.TrustScoreSource;
+import io.casehub.ledger.routing.TrustCandidateClassifier;
+import io.casehub.ledger.routing.TrustCandidateClassifier.ClassifiedCandidate;
+import io.casehub.ledger.routing.TrustCandidateClassifier.Phase;
+import io.casehub.ledger.routing.TrustCandidateClassifier.ScoredCandidate;
 import io.casehub.platform.agent.AgentEvent;
 import io.casehub.platform.agent.AgentProvider;
 import io.casehub.platform.agent.AgentSessionConfig;
@@ -25,9 +36,65 @@ import org.jspecify.annotations.Nullable;
 import java.util.List;
 import java.util.stream.Collectors;
 
-final class LlmRoutingSupport {
+final class RoutingSupport {
 
-    private LlmRoutingSupport() {}
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    private RoutingSupport() {}
+
+    sealed interface TrustFilterOutcome {
+        record Proceed(List<AgentCandidate> eligible,
+                       @Nullable List<ClassifiedCandidate> classified)
+                implements TrustFilterOutcome {}
+        record Decided(AgentAssignment assignment)
+                implements TrustFilterOutcome {}
+    }
+
+    static TrustFilterOutcome applyTrustFilter(
+            @Nullable TrustCandidateClassifier classifier,
+            @Nullable TrustScoreSource scoreSource,
+            @Nullable TrustRoutingPolicyProvider policyProvider,
+            AgentRoutingContext context,
+            List<AgentCandidate> candidates) {
+
+        if (classifier == null || scoreSource == null || policyProvider == null) {
+            return new TrustFilterOutcome.Proceed(candidates, null);
+        }
+
+        TrustRoutingPolicy policy = policyProvider.forCapability(context.capabilityName());
+        List<ClassifiedCandidate> classified =
+                classifier.classify(candidates, context.capabilityName(), policy, scoreSource);
+
+        if (policy.bootstrapEscalationRequired()) {
+            boolean hasQualified =
+                    classified.stream().anyMatch(c -> c.phase() == Phase.QUALIFIED);
+            boolean hasBootstrap =
+                    classified.stream().anyMatch(c -> c.phase() == Phase.BOOTSTRAP);
+            if (!hasQualified && hasBootstrap) {
+                return new TrustFilterOutcome.Decided(AgentAssignment.escalate(
+                        context.capabilityName(),
+                        EscalationReason.NO_QUALIFIED_AGENT,
+                        "bootstrap only — no qualified agents for capability '%s'"
+                                .formatted(context.capabilityName())));
+            }
+        }
+
+        List<AgentCandidate> eligible = classified.stream()
+                .filter(c -> !c.isExcluded())
+                .filter(c -> !policy.bootstrapEscalationRequired() || c.phase() != Phase.BOOTSTRAP)
+                .map(ClassifiedCandidate::candidate)
+                .toList();
+
+        if (eligible.isEmpty()) {
+            List<ScoredCandidate> scored = classified.stream()
+                    .map(c -> new ScoredCandidate(c, 0.0, "excluded by trust filter"))
+                    .toList();
+            return new TrustFilterOutcome.Decided(
+                    classifier.decide(classified, scored, context.capabilityName()));
+        }
+
+        return new TrustFilterOutcome.Proceed(eligible, classified);
+    }
 
     static final String SYSTEM_PROMPT = """
             You are an agent router. Given a capability name, case context, and a list of \
@@ -93,28 +160,34 @@ final class LlmRoutingSupport {
     }
 
     static @Nullable String extractAgentName(@Nullable String text) {
-        if (text == null) return null;
+        if (text == null || text.isBlank()) return null;
         var trimmed = text.trim();
-        int agentIdx = trimmed.indexOf("\"agent\"");
-        if (agentIdx < 0) return null;
-        int colonIdx = trimmed.indexOf(':', agentIdx);
-        if (colonIdx < 0) return null;
-        int firstQuote = trimmed.indexOf('"', colonIdx + 1);
-        if (firstQuote < 0) return null;
-        int secondQuote = trimmed.indexOf('"', firstQuote + 1);
-        if (secondQuote < 0) return null;
-        return trimmed.substring(firstQuote + 1, secondQuote);
+        if (trimmed.startsWith("```")) {
+            int start = trimmed.indexOf('\n');
+            int end = trimmed.lastIndexOf("```");
+            if (start >= 0 && end > start) {
+                trimmed = trimmed.substring(start + 1, end).trim();
+            }
+        }
+        try {
+            var node = MAPPER.readTree(trimmed);
+            var agentNode = node.get("agent");
+            return agentNode != null && agentNode.isTextual() ? agentNode.asText() : null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     static @Nullable String invokeAndCollect(AgentProvider provider,
                                              String systemPrompt, String userPrompt) {
         try {
             var config = AgentSessionConfig.of(systemPrompt, userPrompt);
-            return provider.invoke(config)
+            var result = provider.invoke(config)
                     .filter(e -> e instanceof AgentEvent.TextDelta)
                     .map(e -> ((AgentEvent.TextDelta) e).text())
                     .collect().with(Collectors.joining())
                     .await().indefinitely();
+            return result == null || result.isBlank() ? null : result;
         } catch (Exception e) {
             return null;
         }

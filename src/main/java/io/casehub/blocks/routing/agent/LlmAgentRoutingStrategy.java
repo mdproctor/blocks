@@ -20,12 +20,9 @@ import io.casehub.api.spi.routing.AgentCandidate;
 import io.casehub.api.spi.routing.AgentRoutingContext;
 import io.casehub.api.spi.routing.AgentRoutingStrategy;
 import io.casehub.api.spi.routing.EscalationReason;
-import io.casehub.api.spi.routing.TrustRoutingPolicy;
 import io.casehub.api.spi.routing.TrustRoutingPolicyProvider;
 import io.casehub.ledger.api.spi.TrustScoreSource;
 import io.casehub.ledger.routing.TrustCandidateClassifier;
-import io.casehub.ledger.routing.TrustCandidateClassifier.ClassifiedCandidate;
-import io.casehub.ledger.routing.TrustCandidateClassifier.Phase;
 import io.casehub.ledger.routing.TrustCandidateClassifier.ScoredCandidate;
 import io.casehub.platform.agent.AgentProvider;
 import io.smallrye.mutiny.Uni;
@@ -68,7 +65,7 @@ import java.util.List;
  *
  * <h3>LLM invocation</h3>
  *
- * Delegates to {@link LlmRoutingSupport} for prompt construction, LLM invocation, and response
+ * Delegates to {@link RoutingSupport} for prompt construction, LLM invocation, and response
  * parsing. Returns {@link AgentAssignment.Unresolvable} on LLM failure, unparseable response, or
  * unknown agent selection.
  *
@@ -121,64 +118,49 @@ public class LlmAgentRoutingStrategy implements AgentRoutingStrategy {
 
   private AgentAssignment doSelect(
       final AgentRoutingContext context, final List<AgentCandidate> candidates) {
-    List<AgentCandidate> eligible = candidates;
-    List<ClassifiedCandidate> classified = null;
+    final var trustOutcome = RoutingSupport.applyTrustFilter(
+        classifier, scoreSource, policyProvider, context, candidates);
 
-    // Trust classification path
-    if (classifier != null && scoreSource != null && policyProvider != null) {
-      final TrustRoutingPolicy policy = policyProvider.forCapability(context.capabilityName());
-      classified = classifier.classify(candidates, context.capabilityName(), policy, scoreSource);
-
-      // Bootstrap guard: pre-screen before scoring
-      if (policy.bootstrapEscalationRequired()) {
-        final boolean hasQualified =
-            classified.stream().anyMatch(c -> c.phase() == Phase.QUALIFIED);
-        final boolean hasBootstrap =
-            classified.stream().anyMatch(c -> c.phase() == Phase.BOOTSTRAP);
-        if (!hasQualified && hasBootstrap) {
-          return AgentAssignment.escalate(
-              context.capabilityName(),
-              EscalationReason.NO_QUALIFIED_AGENT,
-              "bootstrap only — no qualified agents for capability '%s'"
-                  .formatted(context.capabilityName()));
-        }
-      }
-
-      // Filter eligible candidates
-      eligible =
-          classified.stream()
-              .filter(c -> !c.isExcluded())
-              .filter(c -> !policy.bootstrapEscalationRequired() || c.phase() != Phase.BOOTSTRAP)
-              .map(ClassifiedCandidate::candidate)
-              .toList();
-
-      // If no eligible candidates remain, delegate to classifier.decide
-      if (eligible.isEmpty()) {
-        final List<ScoredCandidate> scored =
-            classified.stream().map(c -> new ScoredCandidate(c, 0.0, "excluded")).toList();
-        return classifier.decide(classified, scored, context.capabilityName());
-      }
+    if (trustOutcome instanceof RoutingSupport.TrustFilterOutcome.Decided decided) {
+      return decided.assignment();
     }
 
-    // LLM invocation
-    final String caseContextSummary =
-        context.caseContext() != null ? context.caseContext().toString() : null;
+    final var proceed = (RoutingSupport.TrustFilterOutcome.Proceed) trustOutcome;
+    final var eligible = proceed.eligible();
+
+    // NullNode case context filtering — avoid sending "null" as context to the LLM
+    final String caseContextSummary = context.caseContext() != null
+        && !context.caseContext().isNull()
+            ? context.caseContext().toString()
+            : null;
     final String prompt =
-        LlmRoutingSupport.buildUserPrompt(context.capabilityName(), caseContextSummary, eligible);
+        RoutingSupport.buildUserPrompt(context.capabilityName(), caseContextSummary, eligible);
     final String response =
-        LlmRoutingSupport.invokeAndCollect(
-            agentProvider, LlmRoutingSupport.SYSTEM_PROMPT, prompt);
+        RoutingSupport.invokeAndCollect(agentProvider, RoutingSupport.SYSTEM_PROMPT, prompt);
 
     if (response == null) {
+      if (proceed.classified() != null) {
+        final var scored = proceed.classified().stream()
+            .map(c -> new ScoredCandidate(c, 0.0, "LLM invocation failed"))
+            .toList();
+        return classifier.decide(proceed.classified(), scored, context.capabilityName());
+      }
       return AgentAssignment.unresolvable("LLM invocation failed or returned no response");
     }
 
-    final String workerId = LlmRoutingSupport.parseSelection(response, eligible);
+    final String workerId = RoutingSupport.parseSelection(response, eligible);
     if (workerId == null) {
+      if (proceed.classified() != null) {
+        final var scored = proceed.classified().stream()
+            .map(c -> new ScoredCandidate(c, 0.0, "LLM response unparseable"))
+            .toList();
+        return classifier.decide(proceed.classified(), scored, context.capabilityName());
+      }
       return AgentAssignment.unresolvable(
           "LLM response unparseable or selected unknown agent: " + response);
     }
 
-    return AgentAssignment.assign(workerId, "LLM selected from %d candidates".formatted(eligible.size()));
+    return AgentAssignment.assign(
+        workerId, "LLM selected from %d candidates".formatted(eligible.size()));
   }
 }

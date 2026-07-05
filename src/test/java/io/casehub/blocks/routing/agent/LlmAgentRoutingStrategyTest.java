@@ -11,6 +11,7 @@ import io.casehub.api.spi.routing.TrustRoutingPolicy;
 import io.casehub.api.spi.routing.TrustRoutingPolicyProvider;
 import io.casehub.eidos.api.AgentCapability;
 import io.casehub.eidos.api.AgentDescriptor;
+import io.casehub.eidos.api.MatchDegree;
 import io.casehub.ledger.api.spi.TrustScoreSource;
 import io.casehub.ledger.routing.TrustCandidateClassifier;
 import io.casehub.platform.agent.AgentEvent;
@@ -62,7 +63,7 @@ class LlmAgentRoutingStrategyTest {
                 .agentId(id).name(id).slot("agent").tenancyId("test")
                 .capabilities(List.of(AgentCapability.builder().name("analysis").build()))
                 .briefing(briefing).build();
-        return new AgentCandidate(id, Set.of("analysis"), 0, AgentHealth.READY, descriptor);
+        return new AgentCandidate(id, Set.of("analysis"), 0, AgentHealth.READY, descriptor, new MatchDegree.None());
     }
 
     private void agentReturns(String text) {
@@ -149,6 +150,25 @@ class LlmAgentRoutingStrategyTest {
                     List.of(candidate("agent-a"))).await().indefinitely();
             assertThat(result).isNotInstanceOf(AgentAssignment.EscalateToOversight.class);
         }
+
+        @Test
+        void nullNodeCaseContextNotSentAsStringNull() {
+            agentReturns("{\"agent\": \"agent-a\", \"reason\": \"ok\"}");
+            var nullContext = new AgentRoutingContext(
+                    UUID.randomUUID(), "analysis", NullNode.instance, "test-tenant");
+            var result = strategy.select(nullContext,
+                    List.of(candidate("agent-a"))).await().indefinitely();
+            assertThat(result).isInstanceOf(AgentAssignment.Assigned.class);
+        }
+
+        @Test
+        void emptyTextDeltaStreamReturnsUnresolvable() {
+            when(agentProvider.invoke(any(AgentSessionConfig.class)))
+                    .thenReturn(Multi.createFrom().empty());
+            var result = strategy.select(context("analysis"),
+                    List.of(candidate("agent-a"))).await().indefinitely();
+            assertThat(result).isInstanceOf(AgentAssignment.Unresolvable.class);
+        }
     }
 
     @Nested
@@ -220,6 +240,110 @@ class LlmAgentRoutingStrategyTest {
             assertThat(result).isInstanceOf(AgentAssignment.EscalateToOversight.class);
             assertThat(((AgentAssignment.EscalateToOversight) result).reason())
                     .isEqualTo(EscalationReason.NO_QUALIFIED_AGENT);
+        }
+
+        @Test
+        void qualifiedPlusBorderlineFiltersOnlyBorderline() {
+            var qualified = candidate("qual-agent");
+            var borderline = candidate("border-agent");
+            var classified = List.of(
+                    new TrustCandidateClassifier.ClassifiedCandidate(
+                            qualified, TrustCandidateClassifier.Phase.QUALIFIED,
+                            OptionalDouble.of(0.9), 1.0),
+                    new TrustCandidateClassifier.ClassifiedCandidate(
+                            borderline, TrustCandidateClassifier.Phase.BORDERLINE,
+                            OptionalDouble.of(0.65), 1.0));
+            when(classifier.classify(any(), eq("analysis"), eq(policy), eq(scoreSource)))
+                    .thenReturn(classified);
+            agentReturns("{\"agent\": \"qual-agent\", \"reason\": \"only eligible\"}");
+
+            var result = strategy.select(context("analysis"),
+                    List.of(qualified, borderline)).await().indefinitely();
+            assertThat(result).isInstanceOf(AgentAssignment.Assigned.class);
+            assertThat(((AgentAssignment.Assigned) result).workerId()).isEqualTo("qual-agent");
+        }
+
+        @Test
+        void qualifiedPlusBootstrapGuardOnFiltersBootstrap() {
+            var bootstrapPolicy = new TrustRoutingPolicy(0.7, 5, 0.1, 0.5, Map.of(), true, null);
+            when(policyProvider.forCapability("analysis")).thenReturn(bootstrapPolicy);
+            var qualified = candidate("qual-agent");
+            var bootstrap = candidate("boot-agent");
+            var classified = List.of(
+                    new TrustCandidateClassifier.ClassifiedCandidate(
+                            qualified, TrustCandidateClassifier.Phase.QUALIFIED,
+                            OptionalDouble.of(0.9), 1.0),
+                    new TrustCandidateClassifier.ClassifiedCandidate(
+                            bootstrap, TrustCandidateClassifier.Phase.BOOTSTRAP,
+                            OptionalDouble.empty(), 1.0));
+            when(classifier.classify(any(), eq("analysis"), eq(bootstrapPolicy), eq(scoreSource)))
+                    .thenReturn(classified);
+            agentReturns("{\"agent\": \"qual-agent\", \"reason\": \"qualified\"}");
+
+            var result = strategy.select(context("analysis"),
+                    List.of(qualified, bootstrap)).await().indefinitely();
+            assertThat(result).isInstanceOf(AgentAssignment.Assigned.class);
+            assertThat(((AgentAssignment.Assigned) result).workerId()).isEqualTo("qual-agent");
+        }
+
+        @Test
+        void qualifiedPlusBootstrapGuardOffPassesBothThrough() {
+            var qualified = candidate("qual-agent");
+            var bootstrap = candidate("boot-agent");
+            var classified = List.of(
+                    new TrustCandidateClassifier.ClassifiedCandidate(
+                            qualified, TrustCandidateClassifier.Phase.QUALIFIED,
+                            OptionalDouble.of(0.9), 1.0),
+                    new TrustCandidateClassifier.ClassifiedCandidate(
+                            bootstrap, TrustCandidateClassifier.Phase.BOOTSTRAP,
+                            OptionalDouble.empty(), 1.0));
+            when(classifier.classify(any(), eq("analysis"), eq(policy), eq(scoreSource)))
+                    .thenReturn(classified);
+            agentReturns("{\"agent\": \"boot-agent\", \"reason\": \"picked bootstrap\"}");
+
+            var result = strategy.select(context("analysis"),
+                    List.of(qualified, bootstrap)).await().indefinitely();
+            assertThat(result).isInstanceOf(AgentAssignment.Assigned.class);
+            assertThat(((AgentAssignment.Assigned) result).workerId()).isEqualTo("boot-agent");
+        }
+
+        @Test
+        void llmFailureFallsBackToClassifierDecideWhenTrustPresent() {
+            var qualified = candidate("qual-agent");
+            var classified = List.of(
+                    new TrustCandidateClassifier.ClassifiedCandidate(
+                            qualified, TrustCandidateClassifier.Phase.QUALIFIED,
+                            OptionalDouble.of(0.9), 1.0));
+            when(classifier.classify(any(), eq("analysis"), eq(policy), eq(scoreSource)))
+                    .thenReturn(classified);
+            when(agentProvider.invoke(any(AgentSessionConfig.class)))
+                    .thenReturn(Multi.createFrom().failure(new RuntimeException("LLM down")));
+            when(classifier.decide(any(), any(), eq("analysis")))
+                    .thenReturn(AgentAssignment.assign("qual-agent", "classifier fallback"));
+
+            var result = strategy.select(context("analysis"),
+                    List.of(qualified)).await().indefinitely();
+            assertThat(result).isInstanceOf(AgentAssignment.Assigned.class);
+            verify(classifier).decide(any(), any(), eq("analysis"));
+        }
+
+        @Test
+        void unparseableLlmResponseFallsBackToClassifierDecideWhenTrustPresent() {
+            var qualified = candidate("qual-agent");
+            var classified = List.of(
+                    new TrustCandidateClassifier.ClassifiedCandidate(
+                            qualified, TrustCandidateClassifier.Phase.QUALIFIED,
+                            OptionalDouble.of(0.9), 1.0));
+            when(classifier.classify(any(), eq("analysis"), eq(policy), eq(scoreSource)))
+                    .thenReturn(classified);
+            agentReturns("not json at all");
+            when(classifier.decide(any(), any(), eq("analysis")))
+                    .thenReturn(AgentAssignment.assign("qual-agent", "classifier fallback"));
+
+            var result = strategy.select(context("analysis"),
+                    List.of(qualified)).await().indefinitely();
+            assertThat(result).isInstanceOf(AgentAssignment.Assigned.class);
+            verify(classifier).decide(any(), any(), eq("analysis"));
         }
     }
 
