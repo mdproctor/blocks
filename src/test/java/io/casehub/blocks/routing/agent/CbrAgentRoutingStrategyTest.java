@@ -79,8 +79,34 @@ class CbrAgentRoutingStrategyTest {
     void idIsCbr() {
         var strategy = new CbrAgentRoutingStrategy(
                 10, 0.5,
-                absentInstance(), absentInstance(), absentInstance(), absentInstance(), absentInstance());
+                absentInstance(), absentInstance(), absentInstance(), absentInstance(), absentInstance(),
+                new TextOnlyFeatureExtractor());
         assertThat(strategy.id()).isEqualTo("cbr");
+    }
+
+    @Test
+    void usesFeatureExtractorForQuery() {
+        var customExtractor = mock(RoutingFeatureExtractor.class);
+        when(customExtractor.extractProblem(any())).thenReturn("custom problem");
+        when(customExtractor.extractFeatures(any())).thenReturn(Map.of("domain", "aml"));
+        when(cbrStore.retrieveSimilar(any(CbrQuery.class), eq(CbrCase.class)))
+                .thenReturn(List.of());
+        when(graphQuery.topAgentsByOutcome(eq("analysis"), any(), any(), eq(10)))
+                .thenReturn(List.of("agent-a"));
+
+        var strategy = new CbrAgentRoutingStrategy(
+                10, 0.5, presentInstance(cbrStore), presentInstance(graphQuery),
+                absentInstance(), absentInstance(), absentInstance(),
+                customExtractor);
+
+        var result = strategy.select(context("analysis"),
+                List.of(candidate("agent-a"))).await().indefinitely();
+
+        assertThat(result).isInstanceOf(AgentAssignment.Assigned.class);
+        var queryCaptor = org.mockito.ArgumentCaptor.forClass(CbrQuery.class);
+        verify(cbrStore).retrieveSimilar(queryCaptor.capture(), eq(CbrCase.class));
+        assertThat(queryCaptor.getValue().problem()).isEqualTo("custom problem");
+        assertThat(queryCaptor.getValue().features()).containsEntry("domain", "aml");
     }
 
     @Nested
@@ -92,7 +118,8 @@ class CbrAgentRoutingStrategyTest {
             strategy = new CbrAgentRoutingStrategy(
                     10, 0.5,
                     presentInstance(cbrStore), presentInstance(graphQuery),
-                    absentInstance(), absentInstance(), absentInstance());
+                    absentInstance(), absentInstance(), absentInstance(),
+                    new TextOnlyFeatureExtractor());
         }
 
         @Test
@@ -140,7 +167,8 @@ class CbrAgentRoutingStrategyTest {
             var customStrategy = new CbrAgentRoutingStrategy(
                     5, 0.8,
                     presentInstance(cbrStore), presentInstance(graphQuery),
-                    absentInstance(), absentInstance(), absentInstance());
+                    absentInstance(), absentInstance(), absentInstance(),
+                    new TextOnlyFeatureExtractor());
 
             when(cbrStore.retrieveSimilar(any(CbrQuery.class), eq(CbrCase.class)))
                     .thenReturn(List.of());
@@ -179,7 +207,8 @@ class CbrAgentRoutingStrategyTest {
             var strategy = new CbrAgentRoutingStrategy(
                     10, 0.5,
                     presentInstance(cbrStore), presentInstance(graphQuery),
-                    absentInstance(), absentInstance(), absentInstance());
+                    absentInstance(), absentInstance(), absentInstance(),
+                    new TextOnlyFeatureExtractor());
 
             var result = strategy.select(context("analysis"),
                     List.of(candidate("agent-a"))).await().indefinitely();
@@ -198,7 +227,8 @@ class CbrAgentRoutingStrategyTest {
             var strategy = new CbrAgentRoutingStrategy(
                     10, 0.5,
                     absentInstance(), presentInstance(graphQuery),
-                    absentInstance(), absentInstance(), absentInstance());
+                    absentInstance(), absentInstance(), absentInstance(),
+                    new TextOnlyFeatureExtractor());
 
             var result = strategy.select(context("analysis"),
                     List.of(candidate("agent-a"), candidate("agent-b"))).await().indefinitely();
@@ -211,7 +241,8 @@ class CbrAgentRoutingStrategyTest {
             var strategy = new CbrAgentRoutingStrategy(
                     10, 0.5,
                     absentInstance(), absentInstance(),
-                    absentInstance(), absentInstance(), absentInstance());
+                    absentInstance(), absentInstance(), absentInstance(),
+                    new TextOnlyFeatureExtractor());
             var result = strategy.select(context("analysis"),
                     List.of(candidate("agent-a"))).await().indefinitely();
             assertThat(result).isInstanceOf(AgentAssignment.Unresolvable.class);
@@ -222,7 +253,8 @@ class CbrAgentRoutingStrategyTest {
             var strategy = new CbrAgentRoutingStrategy(
                     10, 0.5,
                     presentInstance(cbrStore), absentInstance(),
-                    absentInstance(), absentInstance(), absentInstance());
+                    absentInstance(), absentInstance(), absentInstance(),
+                    new TextOnlyFeatureExtractor());
             var result = strategy.select(context("analysis"), List.of()).await().indefinitely();
             assertThat(result).isInstanceOf(AgentAssignment.Unresolvable.class);
         }
@@ -252,7 +284,8 @@ class CbrAgentRoutingStrategyTest {
                     10, 0.5,
                     absentInstance(), presentInstance(graphQuery),
                     presentInstance(classifier), presentInstance(scoreSource),
-                    presentInstance(policyProvider));
+                    presentInstance(policyProvider),
+                    new TextOnlyFeatureExtractor());
 
             var result = strategy.select(context("analysis"),
                     List.of(good, bad)).await().indefinitely();
@@ -282,7 +315,8 @@ class CbrAgentRoutingStrategyTest {
                     10, 0.5,
                     absentInstance(), presentInstance(graphQuery),
                     presentInstance(classifier), presentInstance(scoreSource),
-                    presentInstance(policyProvider));
+                    presentInstance(policyProvider),
+                    new TextOnlyFeatureExtractor());
 
             var result = strategy.select(context("analysis"),
                     List.of(qualified, borderline)).await().indefinitely();
@@ -312,7 +346,8 @@ class CbrAgentRoutingStrategyTest {
                     10, 0.5,
                     absentInstance(), presentInstance(graphQuery),
                     presentInstance(classifier), presentInstance(scoreSource),
-                    presentInstance(policyProvider));
+                    presentInstance(policyProvider),
+                    new TextOnlyFeatureExtractor());
 
             var result = strategy.select(context("analysis"),
                     List.of(qualified, bootstrap)).await().indefinitely();
@@ -342,7 +377,8 @@ class CbrAgentRoutingStrategyTest {
                     10, 0.5,
                     absentInstance(), presentInstance(graphQuery),
                     presentInstance(classifier), presentInstance(scoreSource),
-                    presentInstance(policyProvider));
+                    presentInstance(policyProvider),
+                    new TextOnlyFeatureExtractor());
 
             var result = strategy.select(context("analysis"),
                     List.of(qualified, bootstrap)).await().indefinitely();
@@ -373,7 +409,8 @@ class CbrAgentRoutingStrategyTest {
                     10, 0.5,
                     presentInstance(cbrStore), presentInstance(graphQuery),
                     presentInstance(classifier), presentInstance(scoreSource),
-                    presentInstance(policyProvider));
+                    presentInstance(policyProvider),
+                    new TextOnlyFeatureExtractor());
 
             var result = strategy.select(context("analysis"),
                     List.of(candidate)).await().indefinitely();

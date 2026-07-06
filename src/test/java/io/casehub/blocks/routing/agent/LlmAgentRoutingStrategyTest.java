@@ -89,7 +89,8 @@ class LlmAgentRoutingStrategyTest {
     @Test
     void idIsLlm() {
         var strategy = new LlmAgentRoutingStrategy(
-                presentInstance(agentProvider), absentInstance(), absentInstance(), absentInstance());
+                presentInstance(agentProvider), absentInstance(), absentInstance(), absentInstance(),
+                new RoutingPromptAssembler(List.of()));
         assertThat(strategy.id()).isEqualTo("llm");
     }
 
@@ -100,7 +101,8 @@ class LlmAgentRoutingStrategyTest {
         @BeforeEach
         void setUp() {
             strategy = new LlmAgentRoutingStrategy(
-                    presentInstance(agentProvider), absentInstance(), absentInstance(), absentInstance());
+                    presentInstance(agentProvider), absentInstance(), absentInstance(), absentInstance(),
+                    new RoutingPromptAssembler(List.of()));
         }
 
         @Test
@@ -182,7 +184,8 @@ class LlmAgentRoutingStrategyTest {
             lenient().when(policyProvider.forCapability(anyString())).thenReturn(policy);
             strategy = new LlmAgentRoutingStrategy(
                     presentInstance(agentProvider), presentInstance(classifier),
-                    presentInstance(scoreSource), presentInstance(policyProvider));
+                    presentInstance(scoreSource), presentInstance(policyProvider),
+                    new RoutingPromptAssembler(List.of()));
         }
 
         @Test
@@ -352,10 +355,55 @@ class LlmAgentRoutingStrategyTest {
         @Test
         void returnsUnresolvableWhenAgentProviderAbsent() {
             var strategy = new LlmAgentRoutingStrategy(
-                    absentInstance(), absentInstance(), absentInstance(), absentInstance());
+                    absentInstance(), absentInstance(), absentInstance(), absentInstance(),
+                    new RoutingPromptAssembler(List.of()));
             var result = strategy.select(context("analysis"),
                     List.of(candidate("agent-a"))).await().indefinitely();
             assertThat(result).isInstanceOf(AgentAssignment.Unresolvable.class);
+        }
+    }
+
+    @Nested
+    class WithPromptEnrichment {
+        @Test
+        void assemblerOutputAppendedToPrompt() {
+            var assembler = mock(RoutingPromptAssembler.class);
+            when(assembler.assemble(any(), any())).thenReturn("Historical context: 3 cases");
+            agentReturns("{\"agent\": \"agent-a\", \"reason\": \"best\"}");
+
+            var strategy = new LlmAgentRoutingStrategy(
+                    presentInstance(agentProvider), absentInstance(),
+                    absentInstance(), absentInstance(), assembler);
+
+            var result = strategy.select(context("analysis"),
+                    List.of(candidate("agent-a"))).await().indefinitely();
+
+            assertThat(result).isInstanceOf(AgentAssignment.Assigned.class);
+            // Verify the prompt passed to agentProvider includes the enrichment
+            var configCaptor = org.mockito.ArgumentCaptor.forClass(AgentSessionConfig.class);
+            verify(agentProvider).invoke(configCaptor.capture());
+            assertThat(configCaptor.getValue().userPrompt())
+                    .contains("Historical context: 3 cases");
+        }
+
+        @Test
+        void assemblerReturnsNull_promptUnchanged() {
+            var assembler = mock(RoutingPromptAssembler.class);
+            when(assembler.assemble(any(), any())).thenReturn(null);
+            agentReturns("{\"agent\": \"agent-a\", \"reason\": \"best\"}");
+
+            var strategy = new LlmAgentRoutingStrategy(
+                    presentInstance(agentProvider), absentInstance(),
+                    absentInstance(), absentInstance(), assembler);
+
+            var result = strategy.select(context("analysis"),
+                    List.of(candidate("agent-a"))).await().indefinitely();
+
+            assertThat(result).isInstanceOf(AgentAssignment.Assigned.class);
+            var configCaptor = org.mockito.ArgumentCaptor.forClass(AgentSessionConfig.class);
+            verify(agentProvider).invoke(configCaptor.capture());
+            assertThat(configCaptor.getValue().userPrompt())
+                    .doesNotContain("Historical context");
         }
     }
 }

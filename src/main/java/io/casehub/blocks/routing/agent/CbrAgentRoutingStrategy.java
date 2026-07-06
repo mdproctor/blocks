@@ -117,6 +117,7 @@ public class CbrAgentRoutingStrategy implements AgentRoutingStrategy {
   private final @Nullable TrustCandidateClassifier classifier;
   private final @Nullable TrustScoreSource scoreSource;
   private final @Nullable TrustRoutingPolicyProvider policyProvider;
+  private final RoutingFeatureExtractor featureExtractor;
 
   @Inject
   public CbrAgentRoutingStrategy(
@@ -127,7 +128,8 @@ public class CbrAgentRoutingStrategy implements AgentRoutingStrategy {
       final Instance<AgentGraphQuery> graphQuery,
       final Instance<TrustCandidateClassifier> classifier,
       final Instance<TrustScoreSource> scoreSource,
-      final Instance<TrustRoutingPolicyProvider> policyProvider) {
+      final Instance<TrustRoutingPolicyProvider> policyProvider,
+      final RoutingFeatureExtractor featureExtractor) {
     this.topK = topK;
     this.minSimilarity = minSimilarity;
     this.cbrStore = cbrStore.isUnsatisfied() ? null : cbrStore.get();
@@ -135,6 +137,7 @@ public class CbrAgentRoutingStrategy implements AgentRoutingStrategy {
     this.classifier = classifier.isUnsatisfied() ? null : classifier.get();
     this.scoreSource = scoreSource.isUnsatisfied() ? null : scoreSource.get();
     this.policyProvider = policyProvider.isUnsatisfied() ? null : policyProvider.get();
+    this.featureExtractor = featureExtractor;
   }
 
   @Override
@@ -209,14 +212,12 @@ public class CbrAgentRoutingStrategy implements AgentRoutingStrategy {
               context.tenancyId(),
               new MemoryDomain(context.capabilityName()),
               "agent-routing",
-              Map.of(),
+              featureExtractor.extractFeatures(context),
               topK)
               .withMinSimilarity(minSimilarity);
-      final String caseContextText =
-          context.caseContext() != null && !context.caseContext().isNull()
-          ? context.caseContext().toString() : null;
-      if (caseContextText != null && !caseContextText.isBlank()) {
-        query = query.withProblem(caseContextText);
+      final String problem = featureExtractor.extractProblem(context);
+      if (problem != null) {
+        query = query.withProblem(problem);
       }
 
       final List<ScoredCbrCase<CbrCase>> results = cbrStore.retrieveSimilar(query, CbrCase.class);

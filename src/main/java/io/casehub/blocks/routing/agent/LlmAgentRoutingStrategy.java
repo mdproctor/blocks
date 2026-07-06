@@ -82,17 +82,20 @@ public class LlmAgentRoutingStrategy implements AgentRoutingStrategy {
   private final @Nullable TrustCandidateClassifier classifier;
   private final @Nullable TrustScoreSource scoreSource;
   private final @Nullable TrustRoutingPolicyProvider policyProvider;
+  private final RoutingPromptAssembler promptAssembler;
 
   @Inject
   public LlmAgentRoutingStrategy(
       final Instance<AgentProvider> agentProvider,
       final Instance<TrustCandidateClassifier> classifier,
       final Instance<TrustScoreSource> scoreSource,
-      final Instance<TrustRoutingPolicyProvider> policyProvider) {
+      final Instance<TrustRoutingPolicyProvider> policyProvider,
+      final RoutingPromptAssembler promptAssembler) {
     this.agentProvider = agentProvider.isUnsatisfied() ? null : agentProvider.get();
     this.classifier = classifier.isUnsatisfied() ? null : classifier.get();
     this.scoreSource = scoreSource.isUnsatisfied() ? null : scoreSource.get();
     this.policyProvider = policyProvider.isUnsatisfied() ? null : policyProvider.get();
+    this.promptAssembler = promptAssembler;
   }
 
   @Override
@@ -133,8 +136,14 @@ public class LlmAgentRoutingStrategy implements AgentRoutingStrategy {
         && !context.caseContext().isNull()
             ? context.caseContext().toString()
             : null;
-    final String prompt =
+    String prompt =
         RoutingSupport.buildUserPrompt(context.capabilityName(), caseContextSummary, eligible);
+
+    final String enrichment = promptAssembler.assemble(context, eligible);
+    if (enrichment != null) {
+      prompt = prompt + "\n\n" + enrichment;
+    }
+
     final String response =
         RoutingSupport.invokeAndCollect(agentProvider, RoutingSupport.SYSTEM_PROMPT, prompt);
 

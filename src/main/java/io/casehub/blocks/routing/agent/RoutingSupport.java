@@ -102,8 +102,10 @@ final class RoutingSupport {
 
             Respond with JSON only: {"agent": "<agent-name>", "reason": "<one sentence>"}
 
-            Select based on the agent's capabilities, briefing, and domain expertise. \
-            Choose the agent whose skills most closely match the task requirements.""";
+            Select based on the agent's capabilities, briefing, domain expertise, \
+            and any historical evidence provided. Choose the agent whose skills \
+            most closely match the task requirements, using historical evidence \
+            to inform confidence when multiple agents are comparably qualified.""";
 
     static String buildUserPrompt(String capabilityName, @Nullable String caseContextSummary,
                                   List<AgentCandidate> candidates) {

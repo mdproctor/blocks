@@ -104,7 +104,7 @@ No Quarkus runtime — plain JUnit 5 tests with Mockito. No CDI container in tes
 | `src/test/java/io/casehub/blocks/oversight/` | Tests for oversight blocks |
 | `src/main/java/io/casehub/blocks/routing/` | Trust routing utilities — shared preference keys, policy resolver, compliance records |
 | `src/test/java/io/casehub/blocks/routing/` | Tests for routing utilities |
-| `src/main/java/io/casehub/blocks/routing/agent/` | AI-powered AgentRoutingStrategy implementations — LLM-reasoned and CBR-evidence agent selection |
+| `src/main/java/io/casehub/blocks/routing/agent/` | AI-powered AgentRoutingStrategy implementations — LLM-reasoned and CBR-evidence agent selection, composable prompt enrichment pipeline, feature extraction SPI, outcome recording |
 | `src/test/java/io/casehub/blocks/routing/agent/` | Tests for AI routing strategies |
 
 ## Package: `io.casehub.blocks.channel`
@@ -190,12 +190,18 @@ Shared trust routing utilities — eliminates duplicated preference-to-policy bo
 
 ## Package: `io.casehub.blocks.routing.agent`
 
-AI-powered `AgentRoutingStrategy` implementations for the engine's routing pipeline. Selected by name via `StrategyResolver` (engine#634). Optional trust classification via `Instance<T>` — activates when engine-ledger is on the consumer's classpath.
+AI-powered `AgentRoutingStrategy` implementations for the engine's routing pipeline, plus composable prompt enrichment and outcome recording infrastructure. Strategies are selected by name via `StrategyResolver` (engine#634). Optional trust classification via `Instance<T>` — activates when engine-ledger is on the consumer's classpath.
 
 | Class | What it does |
 |-------|-------------|
-| `LlmAgentRoutingStrategy` | `AgentRoutingStrategy` (id: `"llm"`). Asks an LLM via `AgentProvider` to reason about which candidate best fits the task. Optional trust classification filters EXCLUDED candidates before the LLM sees them. Worker pool offloading for blocking LLM calls. |
-| `CbrAgentRoutingStrategy` | `AgentRoutingStrategy` (id: `"cbr"`). Uses `CbrCaseMemoryStore` to retrieve similar past cases and analyse worker success rates from `PlanTrace` entries. Falls back to `AgentGraphQuery.topAgentsByOutcome()` when CBR store unavailable. Optional trust classification. |
+| `LlmAgentRoutingStrategy` | `AgentRoutingStrategy` (id: `"llm"`). Asks an LLM via `AgentProvider` to reason about which candidate best fits the task. Delegates to `RoutingPromptAssembler` for composable prompt enrichment (CBR history, future signal sources). Optional trust classification. Worker pool offloading. |
+| `CbrAgentRoutingStrategy` | `AgentRoutingStrategy` (id: `"cbr"`). Uses `CbrCaseMemoryStore` to retrieve similar past cases and analyse worker success rates from `PlanTrace` entries. Falls back to `AgentGraphQuery.topAgentsByOutcome()` when CBR store unavailable. Uses `RoutingFeatureExtractor` for query construction. Optional trust classification. |
+| `RoutingPromptSection` | SPI for composable LLM prompt enrichment. CDI-discovered — all implementations render into the prompt. Returns null to skip. Not a `NamedStrategy`. |
+| `RoutingPromptAssembler` | `@ApplicationScoped` bean that iterates all `RoutingPromptSection` implementations, sorts by `@Priority`, catches rendering failures, and concatenates non-null results. Used by `LlmAgentRoutingStrategy`. |
+| `CbrRoutingPromptSection` | `RoutingPromptSection` implementation — queries `CbrCaseMemoryStore` for similar past cases and formats historical context (agent success rates + case details) for the LLM prompt. Filters to eligible agents only. |
+| `RoutingFeatureExtractor` | SPI for extracting structured features and problem text from `AgentRoutingContext`. `@DefaultBean` `TextOnlyFeatureExtractor` uses `caseContext.toString()` for problem text and `Map.of()` for features. Domain repos override with `@Alternative @Priority`. |
+| `TextOnlyFeatureExtractor` | `@DefaultBean` implementation of `RoutingFeatureExtractor` — text-only similarity, no structured features. |
+| `CbrRoutingOutcomeRecorder` | Implements engine-api `RoutingOutcomeRecorder` — records routing outcomes as `PlanCbrCase` entries in the CBR store, creating a feedback loop. Uses `RoutingFeatureExtractor` for consistent feature vocabulary. |
 | `RoutingSupport` | Package-private utility — shared prompt building, response parsing, `AgentProvider` invocation, and trust classification extraction (`TrustFilterOutcome` sealed interface). Used by both `LlmAgentRoutingStrategy` and `CbrAgentRoutingStrategy`. |
 
 ## Dependencies
