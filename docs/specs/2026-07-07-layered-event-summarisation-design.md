@@ -380,7 +380,7 @@ with tests run between.
 1. Remove `EventConsumer.java`, update `MomentConsumer` — commit, run tests
 2. Remove dead `@Inject @Any Instance<MomentConsumer> consumers` field from `MomentBroker`, update Javadoc — commit, run tests
 3. Change `tick()` return type, add async error test to `SummarisationRunnerTest` — commit, run tests
-4. Make `EventAccumulator` thread-safe (synchronized `collect`/`shouldEmit`/`drain`/`clear`/`size`), add `WindowPolicy` compact constructor validation — commit, run tests
+4. Make `EventAccumulator` thread-safe (synchronized `collect`/`shouldEmit`/`drain`/`clear`/`size`), add `WindowPolicy` compact constructor validation, update `EventStreamBus` class Javadoc to reflect that concurrent `publish()` and `subscribe()` are safe (`CopyOnWriteArrayList`-backed) — commit, run tests
 5. Update issue #27 body to reflect file count change (8→7 after `EventConsumer` removal)
 
 ### Phase 2: Extract to blocks (on issue-27 branch)
@@ -431,6 +431,7 @@ with tests run between.
 ## Acceptance criteria
 
 - [ ] `EventConsumer` removed from quarkmind, `MomentConsumer` updated
+- [ ] `MomentBroker` dead `consumers` field removed, Javadoc corrected
 - [ ] `tick()` returns `CompletionStage<Void>`, all quarkmind tests pass
 - [ ] 7 source + 3 test files extracted to blocks, all pass
 - [ ] quarkmind depends on blocks, local copies removed, all quarkmind tests pass
