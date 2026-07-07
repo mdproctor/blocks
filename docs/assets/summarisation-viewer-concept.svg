@@ -1,0 +1,175 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" font-family="'Inter', 'Segoe UI', system-ui, sans-serif">
+  <defs>
+    <linearGradient id="windowGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#6366f1" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#6366f1" stop-opacity="0.03"/>
+    </linearGradient>
+    <linearGradient id="windowGrad2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#8b5cf6" stop-opacity="0.03"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 7" refX="9" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 3.5 L 0 7 z" fill="#a1a1aa"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="960" height="520" rx="12" fill="#fafafa" stroke="#e4e4e7" stroke-width="1"/>
+
+  <!-- Title bar -->
+  <rect x="0" y="0" width="960" height="44" rx="12" fill="#18181b"/>
+  <rect x="0" y="12" width="960" height="32" fill="#18181b"/>
+  <circle cx="20" cy="22" r="5" fill="#ef4444" opacity="0.8"/>
+  <circle cx="38" cy="22" r="5" fill="#eab308" opacity="0.8"/>
+  <circle cx="56" cy="22" r="5" fill="#22c55e" opacity="0.8"/>
+  <text x="480" y="27" text-anchor="middle" fill="#e4e4e7" font-size="13" font-weight="600">Summarisation Pipeline Viewer — Clinical Domain</text>
+
+  <!-- Level labels (left sidebar) -->
+  <rect x="0" y="44" width="100" height="476" fill="#f4f4f5" rx="0"/>
+  <line x1="100" y1="44" x2="100" y2="520" stroke="#e4e4e7"/>
+
+  <text x="50" y="112" text-anchor="middle" fill="#a855f7" font-size="11" font-weight="700">L4</text>
+  <text x="50" y="126" text-anchor="middle" fill="#71717a" font-size="9">Narrative</text>
+
+  <text x="50" y="202" text-anchor="middle" fill="#3b82f6" font-size="11" font-weight="700">L3</text>
+  <text x="50" y="216" text-anchor="middle" fill="#71717a" font-size="9">Care Phase</text>
+
+  <text x="50" y="302" text-anchor="middle" fill="#10b981" font-size="11" font-weight="700">L2</text>
+  <text x="50" y="316" text-anchor="middle" fill="#71717a" font-size="9">Episode</text>
+
+  <text x="50" y="412" text-anchor="middle" fill="#f59e0b" font-size="11" font-weight="700">L1</text>
+  <text x="50" y="426" text-anchor="middle" fill="#71717a" font-size="9">Vital Reading</text>
+
+  <!-- Lane dividers -->
+  <line x1="100" y1="155" x2="940" y2="155" stroke="#e4e4e7" stroke-dasharray="3,3"/>
+  <line x1="100" y1="255" x2="940" y2="255" stroke="#e4e4e7" stroke-dasharray="3,3"/>
+  <line x1="100" y1="355" x2="940" y2="355" stroke="#e4e4e7" stroke-dasharray="3,3"/>
+
+  <!-- Time axis -->
+  <line x1="120" y1="470" x2="920" y2="470" stroke="#d4d4d8" stroke-width="1" marker-end="url(#arrow)"/>
+  <text x="930" y="474" fill="#a1a1aa" font-size="10">time →</text>
+  <text x="160" y="488" text-anchor="middle" fill="#a1a1aa" font-size="9">14:00</text>
+  <text x="310" y="488" text-anchor="middle" fill="#a1a1aa" font-size="9">14:15</text>
+  <text x="460" y="488" text-anchor="middle" fill="#a1a1aa" font-size="9">14:30</text>
+  <text x="610" y="488" text-anchor="middle" fill="#a1a1aa" font-size="9">14:45</text>
+  <text x="760" y="488" text-anchor="middle" fill="#a1a1aa" font-size="9">15:00</text>
+  <!-- Tick marks -->
+  <line x1="160" y1="467" x2="160" y2="473" stroke="#d4d4d8"/>
+  <line x1="310" y1="467" x2="310" y2="473" stroke="#d4d4d8"/>
+  <line x1="460" y1="467" x2="460" y2="473" stroke="#d4d4d8"/>
+  <line x1="610" y1="467" x2="610" y2="473" stroke="#d4d4d8"/>
+  <line x1="760" y1="467" x2="760" y2="473" stroke="#d4d4d8"/>
+
+  <!-- Window boundaries (L1 → L2) -->
+  <rect x="130" y="360" width="200" height="100" rx="4" fill="url(#windowGrad)" stroke="#6366f1" stroke-width="1" stroke-opacity="0.2"/>
+  <rect x="335" y="360" width="200" height="100" rx="4" fill="url(#windowGrad)" stroke="#6366f1" stroke-width="1" stroke-opacity="0.2"/>
+  <rect x="540" y="360" width="200" height="100" rx="4" fill="url(#windowGrad)" stroke="#6366f1" stroke-width="1" stroke-opacity="0.2"/>
+  <rect x="745" y="360" width="160" height="100" rx="4" fill="url(#windowGrad)" stroke="#6366f1" stroke-width="1" stroke-opacity="0.2"/>
+
+  <!-- Window labels -->
+  <text x="230" y="454" text-anchor="middle" fill="#6366f1" font-size="8" opacity="0.6">window 1 (maxCount=5)</text>
+  <text x="435" y="454" text-anchor="middle" fill="#6366f1" font-size="8" opacity="0.6">window 2</text>
+  <text x="640" y="454" text-anchor="middle" fill="#6366f1" font-size="8" opacity="0.6">window 3</text>
+  <text x="825" y="454" text-anchor="middle" fill="#6366f1" font-size="8" opacity="0.6">window 4</text>
+
+  <!-- Window boundaries (L2 → L3) -->
+  <rect x="130" y="260" width="395" height="90" rx="4" fill="url(#windowGrad2)" stroke="#8b5cf6" stroke-width="1" stroke-opacity="0.15"/>
+  <rect x="530" y="260" width="375" height="90" rx="4" fill="url(#windowGrad2)" stroke="#8b5cf6" stroke-width="1" stroke-opacity="0.15"/>
+  <text x="327" y="344" text-anchor="middle" fill="#8b5cf6" font-size="8" opacity="0.5">phase window (maxAge=900s)</text>
+  <text x="717" y="344" text-anchor="middle" fill="#8b5cf6" font-size="8" opacity="0.5">phase window</text>
+
+  <!-- L1 events (vital readings — dense dots) -->
+  <circle cx="150" cy="410" r="4" fill="#f59e0b" opacity="0.7"/>
+  <circle cx="175" cy="415" r="4" fill="#f59e0b" opacity="0.7"/>
+  <circle cx="200" cy="408" r="4" fill="#f59e0b" opacity="0.7"/>
+  <circle cx="230" cy="420" r="4" fill="#f59e0b" opacity="0.7"/>
+  <circle cx="260" cy="405" r="4" fill="#f59e0b" opacity="0.7"/>
+  <!-- window 2 -->
+  <circle cx="355" cy="412" r="4" fill="#f59e0b" opacity="0.7"/>
+  <circle cx="385" cy="418" r="4" fill="#f59e0b" opacity="0.7"/>
+  <circle cx="410" cy="406" r="4" fill="#f59e0b" opacity="0.7"/>
+  <circle cx="440" cy="422" r="4" fill="#ef4444" opacity="0.9"/>
+  <circle cx="468" cy="425" r="4" fill="#ef4444" opacity="0.9"/>
+  <!-- window 3 -->
+  <circle cx="560" cy="425" r="4" fill="#ef4444" opacity="0.9"/>
+  <circle cx="590" cy="428" r="4" fill="#ef4444" opacity="0.9"/>
+  <circle cx="618" cy="420" r="4" fill="#ef4444" opacity="0.9"/>
+  <circle cx="648" cy="415" r="4" fill="#f59e0b" opacity="0.7"/>
+  <circle cx="680" cy="410" r="4" fill="#f59e0b" opacity="0.7"/>
+  <!-- window 4 -->
+  <circle cx="765" cy="408" r="4" fill="#f59e0b" opacity="0.7"/>
+  <circle cx="795" cy="410" r="4" fill="#f59e0b" opacity="0.7"/>
+  <circle cx="825" cy="405" r="4" fill="#f59e0b" opacity="0.7"/>
+  <circle cx="855" cy="412" r="4" fill="#f59e0b" opacity="0.7"/>
+
+  <!-- L2 episodes (clinical events) -->
+  <rect x="215" y="288" width="110" height="28" rx="6" fill="#dcfce7" stroke="#10b981" stroke-width="1.5"/>
+  <text x="270" y="306" text-anchor="middle" fill="#166534" font-size="10" font-weight="500">tachycardia</text>
+
+  <rect x="400" y="288" width="110" height="28" rx="6" fill="#fef2f2" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="455" y="306" text-anchor="middle" fill="#991b1b" font-size="10" font-weight="500">resp. distress</text>
+
+  <rect x="570" y="288" width="110" height="28" rx="6" fill="#fef2f2" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="625" y="306" text-anchor="middle" fill="#991b1b" font-size="10" font-weight="500">hypoxemia</text>
+
+  <rect x="760" y="288" width="100" height="28" rx="6" fill="#dcfce7" stroke="#10b981" stroke-width="1.5"/>
+  <text x="810" y="306" text-anchor="middle" fill="#166534" font-size="10" font-weight="500">stabilising</text>
+
+  <!-- L3 phases -->
+  <rect x="160" y="185" width="220" height="32" rx="8" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="270" y="205" text-anchor="middle" fill="#1e40af" font-size="11" font-weight="600">Stable Monitoring</text>
+
+  <rect x="420" y="185" width="220" height="32" rx="8" fill="#fee2e2" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="530" y="205" text-anchor="middle" fill="#991b1b" font-size="11" font-weight="600">Acute Deterioration</text>
+
+  <rect x="680" y="185" width="180" height="32" rx="8" fill="#d1fae5" stroke="#10b981" stroke-width="1.5"/>
+  <text x="770" y="205" text-anchor="middle" fill="#065f46" font-size="11" font-weight="600">Recovery Phase</text>
+
+  <!-- L4 narrative -->
+  <rect x="260" y="80" width="500" height="56" rx="10" fill="#faf5ff" stroke="#a855f7" stroke-width="1.5"/>
+  <text x="510" y="100" text-anchor="middle" fill="#6b21a8" font-size="10" font-weight="600">Clinical Narrative (LLM-generated)</text>
+  <text x="510" y="118" text-anchor="middle" fill="#7c3aed" font-size="9" font-style="italic">"Patient experienced 45-min respiratory distress episode requiring</text>
+  <text x="510" y="130" text-anchor="middle" fill="#7c3aed" font-size="9" font-style="italic">intervention. Vitals stabilising post-treatment. SpO₂ recovering."</text>
+
+  <!-- Flow arrows (L1 → L2) -->
+  <path d="M 230 400 Q 230 370 250 355 Q 260 345 270 320" stroke="#a1a1aa" stroke-width="1" fill="none" stroke-dasharray="3,2" opacity="0.4"/>
+  <path d="M 440 400 Q 440 370 450 355 Q 455 345 455 320" stroke="#a1a1aa" stroke-width="1" fill="none" stroke-dasharray="3,2" opacity="0.4"/>
+  <path d="M 590 400 Q 590 370 600 355 Q 610 345 625 320" stroke="#a1a1aa" stroke-width="1" fill="none" stroke-dasharray="3,2" opacity="0.4"/>
+  <path d="M 810 400 Q 810 370 810 355 Q 810 345 810 320" stroke="#a1a1aa" stroke-width="1" fill="none" stroke-dasharray="3,2" opacity="0.4"/>
+
+  <!-- Flow arrows (L2 → L3) -->
+  <path d="M 270 288 Q 270 260 270 250 Q 270 240 270 220" stroke="#a1a1aa" stroke-width="1" fill="none" stroke-dasharray="3,2" opacity="0.4"/>
+  <path d="M 455 288 Q 455 260 500 240 Q 520 230 530 220" stroke="#a1a1aa" stroke-width="1" fill="none" stroke-dasharray="3,2" opacity="0.4"/>
+  <path d="M 625 288 Q 625 260 600 240 Q 580 230 530 220" stroke="#a1a1aa" stroke-width="1" fill="none" stroke-dasharray="3,2" opacity="0.4"/>
+  <path d="M 810 288 Q 810 260 790 240 Q 780 230 770 220" stroke="#a1a1aa" stroke-width="1" fill="none" stroke-dasharray="3,2" opacity="0.4"/>
+
+  <!-- Flow arrows (L3 → L4) -->
+  <path d="M 270 185 Q 270 165 350 150 Q 400 142 420 140" stroke="#a1a1aa" stroke-width="1" fill="none" stroke-dasharray="3,2" opacity="0.4"/>
+  <path d="M 530 185 Q 530 165 520 155 Q 515 148 510 140" stroke="#a1a1aa" stroke-width="1" fill="none" stroke-dasharray="3,2" opacity="0.4"/>
+  <path d="M 770 185 Q 770 165 680 150 Q 640 142 600 140" stroke="#a1a1aa" stroke-width="1" fill="none" stroke-dasharray="3,2" opacity="0.4"/>
+
+  <!-- Inspect tooltip (showing click-to-inspect) -->
+  <rect x="410" y="240" width="180" height="52" rx="6" fill="#18181b" opacity="0.92"/>
+  <text x="420" y="257" fill="#e4e4e7" font-size="9" font-weight="600">resp. distress</text>
+  <text x="420" y="270" fill="#a1a1aa" font-size="8">severity: CRITICAL</text>
+  <text x="420" y="281" fill="#a1a1aa" font-size="8">rationale: SpO₂ &lt; 90%, HR &gt; 130</text>
+  <!-- Pointer triangle -->
+  <polygon points="455,292 465,292 460,298" fill="#18181b" opacity="0.92"/>
+
+  <!-- Legend -->
+  <rect x="110" y="496" width="830" height="20" rx="0" fill="#f4f4f5"/>
+  <circle cx="140" cy="508" r="4" fill="#f59e0b"/>
+  <text x="150" y="511" fill="#71717a" font-size="9">Normal vital</text>
+  <circle cx="230" cy="508" r="4" fill="#ef4444"/>
+  <text x="240" y="511" fill="#71717a" font-size="9">Abnormal vital</text>
+  <rect x="330" y="504" width="20" height="8" rx="2" fill="url(#windowGrad)" stroke="#6366f1" stroke-width="0.5"/>
+  <text x="356" y="511" fill="#71717a" font-size="9">Accumulator window</text>
+  <line x1="470" y1="508" x2="490" y2="508" stroke="#a1a1aa" stroke-dasharray="3,2"/>
+  <text x="496" y="511" fill="#71717a" font-size="9">Lineage flow</text>
+  <rect x="570" y="504" width="12" height="8" rx="2" fill="#18181b" opacity="0.9"/>
+  <text x="588" y="511" fill="#71717a" font-size="9">Click-to-inspect</text>
+</svg>
