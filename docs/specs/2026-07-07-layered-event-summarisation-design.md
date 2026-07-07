@@ -14,10 +14,12 @@ explicitly packaged for migration to blocks. It is pure Java — zero CDI,
 zero Quarkus dependencies — and has been validated by 3 summarisers and
 3 window policies across quarkmind's SC2 domain.
 
-The framework belongs in blocks because it meets the scope criteria: it
+The framework belongs in blocks because it meets two scope criteria: it
 involves LLM-driven decision-making (async `Summariser` interface designed
-for LLM-backed summarisation at upper levels) and composes across foundational
-platform parts (event buses, windowed accumulation, pluggable summarisation).
+for LLM-backed summarisation at upper levels) and uses classical AI at
+lower levels (threshold/pattern detection, windowed accumulation with
+configurable policies — the technology split between deterministic
+lower layers and pluggable upper layers is the core design).
 
 The extraction is blocked on two API improvements identified during
 first-principles review, and on domain-agnostic example tests that prove
@@ -72,9 +74,9 @@ Follows the existing blocks pattern (`blocks.channel`, `blocks.conversation`,
 |------|------|---------|
 | `EventLevel` | Record | `(String name, int ordinal)` — identifies a level in the hierarchy |
 | `LevelEvent<E>` | Record | `(E payload, long timestamp, EventLevel level)` — typed event at a specific level |
-| `WindowPolicy` | Record | `(long maxAge, int maxCount)` — dual-trigger windowing (emit on either threshold) |
-| `EventAccumulator<E>` | Class | Collects events, tracks window state, `shouldEmit(now)`, `drain()`, `clear()`. Not thread-safe. |
-| `EventStreamBus<E>` | Class | Predicate-based pub/sub: `subscribe(Predicate, Consumer)`, `publish(LevelEvent)`, `clear()`. Not thread-safe. |
+| `WindowPolicy` | Record | `(long maxAge, int maxCount)` — dual-trigger windowing (emit on either threshold). Compact constructor validates: `maxAge >= 0`, `maxCount >= 0`, at least one must be positive. |
+| `EventAccumulator<E>` | Class | Collects events, tracks window state, `shouldEmit(now)`, `drain()`, `clear()`. Thread-safe — all public methods are synchronized. |
+| `EventStreamBus<E>` | Class | Predicate-based pub/sub: `subscribe(Predicate, Consumer)`, `publish(LevelEvent)`, `clear()`. `CopyOnWriteArrayList`-backed — concurrent `publish()` and `subscribe()` are safe. |
 | `Summariser<IN, OUT>` | Interface | `@FunctionalInterface`. `CompletionStage<List<OUT>> summarise(List<LevelEvent<IN>>)`. Includes `ofSync()` factory. |
 | `SummarisationRunner<IN, OUT>` | Class | Wires accumulator -> summariser -> output bus. API: `collect()`, `tick()`, `clear()`, `size()`. |
 
@@ -84,7 +86,7 @@ Follows the existing blocks pattern (`blocks.channel`, `blocks.conversation`,
 |------|----------|
 | `EventAccumulatorTest` | 6 tests — timestamp trigger, count trigger, dual trigger, drain, clear, empty guard |
 | `EventStreamBusTest` | 4 tests — pub/sub, predicate filtering, multiple subscribers, no-subscribers |
-| `SummarisationRunnerTest` | 4 tests — windowing + publication, no-emit guard, level/timestamp wrapping, clear delegation |
+| `SummarisationRunnerTest` | 5 tests — windowing + publication, no-emit guard, level/timestamp wrapping, clear delegation, async error observability (failed `CompletionStage` propagation via `tick()` return) |
 
 All plain JUnit 5 + AssertJ. No CDI, no Quarkus. Zero-dependency tests.
 
@@ -114,15 +116,25 @@ public interface MomentConsumer { ... }
 method — the method signature is unchanged, only the supertype is removed. No
 other consumers exist. `EventConsumer.java` is not extracted to blocks.
 
+**`eventFilter()` call sites:**
+
+| Call site | Class | Post-change behaviour |
+|-----------|-------|----------------------|
+| `ensureSummarisationInitialized()` line 118 | `DroolsStrategyTask` | Calls `eventFilter()` on `this` (implements `MomentConsumer`). `eventFilter()` remains as a default method on `MomentConsumer` — works identically. |
+
+No other `MomentConsumer` implementors exist. No code references
+`EventConsumer` by its own type — all usage is through `MomentConsumer`.
+
 #### 2. Change `SummarisationRunner.tick()` return type
 
 **Current:** `public void tick(long now)`
 
 **Problem:** The `CompletionStage` from `summarise()` is consumed with `thenAccept`
-but no `exceptionally()` handler exists. Async errors from LLM-backed summarisers
-vanish silently. The buffer is already drained when the error occurs — events are
-lost AND the failure is invisible. The Chain of Summarization paper (Ma et al.)
-confirms LLM summarisers are a primary use case, not an edge case.
+but no `exceptionally()` handler exists. The void return type means callers have
+no mechanism to observe async errors even if they want to. The buffer is already
+drained when a failure occurs — events are lost AND there is no API surface to
+detect the loss. The Chain of Summarization paper (Ma et al.) confirms LLM
+summarisers are a primary use case, not an edge case.
 
 **Change:**
 
@@ -155,9 +167,14 @@ public CompletionStage<Void> tick(long now) {
 - Sync callers: no change. The returned `CompletionStage` is already complete
   (sync summarisers wrap in `CompletableFuture.completedFuture()`). Existing
   fire-and-forget callers continue to work — they just ignore the return value.
-- Async callers: can now chain `.exceptionally()` to handle LLM failures.
+- **API enablement, not a fix:** no existing caller currently observes the
+  returned stage. quarkmind's `SummarisationLifecycle.tick()` ignores it
+  (sync summarisers, already complete). This change exposes the information
+  at the `SummarisationRunner` boundary so that future callers — or consumers
+  using async summarisers — *can* chain `.exceptionally()`. It does not change
+  any current behaviour.
 - Batch loss on error is accepted: standard tumbling-window at-most-once
-  semantics. The framework's job is to make failure visible, not to retry.
+  semantics. The framework's job is to make failure *observable*, not to retry.
 
 **Call site updates in quarkmind:**
 
@@ -197,7 +214,46 @@ These were evaluated during first-principles review and confirmed as correct:
 | No back-pressure mechanism | In-process streaming framework, not distributed messaging. |
 | Runner owns its `EventAccumulator` (encapsulated since quarkmind#232) | Consumers configure via `WindowPolicy`, never interact with accumulator directly. Direct accumulator use is a separate pattern (Pattern B). |
 | `CompletionStage` for async (not `Uni`) | Pure Java, zero framework dependency. Consumers convert with `Uni.createFrom().completionStage()` if needed. |
-| `CopyOnWriteArrayList` for bus subscriptions | Safe iteration during publish (callback-triggered subscribe won't CME). Overall class documented as not thread-safe. |
+| `CopyOnWriteArrayList` for bus subscriptions | Safe concurrent `publish()` and `subscribe()`. In-flight `publish()` iterates a snapshot — new subscriptions appear in subsequent publishes. Thread-safety of the overall pipeline depends on subscriber callbacks, which are safe when using the framework's `SummarisationRunner` (synchronized `EventAccumulator`). |
+| Output event timestamps = assessment time | `tick(now)` stamps output events with the `now` parameter, not the time range of constituent events. Output timestamps reflect *when the summarisation was triggered*. Consumers needing constituent time ranges should embed them in their payload records (e.g. clinical `CarePhase.durationSeconds`). |
+
+### Framework patterns
+
+Two integration patterns for consuming the summarisation framework:
+
+**Pattern A — SummarisationRunner pipeline.** Wire `EventAccumulator` →
+`Summariser` → output `EventStreamBus` via `SummarisationRunner`. Best for
+synchronous, fast summarisers (pure-Java heuristics, microsecond completion).
+Supports async summarisers via `CompletionStage` return, but see thread-safety
+note below.
+
+**Pattern B — Direct EventAccumulator with external dispatch.** Use
+`EventAccumulator` + `WindowPolicy` directly for accumulation, then dispatch
+async work externally (e.g. via CaseHub Workers). Bypasses `SummarisationRunner`
+and `Summariser` entirely. Best for LLM-backed summarisation where the async
+call duration (1–5s) would create cross-thread pipeline hazards if wired
+through `SummarisationRunner` at a non-terminal level. Proven by quarkmind's
+commentary system (see `quarkmind/docs/superpowers/specs/2026-07-06-commentator-observer-llm-design.md`).
+
+**When to use each:**
+
+| Criterion | Pattern A | Pattern B |
+|-----------|-----------|-----------|
+| Summariser latency | Microseconds (sync heuristics) | Seconds (LLM calls) |
+| Pipeline position | Any level | Any level |
+| Thread-safety | Safe — `EventAccumulator` is synchronized | Safe — caller manages dispatch |
+| Error observability | Via `tick()` return type (`CompletionStage<Void>`) | Caller's dispatch mechanism |
+| Example | quarkmind's `GamePhaseSummariser`, `GameArcSummariser` | quarkmind's `CommentaryAccumulator` |
+
+**Thread-safety note for multi-level async pipelines:** When an async
+summariser at a non-terminal pipeline level completes on a background thread,
+its `thenAccept` callback calls `outputBus.publish()`, which triggers
+downstream `collect()` calls on the background thread. The downstream
+`EventAccumulator`'s synchronized methods handle this safely — `collect()`
+on the background thread and `tick()` on the main thread are mutually
+exclusive. This is why `EventAccumulator` is synchronized: the bus-wired
+pipeline creates implicit cross-thread access that callers cannot
+synchronize externally.
 
 ### Dependencies
 
@@ -230,27 +286,33 @@ abstraction. Maps directly to our level hierarchy.
 | `CarePhase` | L3 output | `phase` (STABLE_MONITORING, ACUTE_DETERIORATION, RECOVERY, ...), `durationSeconds`, `rationale` |
 | `ClinicalNarrative` | L4 output | `summary`, `timestamp` |
 
-**Pipeline:**
+**Pipeline (fan-out at L2):**
 
 ```
 VitalReading bus (L1)
     → ClinicalEventSummariser (sync, rule-based: threshold classification)
     → WindowPolicy(maxCount=5)
     → ClinicalEvent bus (L2)
-        → CarePhaseSummariser (sync, rule-based: windowed phase classification)
-        → WindowPolicy(maxAge=900_000)  // 15 minutes
-        → CarePhase bus (L3)
-            → NarrativeSummariser (async, simulates LLM call)
+        ├→ CarePhaseSummariser (sync, rule-based: windowed phase classification)
+        │   → WindowPolicy(maxAge=900_000)  // 15 minutes
+        │   → CarePhase bus (L3)
+        │       → NarrativeSummariser (async, simulates LLM call)
+        │       → WindowPolicy(maxCount=3)
+        │       → ClinicalNarrative bus (L4)
+        │
+        └→ MedicationAlertAccumulator (Pattern B — direct EventAccumulator)
             → WindowPolicy(maxCount=3)
-            → ClinicalNarrative bus (L4)
+            → drains batch, checks for drug interaction patterns
 ```
 
 **Tests demonstrate:**
 - Full pipeline: L1 vitals -> L2 episodes -> L3 phases -> L4 narrative
+- **Fan-out topology:** L2 bus feeds both the L3 runner and an independent accumulator
 - Severity escalation: normal vitals -> abnormal -> critical episode detection
 - Phase transitions: stable -> deterioration -> recovery
 - Async summariser with `CompletionStage` (simulates LLM latency)
 - Error handling via `tick()` return type (async failure scenario)
+- Pattern B (direct `EventAccumulator`) alongside Pattern A (runner pipeline)
 - Rationale traces at every level
 
 #### Logistics hub monitoring
@@ -274,12 +336,16 @@ PackageScan bus (L1)
     → AnomalyDetectorSummariser (sync, rule-based: pattern detection)
     → WindowPolicy(maxCount=10)
     → PackageAnomaly bus (L2)
-        → HubPhaseSummariser (sync, rule-based: congestion classification)
-        → WindowPolicy(maxAge=300_000)  // 5 minutes
-        → HubPhase bus (L3)
-            → HubNarrativeSummariser (async, simulates LLM)
-            → WindowPolicy(maxCount=2)
-            → HubNarrative bus (L4)
+        ├→ HubPhaseSummariser (sync, rule-based: congestion classification)
+        │   → WindowPolicy(maxAge=300_000)  // 5 minutes
+        │   → HubPhase bus (L3)
+        │       → HubNarrativeSummariser (async, simulates LLM)
+        │       → WindowPolicy(maxCount=2)
+        │       → HubNarrative bus (L4)
+        │
+        └→ ComplianceAuditAccumulator (Pattern B — direct EventAccumulator)
+            → WindowPolicy(maxAge=600_000)  // 10 minutes
+            → drains batch for compliance event log
 ```
 
 **Tests demonstrate:**
@@ -298,6 +364,8 @@ PackageScan bus (L1)
 | Count + time windowing | `maxCount` triggers at lower levels, `maxAge` at upper levels |
 | Rationale traces | Every output record carries human-readable reasoning |
 | Error observability | Async failure test using `tick()` return type |
+| Fan-out topology | L2 bus feeds both a `SummarisationRunner` (Pattern A) and a direct `EventAccumulator` (Pattern B) in both examples |
+| Pattern A (runner pipeline) | `SummarisationRunner` wires accumulator → summariser → output bus |
 | Pattern B (independent accumulator) | Direct `EventAccumulator` + `WindowPolicy` without `SummarisationRunner` |
 | Multi-bus subscription | Consumer subscribing to multiple level buses simultaneously |
 
@@ -310,30 +378,35 @@ Quarkmind commits on main are approved for consolidation work (CLAUDE.md
 with tests run between.
 
 1. Remove `EventConsumer.java`, update `MomentConsumer` — commit, run tests
-2. Change `tick()` return type, update `SummarisationRunnerTest` — commit, run tests
+2. Remove dead `@Inject @Any Instance<MomentConsumer> consumers` field from `MomentBroker`, update Javadoc — commit, run tests
+3. Change `tick()` return type, add async error test to `SummarisationRunnerTest` — commit, run tests
+4. Make `EventAccumulator` thread-safe (synchronized `collect`/`shouldEmit`/`drain`/`clear`/`size`), add `WindowPolicy` compact constructor validation — commit, run tests
+5. Update issue #27 body to reflect file count change (8→7 after `EventConsumer` removal)
 
 ### Phase 2: Extract to blocks (on issue-27 branch)
 
-3. Create `io.casehub.blocks.summarisation` package in blocks
-4. Copy 7 source files + 3 test files from quarkmind
-5. Run blocks tests to validate — commit
+6. Create `io.casehub.blocks.summarisation` package in blocks
+7. Copy 7 source files + 3 test files from quarkmind
+8. Run blocks tests to validate — commit
 
 ### Phase 3: Wire quarkmind to blocks (on quarkmind main)
 
-6. Add `casehub-blocks` as a compile dependency in quarkmind's `pom.xml`
-7. Remove the 7 source files + 3 test files from quarkmind
-8. Run quarkmind's full test suite to validate the dependency switch — commit
+9. Add `casehub-blocks` as a compile dependency in quarkmind's `pom.xml`
+10. Remove the 7 source files + 3 test files from quarkmind
+11. Run quarkmind's full test suite to validate the dependency switch — commit
 
 ### Phase 4: Domain-agnostic examples (#38, on blocks branch)
 
-9. Clinical domain records + pipeline + tests
-10. Logistics domain records + pipeline + tests
-11. Run full blocks test suite — commit
+12. Clinical domain records + pipeline + tests (including fan-out at L2)
+13. Logistics domain records + pipeline + tests (including Pattern B branch)
+14. Run full blocks test suite — commit
 
 ### Phase 5: Documentation
 
-12. Update blocks CLAUDE.md with new package documentation
-13. Update #38 issue as complete
+15. Update blocks CLAUDE.md with new package documentation
+16. Update blocks ARC42STORIES.MD §5 with `io.casehub.blocks.summarisation` package entry
+17. Update quarkmind ARC42STORIES.MD to note `casehub-blocks` dependency for generic framework types
+18. Update #38 issue as complete
 
 ## Related issues
 
@@ -364,5 +437,11 @@ with tests run between.
 - [ ] Clinical example: full L1->L4 pipeline with sync + async summarisers
 - [ ] Logistics example: full L1->L4 pipeline with different event shapes
 - [ ] Both examples demonstrate rationale traces, windowing modes, error observability
+- [ ] Clinical example demonstrates fan-out topology (Pattern A + Pattern B from L2 bus)
+- [ ] `WindowPolicy` rejects invalid configurations (both triggers zero or negative)
+- [ ] `EventAccumulator` is thread-safe (synchronized public methods)
 - [ ] CLAUDE.md updated with summarisation package documentation
+- [ ] Blocks ARC42STORIES.MD §5 updated with summarisation package entry
+- [ ] Quarkmind ARC42STORIES.MD updated to note `casehub-blocks` dependency
+- [ ] Issue #27 body updated to reflect `EventConsumer` removal (8→7 files)
 - [ ] Zero new compile dependencies added to blocks
