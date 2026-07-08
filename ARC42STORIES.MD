@@ -8,7 +8,7 @@
 | 2 | Constraints | 🔲 pending (TBD) | |
 | 3 | Context and Scope | 🔲 pending (TBD) | |
 | 4 | Solution Strategy | ✅ initial (#2) | Single module, all foundation deps |
-| 5 | Building Block View | ✅ initial (#2) | `channel` package — 4 classes |
+| 5 | Building Block View | ✅ initial (#2) | `channel`, `agentic`, `summarisation` packages |
 | 6 | Runtime View | 🔲 pending (TBD) | |
 | 7 | Deployment View | 🔲 pending (TBD) | N/A — library, no deployment |
 | 8 | Crosscutting Concepts | 🔲 pending (TBD) | |
@@ -69,6 +69,26 @@ Compositional agentic orchestration framework — five SPIs for agent selection,
 | `io.casehub.blocks.agentic.pattern` | Pattern DSL: `Patterns` entry point, 8 builders (Supervisor, Sequence, Loop, Parallel, Voting, Debate, Conditional, HTN) |
 
 **Implementation epic:** casehubio/blocks#595
+
+### Package: `io.casehub.blocks.summarisation`
+
+Temporal abstraction framework for summarising high-frequency event streams into progressively higher-level abstractions. Pure Java, zero CDI/Quarkus dependencies.
+
+| Block | What it does | Extracted from |
+|-------|-------------|---------------|
+| `EventLevel` | Record identifying a level in the hierarchy: `(String name, int ordinal)` | quarkmind `EventLevel` |
+| `LevelEvent<E>` | Record wrapping a typed event at a specific level: `(E payload, long timestamp, EventLevel level)` | quarkmind `LevelEvent` |
+| `WindowPolicy` | Record defining dual-trigger windowing: `(long maxAge, int maxCount)`. Validates: both >= 0, at least one positive. | quarkmind `WindowPolicy` |
+| `EventAccumulator<E>` | Thread-safe event buffer with windowing logic. `collect()`, `shouldEmit(now)`, `drain()`, `clear()`, `size()`. All public methods synchronized. | quarkmind `EventAccumulator` |
+| `EventStreamBus<E>` | Predicate-based pub/sub for level events. `subscribe(Predicate, Consumer)`, `publish(LevelEvent)`, `clear()`. CopyOnWriteArrayList-backed — concurrent publish+subscribe safe. | quarkmind `EventStreamBus` |
+| `Summariser<IN, OUT>` | `@FunctionalInterface` for summarisation logic: `CompletionStage<List<OUT>> summarise(List<LevelEvent<IN>>)`. `ofSync()` factory for deterministic implementations. | quarkmind `Summariser` |
+| `SummarisationRunner<IN, OUT>` | Wires accumulator → summariser → output bus. `collect()`, `tick()` (returns `CompletionStage<Void>`), `clear()`, `size()`. | quarkmind `SummarisationRunner` |
+
+Two integration patterns:
+- **Pattern A** (SummarisationRunner pipeline): sync heuristics, microsecond latency. Used for rule-based summarisation where speed is critical.
+- **Pattern B** (direct EventAccumulator): async LLM dispatch, caller manages execution. Used when summarisation requires LLM reasoning and latency tolerance is higher.
+
+**Implementation issue:** casehubio/blocks#27
 
 ### Planned packages (per parent#310)
 

@@ -106,6 +106,10 @@ No Quarkus runtime — plain JUnit 5 tests with Mockito. No CDI container in tes
 | `src/test/java/io/casehub/blocks/routing/` | Tests for routing utilities |
 | `src/main/java/io/casehub/blocks/routing/agent/` | AI-powered AgentRoutingStrategy implementations — LLM-reasoned and CBR-evidence agent selection, composable prompt enrichment pipeline, feature extraction SPI, outcome recording |
 | `src/test/java/io/casehub/blocks/routing/agent/` | Tests for AI routing strategies |
+| `src/main/java/io/casehub/blocks/summarisation/` | Temporal abstraction framework — event levels, windowed accumulation, pluggable summarisation |
+| `src/test/java/io/casehub/blocks/summarisation/` | Tests for summarisation framework |
+| `src/test/java/io/casehub/blocks/summarisation/examples/clinical/` | Clinical temporal abstraction example (L1-L4 pipeline) |
+| `src/test/java/io/casehub/blocks/summarisation/examples/logistics/` | Logistics hub monitoring example (L1-L4 pipeline) |
 
 ## Package: `io.casehub.blocks.channel`
 
@@ -204,6 +208,22 @@ AI-powered `AgentRoutingStrategy` implementations for the engine's routing pipel
 | `CbrRoutingOutcomeRecorder` | Implements engine-api `RoutingOutcomeRecorder` — records routing outcomes as `PlanCbrCase` entries in the CBR store, creating a feedback loop. Uses `RoutingFeatureExtractor` for consistent feature vocabulary. |
 | `RoutingSupport` | Package-private utility — shared prompt building, response parsing, `AgentProvider` invocation, and trust classification extraction (`TrustFilterOutcome` sealed interface). Used by both `LlmAgentRoutingStrategy` and `CbrAgentRoutingStrategy`. |
 
+## Package: `io.casehub.blocks.summarisation`
+
+Temporal abstraction framework for summarising high-frequency event streams into progressively higher-level abstractions. Pure Java, zero CDI/Quarkus dependencies. Extracted from quarkmind via #27.
+
+| Class | What it does |
+|-------|-------------|
+| `EventLevel` | Record: `(String name, int ordinal)` — identifies a level in the hierarchy |
+| `LevelEvent<E>` | Record: `(E payload, long timestamp, EventLevel level)` — typed event at a specific level |
+| `WindowPolicy` | Record: `(long maxAge, int maxCount)` — dual-trigger windowing. Validates: both >= 0, at least one positive. |
+| `EventAccumulator<E>` | Thread-safe event buffer. `collect()`, `shouldEmit(now)`, `drain()`, `clear()`, `size()`. Synchronized on all public methods. |
+| `EventStreamBus<E>` | Predicate-based pub/sub. `subscribe(Predicate, Consumer)`, `publish(LevelEvent)`, `clear()`. CopyOnWriteArrayList-backed — concurrent publish+subscribe safe. |
+| `Summariser<IN, OUT>` | `@FunctionalInterface`. `CompletionStage<List<OUT>> summarise(List<LevelEvent<IN>>)`. `ofSync()` factory for deterministic implementations. |
+| `SummarisationRunner<IN, OUT>` | Wires accumulator → summariser → output bus. `collect()`, `tick()` (returns `CompletionStage<Void>`), `clear()`, `size()`. |
+
+Two integration patterns: **Pattern A** (SummarisationRunner pipeline — sync heuristics, microsecond latency) and **Pattern B** (direct EventAccumulator — async LLM dispatch, caller manages). See spec for details.
+
 ## Dependencies
 
 **Compile:** `casehub-qhorus-api`, `casehub-work-api`, `casehub-engine-api`, `casehub-eidos-api`, `casehub-worker-api`, `org.jspecify:jspecify`
@@ -223,6 +243,7 @@ AI-powered `AgentRoutingStrategy` implementations for the engine's routing pipel
 | casehub-soc | Oversight: `ActionRiskClassifier`, `RiskClassifier`, `RiskDecision`, `ClassificationContext` |
 | casehub-clinical | Routing: `ClinicalRoutingFeatureExtractor` (implements `RoutingFeatureExtractor`). Oversight: `ActionRiskClassifier`, `RiskClassifier`, `RiskDecision`, `ClassificationContext` |
 | casehub-iot | Oversight: `ActionRiskClassifier`, `RiskClassifier`, `RiskDecision`, `ClassificationContext` |
+| casehub-quarkmind | Summarisation: `SummarisationRunner`, `EventStreamBus`, `EventAccumulator`, `WindowPolicy`, `Summariser`, `EventLevel`, `LevelEvent` — SC2 game event hierarchy (L2→L3→L4 pipeline via `SummarisationLifecycle`, `GamePhaseSummariser`, `GameArcSummariser`) |
 
 ## Blocks Scope Criteria
 
