@@ -1,7 +1,7 @@
 package io.casehub.blocks.routing.agent;
 
 import com.fasterxml.jackson.databind.node.NullNode;
-import io.casehub.api.spi.routing.AgentAssignment;
+import io.casehub.api.spi.routing.RoutingResult;
 import io.casehub.api.spi.routing.AgentCandidate;
 import io.casehub.api.spi.routing.AgentHealth;
 import io.casehub.api.spi.routing.AgentRoutingContext;
@@ -218,7 +218,7 @@ class RoutingSupportTest {
 
             assertThat(outcome).isInstanceOf(RoutingSupport.TrustFilterOutcome.Decided.class);
             var decided = (RoutingSupport.TrustFilterOutcome.Decided) outcome;
-            assertThat(decided.assignment()).isInstanceOf(AgentAssignment.EscalateToOversight.class);
+            assertThat(decided.assignment()).isInstanceOf(RoutingResult.Escalated.class);
         }
     }
 }

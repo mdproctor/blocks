@@ -15,7 +15,7 @@
  */
 package io.casehub.blocks.routing.agent;
 
-import io.casehub.api.spi.routing.AgentAssignment;
+import io.casehub.api.spi.routing.RoutingResult;
 import io.casehub.api.spi.routing.AgentCandidate;
 import io.casehub.api.spi.routing.AgentRoutingContext;
 import io.casehub.api.spi.routing.AgentRoutingStrategy;
