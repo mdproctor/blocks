@@ -1,13 +1,12 @@
 package io.casehub.blocks.agentic.decomposition;
 
+import io.casehub.blocks.agentic.plan.ExecutionPlan;
 import io.smallrye.mutiny.Uni;
-
-import java.util.List;
 
 public class StaticDecomposition<T> implements DecompositionStrategy<T> {
 
     @Override
-    public Uni<List<TaskNode<T>>> decompose(TaskNode<T> compound,
+    public Uni<ExecutionPlan<T>> decompose(TaskNode<T> compound,
                                             DecompositionContext<T> context) {
         if (compound instanceof TaskNode.CompoundTask<T> ct) {
             for (var method : ct.methods()) {
@@ -15,8 +14,9 @@ public class StaticDecomposition<T> implements DecompositionStrategy<T> {
                     return method.strategy().decompose(compound, context);
                 }
             }
-            return Uni.createFrom().item(List.of());
+            return Uni.createFrom().failure(
+                new IllegalStateException("No decomposition method guard matched"));
         }
-        return Uni.createFrom().item(List.of(compound));
+        return Uni.createFrom().item(ExecutionPlan.singleton((TaskNode.LeafTask<T>) compound));
     }
 }

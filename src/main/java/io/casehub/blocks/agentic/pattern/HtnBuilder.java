@@ -9,12 +9,12 @@ import io.casehub.blocks.agentic.decomposition.TaskNode;
 import io.casehub.blocks.agentic.model.ExecutionModel;
 import io.casehub.blocks.agentic.model.ExecutionResult;
 import io.casehub.blocks.agentic.model.OrchestratedDriver;
+import io.casehub.blocks.agentic.plan.ExecutionPlan;
 import io.casehub.blocks.agentic.routing.SequentialRouting;
 import io.casehub.blocks.agentic.termination.TerminationCondition;
 import io.casehub.blocks.agentic.termination.TerminationDecision;
 import io.smallrye.mutiny.Uni;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class HtnBuilder<T> extends AbstractPatternBuilder<T, HtnBuilder<T>> {
@@ -44,22 +44,18 @@ public class HtnBuilder<T> extends AbstractPatternBuilder<T, HtnBuilder<T>> {
             throw new IllegalStateException("rootTask must be set before execute()");
         }
 
-        // Pre-decompose task tree eagerly using initial state
         return flatten(rootTask, initialContext)
-                .map(tasks -> {
-                    // Extract agents from primitive tasks
-                    var agents = tasks.stream()
-                            .map(t -> new RoutingCandidate(t.agent(), null))
+                .map(plan -> {
+                    var sortedNodes = plan.topologicalSort();
+                    var agents = sortedNodes.stream()
+                            .map(n -> new RoutingCandidate(n.task().agent(), null))
                             .toList();
 
-                    // Create termination condition that allows enough iterations for all tasks
-                    // SequentialRouting executes one agent per iteration
                     var localTermination = (TerminationCondition<T>) ctx -> Uni.createFrom().item(
                             ctx.iterationCount() >= agents.size()
                                     ? new TerminationDecision.Complete(ctx.results())
                                     : TerminationDecision.Continue.INSTANCE);
 
-                    // Build LOCAL execution model (does not mutate builder fields)
                     var localModel = new ExecutionModel<>(
                             routing,
                             decomposition,
@@ -77,9 +73,9 @@ public class HtnBuilder<T> extends AbstractPatternBuilder<T, HtnBuilder<T>> {
                 .flatMap(localModel -> new OrchestratedDriver<T>().execute(localModel, initialContext));
     }
 
-    private Uni<List<TaskNode.LeafTask<T>>> flatten(TaskNode<T> node, T state) {
+    private Uni<ExecutionPlan<T>> flatten(TaskNode<T> node, T state) {
         return switch (node) {
-            case TaskNode.LeafTask<T> leaf -> Uni.createFrom().item(List.of(leaf));
+            case TaskNode.LeafTask<T> leaf -> Uni.createFrom().item(ExecutionPlan.singleton(leaf));
 
             case TaskNode.CompoundTask<T> compound -> {
                 var matchingMethod = compound.methods().stream()
@@ -90,23 +86,7 @@ public class HtnBuilder<T> extends AbstractPatternBuilder<T, HtnBuilder<T>> {
 
                 var ctx = new DecompositionContext<>(state, List.of(), 0);
                 yield matchingMethod.strategy()
-                        .decompose(compound, ctx)
-                        .flatMap(children -> {
-                            var childFlattens = children.stream()
-                                    .map(child -> flatten(child, state))
-                                    .toList();
-
-                            return Uni.combine().all().unis(childFlattens)
-                                    .combinedWith(results -> {
-                                        var flattened = new ArrayList<TaskNode.LeafTask<T>>();
-                                        for (var result : results) {
-                                            @SuppressWarnings("unchecked")
-                                            var taskList = (List<TaskNode.LeafTask<T>>) result;
-                                            flattened.addAll(taskList);
-                                        }
-                                        return flattened;
-                                    });
-                        });
+                        .decompose(compound, ctx);
             }
         };
     }

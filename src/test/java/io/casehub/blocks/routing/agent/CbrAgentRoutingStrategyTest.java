@@ -54,7 +54,8 @@ class CbrAgentRoutingStrategyTest {
         0.85,
         Map.of(),
         List.of(
-            new ExperiencePlanStep("binding-a", capName, workerName, outcome, 0, Map.of())));
+            new ExperiencePlanStep("binding-a", capName, workerName, outcome, 0, Map.of())),
+        Map.of());
   }
 
   @Test
@@ -146,7 +147,8 @@ class CbrAgentRoutingStrategyTest {
               List.of(
                   new ExperiencePlanStep("b", "analysis", "agent-a", "SUCCESS", 0, Map.of()),
                   new ExperiencePlanStep("b", "analysis", "agent-b", "SUCCESS", 0, Map.of()),
-                  new ExperiencePlanStep("b", "analysis", "agent-b", "SUCCESS", 0, Map.of())));
+                  new ExperiencePlanStep("b", "analysis", "agent-b", "SUCCESS", 0, Map.of())),
+              Map.of());
 
       var strategy = new CbrAgentRoutingStrategy((AgentGraphQuery) null, null, null, null);
       var result =

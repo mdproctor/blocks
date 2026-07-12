@@ -4,6 +4,7 @@ import io.casehub.blocks.agentic.AgentRef;
 import io.casehub.blocks.agentic.AgentResult;
 import io.casehub.blocks.agentic.decomposition.DecompositionMethod;
 import io.casehub.blocks.agentic.decomposition.TaskNode;
+import io.casehub.blocks.agentic.plan.ExecutionPlan;
 import io.casehub.blocks.agentic.model.ExecutionResult;
 import io.smallrye.mutiny.Uni;
 import org.junit.jupiter.api.Test;
@@ -49,10 +50,10 @@ class HtnBuilderTest {
         var rootTask = new TaskNode.CompoundTask<String>("deploy-app", List.of(
                 new DecompositionMethod<String>(
                         state -> true,
-                        (compound, ctx) -> Uni.createFrom().item(List.of(
+                        (compound, ctx) -> Uni.createFrom().item(ExecutionPlan.sequence(List.of(
                                 new TaskNode.PrimitiveTask<String>(null, build, s -> true, s -> {}),
                                 new TaskNode.PrimitiveTask<String>(null, test, s -> true, s -> {}),
-                                new TaskNode.PrimitiveTask<String>(null, deploy, s -> true, s -> {}))))));
+                                new TaskNode.PrimitiveTask<String>(null, deploy, s -> true, s -> {})))))));
 
         var result = Patterns.<String>htn()
                 .rootTask(rootTask)
@@ -79,11 +80,11 @@ class HtnBuilderTest {
         var rootTask = new TaskNode.CompoundTask<String>("deploy", List.of(
                 new DecompositionMethod<>(
                         (String s) -> s.contains("hotfix"),
-                        (compound, ctx) -> Uni.createFrom().item(List.of(
+                        (compound, ctx) -> Uni.createFrom().item(ExecutionPlan.singleton(
                                 new TaskNode.PrimitiveTask<>(null, hotfix, s -> true, s -> {})))),
                 new DecompositionMethod<>(
                         (String s) -> true,
-                        (compound, ctx) -> Uni.createFrom().item(List.of(
+                        (compound, ctx) -> Uni.createFrom().item(ExecutionPlan.singleton(
                                 new TaskNode.PrimitiveTask<>(null, fullDeploy, s -> true, s -> {}))))));
 
         var result = Patterns.<String>htn()

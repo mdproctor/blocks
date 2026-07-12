@@ -1,6 +1,7 @@
 package io.casehub.blocks.agentic.decomposition;
 
 import io.casehub.blocks.agentic.AgentRef;
+import io.casehub.blocks.agentic.plan.ExecutionPlan;
 
 import java.util.List;
 import java.util.function.Predicate;
@@ -22,9 +23,14 @@ public final class Decomposition {
     }
 
     @SafeVarargs
+    @SuppressWarnings("unchecked")
     public static <T> DecompositionStrategy<T> sequence(TaskNode<T>... tasks) {
-        var list = List.of(tasks);
-        return (compound, ctx) -> io.smallrye.mutiny.Uni.createFrom().item(list);
+        var leafTasks = java.util.Arrays.stream(tasks)
+            .filter(t -> t instanceof TaskNode.LeafTask<T>)
+            .map(t -> (TaskNode.LeafTask<T>) t)
+            .toList();
+        return (compound, ctx) -> io.smallrye.mutiny.Uni.createFrom()
+            .item(ExecutionPlan.sequence(leafTasks));
     }
 
     public static <T> TaskNode.PrimitiveTask<T> primitive(AgentRef agent) {

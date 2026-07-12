@@ -3,6 +3,7 @@ package io.casehub.blocks.agentic.decomposition;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.blocks.agentic.AgentCardSupport;
+import io.casehub.blocks.agentic.plan.ExecutionPlan;
 import io.casehub.blocks.agentic.AgentRef;
 import io.casehub.blocks.agentic.RoutingCandidate;
 import io.casehub.platform.agent.AgentEvent;
@@ -43,10 +44,14 @@ public class LlmDecomposition<T> implements DecompositionStrategy<T> {
     }
 
     @Override
-    public Uni<List<TaskNode<T>>> decompose(TaskNode<T> compound,
+    public Uni<ExecutionPlan<T>> decompose(TaskNode<T> compound,
                                             DecompositionContext<T> context) {
         if (!(compound instanceof TaskNode.CompoundTask<T> goal)) {
-            return Uni.createFrom().item(List.of(compound));
+            if (compound instanceof TaskNode.LeafTask<T> leaf) {
+                return Uni.createFrom().item(ExecutionPlan.singleton(leaf));
+            }
+            return Uni.createFrom().failure(
+                new IllegalStateException("Unexpected TaskNode type: " + compound.getClass()));
         }
 
         return Uni.createFrom().item(() -> {
@@ -60,10 +65,12 @@ public class LlmDecomposition<T> implements DecompositionStrategy<T> {
                         .collect().with(Collectors.joining())
                         .await().indefinitely();
 
-                return parseResponse(text, context.agents());
+                var tasks = parseResponse(text, context.agents());
+                if (tasks.isEmpty()) throw new IllegalStateException("LLM returned empty plan");
+                return ExecutionPlan.sequence(tasks);
             } catch (Exception e) {
                 LOG.log(System.Logger.Level.WARNING, "LLM decomposition failed", e);
-                return List.<TaskNode<T>>of();
+                throw e;
             }
         });
     }
@@ -87,7 +94,7 @@ public class LlmDecomposition<T> implements DecompositionStrategy<T> {
         return sb.toString();
     }
 
-    private List<TaskNode<T>> parseResponse(@Nullable String text,
+    private List<TaskNode.LeafTask<T>> parseResponse(@Nullable String text,
                                             List<RoutingCandidate> agents) {
         if (text == null || text.isBlank()) return List.of();
 
@@ -104,7 +111,7 @@ public class LlmDecomposition<T> implements DecompositionStrategy<T> {
             var root = MAPPER.readTree(trimmed);
             if (!root.isArray()) return List.of();
 
-            var result = new ArrayList<TaskNode<T>>();
+            var result = new ArrayList<TaskNode.LeafTask<T>>();
             for (JsonNode node : root) {
                 var agentName = node.has("agent") ? node.get("agent").asText() : null;
                 var task = node.has("task") ? node.get("task").asText() : null;

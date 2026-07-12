@@ -48,7 +48,8 @@ class CbrRoutingPromptSectionTest {
             Map.of(),
             List.of(
                 new ExperiencePlanStep(
-                    "binding", "other-cap", "agent-a", "SUCCESS", 0, Map.of())));
+                    "binding", "other-cap", "agent-a", "SUCCESS", 0, Map.of())),
+            Map.of());
 
     var result =
         section.render(
@@ -69,7 +70,8 @@ class CbrRoutingPromptSectionTest {
             Map.of(),
             List.of(
                 new ExperiencePlanStep(
-                    "assess-risk", "analysis", "agent-a", "SUCCESS", 0, Map.of())));
+                    "assess-risk", "analysis", "agent-a", "SUCCESS", 0, Map.of())),
+            Map.of());
 
     var result =
         section.render(
@@ -94,7 +96,8 @@ class CbrRoutingPromptSectionTest {
                       Map.of(),
                       List.of(
                               new ExperiencePlanStep(
-                                      "binding", "analysis", "not-eligible", "SUCCESS", 0, Map.of())));
+                                      "binding", "analysis", "not-eligible", "SUCCESS", 0, Map.of())),
+                      Map.of());
 
       var result =
               section.render(
@@ -116,7 +119,8 @@ class CbrRoutingPromptSectionTest {
                 new ExperiencePlanStep(
                     "b1", "analysis", "agent-a", "SUCCESS", 0, Map.of()),
                 new ExperiencePlanStep(
-                    "b2", "analysis", "agent-a", "FAILURE", 0, Map.of())));
+                    "b2", "analysis", "agent-a", "FAILURE", 0, Map.of())),
+            Map.of());
 
     var result =
         section.render(

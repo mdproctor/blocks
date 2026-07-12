@@ -224,7 +224,7 @@ class LlmAgentRoutingStrategyTest {
 
             var result = strategy.select(context("analysis"), List.of(a)).await().indefinitely();
             assertThat(result).isInstanceOf(RoutingResult.Escalated.class);
-            assertThat(((RoutingResult.Escalated) result).reason())
+            assertThat(((RoutingResult.Escalated) result).escalationReason())
                     .isEqualTo(EscalationReason.BORDERLINE_STALEMATE);
         }
 
@@ -242,7 +242,7 @@ class LlmAgentRoutingStrategyTest {
 
             var result = strategy.select(context("analysis"), List.of(a)).await().indefinitely();
             assertThat(result).isInstanceOf(RoutingResult.Escalated.class);
-            assertThat(((RoutingResult.Escalated) result).reason())
+            assertThat(((RoutingResult.Escalated) result).escalationReason())
                     .isEqualTo(EscalationReason.NO_QUALIFIED_AGENT);
         }
 
