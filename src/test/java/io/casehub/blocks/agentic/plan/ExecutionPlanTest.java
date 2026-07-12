@@ -13,8 +13,8 @@ import org.junit.jupiter.api.Test;
 class ExecutionPlanTest {
 
     private static TaskNode.PlannedTask<String> task(String desc) {
-        return new TaskNode.PlannedTask<>(desc,
-                new AgentRef.ExternalAgent(s -> java.util.concurrent.CompletableFuture.completedStage(io.casehub.blocks.agentic.AgentResult.success(null, null))), null);
+        return new TaskNode.PlannedTask<>(java.util.UUID.randomUUID().toString(), java.time.Instant.now(), desc,
+                new AgentRef.ExternalAgent(null, s -> java.util.concurrent.CompletableFuture.completedStage(io.casehub.blocks.agentic.AgentResult.success(null, null))), null);
     }
 
     @Test

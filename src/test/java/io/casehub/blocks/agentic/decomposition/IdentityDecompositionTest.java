@@ -15,7 +15,7 @@ class IdentityDecompositionTest {
     @Test
     void returnsPrimitiveAsSingletonPlan() {
         var agent = AgentRef.external(s -> CompletableFuture.completedFuture(null));
-        var primitive = new TaskNode.PrimitiveTask<String>(null, agent, null, null);
+        var primitive = new TaskNode.PrimitiveTask<String>("id1", java.time.Instant.now(), null, agent, null, null);
         var decomp = new IdentityDecomposition<String>();
         var ctx = new DecompositionContext<>("state", List.of(), 0);
 

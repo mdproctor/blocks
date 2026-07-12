@@ -198,7 +198,7 @@ class LlmDecompositionTest {
         @Test
         void returnsInputUnchangedForNonCompoundTask() {
             var decomp = new LlmDecomposition<String>(failingProvider());
-            var leaf = new TaskNode.PlannedTask<String>("task", dummyAgent(), null);
+            var leaf = new TaskNode.PlannedTask<String>("id1", java.time.Instant.now(), "task", dummyAgent(), null);
             var ctx = new DecompositionContext<String>("s", List.of(), 0);
 
             var result = decomp.decompose(leaf, ctx).await().indefinitely();

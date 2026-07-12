@@ -12,8 +12,10 @@ import io.casehub.platform.agent.AgentSessionConfig;
 import io.smallrye.mutiny.Uni;
 import org.jspecify.annotations.Nullable;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -126,7 +128,7 @@ public class LlmDecomposition<T> implements DecompositionStrategy<T> {
                     continue;
                 }
 
-                result.add(new TaskNode.PlannedTask<>(task, agentRef, rationale));
+                result.add(new TaskNode.PlannedTask<>(UUID.randomUUID().toString(), Instant.now(), task, agentRef, rationale));
             }
             return result;
         } catch (Exception e) {

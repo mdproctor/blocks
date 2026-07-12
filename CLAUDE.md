@@ -144,7 +144,6 @@ Structured conversation protocol — reusable infrastructure for multi-agent del
 | `RoundMemo` | Summary memo for a completed conversation round — key outcomes, unresolved points. |
 | `FlagEntry` | Flag raised during conversation — attention markers for moderators or supervisors. |
 | `SubTaskFinding` | Result from a sub-agent task (verify, analyse, etc.) attached to a conversation point. |
-| `SubTaskStatus` | Status tracking for dispatched sub-agent tasks within a conversation. |
 
 ## Package: `io.casehub.blocks.oversight`
 
@@ -168,9 +167,9 @@ Compositional agentic orchestration framework — eight sub-packages implementin
 
 | Sub-package | What it contains |
 |-------------|-----------------|
-| `agentic` | Foundation types: `AgentRef` (sealed: WorkerAgent, ChannelAgent, HumanAgent, ExternalAgent, ComposedAgent), `AgentResult`, `RoutingCandidate`, `FailurePolicy`, `AgentCardSupport` (shared card-building + name-resolution for LLM prompts) |
+| `agentic` | Foundation types: `AgentRef` (sealed: WorkerAgent, ChannelAgent, HumanAgent, ExternalAgent, ComposedAgent; extends `ExecutorRef` — each variant implements `name()`/`description()`), `AgentResult`, `RoutingCandidate`, `FailurePolicy`, `AgentCardSupport` (shared card-building via `ExecutorRef`; no more pattern matching) |
 | `agentic.routing` | Routing SPI: `RoutingStrategy<T>`, `RoutingDecision` (sealed: Selected, Unresolvable, Escalate), `FirstMatchRouting`, `RoundRobinRouting`, `SequentialRouting`, `LlmSelectedRouting` |
-| `agentic.decomposition` | Decomposition SPI: `DecompositionStrategy<T>`, `TaskNode` (sealed: LeafTask \| CompoundTask; LeafTask sealed: PrimitiveTask, PlannedTask), `DecompositionMethod`, `DecompositionContext`, `IdentityDecomposition`, `StaticDecomposition`, `LlmDecomposition` |
+| `agentic.decomposition` | Decomposition SPI: `DecompositionStrategy<T>`, `TaskNode` (sealed: LeafTask \| CompoundTask; LeafTask sealed: PrimitiveTask, PlannedTask; LeafTask extends `TaskDescriptor` — both variants carry `id`, `createdAt`, `status()` → PENDING, `executor()` delegates to `agent()`), `DecompositionMethod`, `DecompositionContext`, `IdentityDecomposition`, `StaticDecomposition`, `LlmDecomposition` |
 | `agentic.activation` | Activation SPI: `ActivationRule<T>`, `ActivationContext`, `OnExplicitDispatch`, `MaxIterationsGuard` |
 | `agentic.aggregation` | Aggregation SPI: `AggregationStrategy<T>`, `AggregationResult` (sealed: Resolved, Partial, Deadlocked), `PassThrough`, `CollectAll`, `MajorityVote` |
 | `agentic.termination` | Termination SPI: `TerminationCondition<T>`, `TerminationDecision` (sealed: Continue, Complete, Failed, Escalate), `GoalReached`, `MaxIterationsTermination`, `JudgeConvergence` |

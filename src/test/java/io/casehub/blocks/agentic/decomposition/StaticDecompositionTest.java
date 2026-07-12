@@ -15,7 +15,7 @@ class StaticDecompositionTest {
     @Test
     void selectsFirstMatchingMethod() {
         var agent1 = AgentRef.external(s -> CompletableFuture.completedFuture(null));
-        var prim1 = new TaskNode.PrimitiveTask<String>(null, agent1, null, null);
+        var prim1 = new TaskNode.PrimitiveTask<String>("s1", java.time.Instant.now(), null, agent1, null, null);
 
         DecompositionStrategy<String> strategy1 = (compound, ctx) ->
                 io.smallrye.mutiny.Uni.createFrom().item(ExecutionPlan.singleton(prim1));

@@ -3,7 +3,9 @@ package io.casehub.blocks.agentic.decomposition;
 import io.casehub.blocks.agentic.AgentRef;
 import io.casehub.blocks.agentic.plan.ExecutionPlan;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import java.util.function.Predicate;
 
 public final class Decomposition {
@@ -34,11 +36,11 @@ public final class Decomposition {
     }
 
     public static <T> TaskNode.PrimitiveTask<T> primitive(AgentRef agent) {
-        return new TaskNode.PrimitiveTask<>(null, agent, null, null);
+        return new TaskNode.PrimitiveTask<>(UUID.randomUUID().toString(), Instant.now(), null, agent, null, null);
     }
 
     public static <T> TaskNode.PrimitiveTask<T> primitive(String description, AgentRef agent) {
-        return new TaskNode.PrimitiveTask<>(description, agent, null, null);
+        return new TaskNode.PrimitiveTask<>(UUID.randomUUID().toString(), Instant.now(), description, agent, null, null);
     }
 
     public static <T> TaskNode.CompoundTask<T> compound(String name,
@@ -47,11 +49,11 @@ public final class Decomposition {
     }
 
     public static <T> TaskNode.PlannedTask<T> planned(String description, AgentRef agent) {
-        return new TaskNode.PlannedTask<>(description, agent, null);
+        return new TaskNode.PlannedTask<>(UUID.randomUUID().toString(), Instant.now(), description, agent, null);
     }
 
     public static <T> TaskNode.PlannedTask<T> planned(String description, AgentRef agent,
                                                       String rationale) {
-        return new TaskNode.PlannedTask<>(description, agent, rationale);
+        return new TaskNode.PlannedTask<>(UUID.randomUUID().toString(), Instant.now(), description, agent, rationale);
     }
 }
