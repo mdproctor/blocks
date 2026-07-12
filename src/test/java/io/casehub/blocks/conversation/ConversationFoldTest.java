@@ -1,6 +1,7 @@
 package io.casehub.blocks.conversation;
 
 import org.junit.jupiter.api.Nested;
+import io.casehub.api.model.TaskStatus;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -248,7 +249,7 @@ class ConversationFoldTest {
             assertThat(f.pointId()).isEqualTo("point-1");
             assertThat(f.finding()).isNull();
             assertThat(f.errorReason()).isNull();
-            assertThat(f.status()).isEqualTo(SubTaskStatus.PENDING);
+            assertThat(f.status()).isEqualTo(TaskStatus.PENDING);
         }
 
         @Test
@@ -274,7 +275,7 @@ class ConversationFoldTest {
                     "st-1", "VERIFY", "ARBITRATOR", "point-1", "Claim verified");
 
             SubTaskFinding f = result.subTaskFindings().get("st-1");
-            assertThat(f.status()).isEqualTo(SubTaskStatus.COMPLETE);
+            assertThat(f.status()).isEqualTo(TaskStatus.COMPLETED);
             assertThat(f.finding()).isEqualTo("Claim verified");
             assertThat(f.requestedBy()).isEqualTo("REVIEWER");
             assertThat(f.pointId()).isEqualTo("point-1");
@@ -286,7 +287,7 @@ class ConversationFoldTest {
                     "st-new", "VERIFY", "ARBITRATOR", "point-2", "finding content");
 
             SubTaskFinding f = result.subTaskFindings().get("st-new");
-            assertThat(f.status()).isEqualTo(SubTaskStatus.COMPLETE);
+            assertThat(f.status()).isEqualTo(TaskStatus.COMPLETED);
             assertThat(f.requestedBy()).isEqualTo("ARBITRATOR");
         }
 
@@ -316,7 +317,7 @@ class ConversationFoldTest {
                     "st-2", "CUSTOM", "ARBITRATOR", "task failed");
 
             SubTaskFinding f = result.subTaskFindings().get("st-2");
-            assertThat(f.status()).isEqualTo(SubTaskStatus.ERROR);
+            assertThat(f.status()).isEqualTo(TaskStatus.FAULTED);
             assertThat(f.errorReason()).isEqualTo("task failed");
             assertThat(f.requestedBy()).isEqualTo("IMPLEMENTOR");
             assertThat(f.pointId()).isEqualTo("point-3");
@@ -328,7 +329,7 @@ class ConversationFoldTest {
                     "st-orphan", "CUSTOM", "ARBITRATOR", "error reason");
 
             SubTaskFinding f = result.subTaskFindings().get("st-orphan");
-            assertThat(f.status()).isEqualTo(SubTaskStatus.ERROR);
+            assertThat(f.status()).isEqualTo(TaskStatus.FAULTED);
             assertThat(f.requestedBy()).isEqualTo("ARBITRATOR");
         }
 

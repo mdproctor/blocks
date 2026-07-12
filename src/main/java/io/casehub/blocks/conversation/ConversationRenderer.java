@@ -122,9 +122,10 @@ public class ConversationRenderer {
     private String renderFinding(SubTaskFinding f) {
         return switch (f.status()) {
             case PENDING  -> "  ⏳ **" + f.taskType() + "** pending...\n";
-            case ERROR    -> "  ✗ **" + f.taskType() + "** failed: " + f.errorReason() + "\n";
-            case COMPLETE -> "  ⊕ **" + f.taskType() + "** _(fresh context — no prior round knowledge)_\n"
+            case FAULTED    -> "  ✗ **" + f.taskType() + "** failed: " + f.errorReason() + "\n";
+            case COMPLETED -> "  ⊕ **" + f.taskType() + "** _(fresh context — no prior round knowledge)_\n"
                            + "  " + Objects.requireNonNullElse(f.finding(), "(no finding)") + "\n";
+            default -> "  **" + f.taskType() + "** " + f.status() + System.lineSeparator();
         };
     }
 }

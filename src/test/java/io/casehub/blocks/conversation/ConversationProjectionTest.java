@@ -2,6 +2,7 @@ package io.casehub.blocks.conversation;
 
 import io.casehub.blocks.channel.ChannelMessageMeta;
 import io.casehub.qhorus.api.message.MessageView;
+import io.casehub.api.model.TaskStatus;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -229,7 +230,7 @@ class ConversationProjectionTest {
         assertThat(finding.pointId()).isEqualTo("point-1");
         assertThat(finding.finding()).isNull();
         assertThat(finding.errorReason()).isNull();
-        assertThat(finding.status()).isEqualTo(SubTaskStatus.PENDING);
+        assertThat(finding.status()).isEqualTo(TaskStatus.PENDING);
     }
 
     @Test
@@ -268,7 +269,7 @@ class ConversationProjectionTest {
         var result = projection.apply(state, findingMsg);
 
         SubTaskFinding f = result.subTaskFindings().get("st-1");
-        assertThat(f.status()).isEqualTo(SubTaskStatus.COMPLETE);
+        assertThat(f.status()).isEqualTo(TaskStatus.COMPLETED);
         assertThat(f.finding()).isEqualTo("Claim verified");
         assertThat(f.requestedBy()).isEqualTo("REVIEWER");  // Bug fix R2-03
         assertThat(f.pointId()).isEqualTo("point-1");
@@ -287,7 +288,7 @@ class ConversationProjectionTest {
         var result = projection.apply(state, msg);
 
         SubTaskFinding f = result.subTaskFindings().get("st-new");
-        assertThat(f.status()).isEqualTo(SubTaskStatus.COMPLETE);
+        assertThat(f.status()).isEqualTo(TaskStatus.COMPLETED);
         assertThat(f.requestedBy()).isEqualTo("ARBITRATOR");
     }
 
@@ -314,7 +315,7 @@ class ConversationProjectionTest {
         var result = projection.apply(state, errorMsg);
 
         SubTaskFinding f = result.subTaskFindings().get("st-2");
-        assertThat(f.status()).isEqualTo(SubTaskStatus.ERROR);
+        assertThat(f.status()).isEqualTo(TaskStatus.FAULTED);
         assertThat(f.errorReason()).isEqualTo("task failed");
         assertThat(f.requestedBy()).isEqualTo("IMPLEMENTOR");  // Bug fix R2-03
         assertThat(f.pointId()).isEqualTo("point-3");
@@ -332,7 +333,7 @@ class ConversationProjectionTest {
         var result = projection.apply(state, msg);
 
         SubTaskFinding f = result.subTaskFindings().get("st-orphan");
-        assertThat(f.status()).isEqualTo(SubTaskStatus.ERROR);
+        assertThat(f.status()).isEqualTo(TaskStatus.FAULTED);
         assertThat(f.requestedBy()).isEqualTo("ARBITRATOR");
     }
 

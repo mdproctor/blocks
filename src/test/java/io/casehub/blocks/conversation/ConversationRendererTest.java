@@ -1,5 +1,6 @@
 package io.casehub.blocks.conversation;
 
+import io.casehub.api.model.TaskStatus;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -226,7 +227,7 @@ class ConversationRendererTest {
 
         var findings = new LinkedHashMap<String, SubTaskFinding>();
         findings.put("st-1", new SubTaskFinding("st-1", "VERIFY", "REV", "RP-1",
-                "Verified: bug confirmed", null, SubTaskStatus.COMPLETE));
+                "Verified: bug confirmed", null, TaskStatus.COMPLETED));
 
         var renderer = new ConversationRenderer(emptyConfig());
         var result = renderer.render(state(points, List.of(), List.of(), findings));
@@ -245,7 +246,7 @@ class ConversationRendererTest {
     void subTaskFindings_standaloneRenderedSeparately() {
         var findings = new LinkedHashMap<String, SubTaskFinding>();
         findings.put("st-1", new SubTaskFinding("st-1", "NEUTRAL_SUMMARY", "REV", null,
-                "Overall summary text", null, SubTaskStatus.COMPLETE));
+                "Overall summary text", null, TaskStatus.COMPLETED));
 
         var renderer = new ConversationRenderer(emptyConfig());
         var result = renderer.render(state(Map.of(), List.of(), List.of(), findings));
@@ -259,11 +260,11 @@ class ConversationRendererTest {
     void subTaskFindings_statusRendering() {
         var findings = new LinkedHashMap<String, SubTaskFinding>();
         findings.put("st-p", new SubTaskFinding("st-p", "CHECK", "REV", null,
-                null, null, SubTaskStatus.PENDING));
+                null, null, TaskStatus.PENDING));
         findings.put("st-e", new SubTaskFinding("st-e", "VALIDATE", "REV", null,
-                null, "timeout", SubTaskStatus.ERROR));
+                null, "timeout", TaskStatus.FAULTED));
         findings.put("st-c", new SubTaskFinding("st-c", "VERIFY", "REV", null,
-                "All good", null, SubTaskStatus.COMPLETE));
+                "All good", null, TaskStatus.COMPLETED));
 
         var renderer = new ConversationRenderer(emptyConfig());
         var result = renderer.render(state(Map.of(), List.of(), List.of(), findings));
@@ -356,9 +357,9 @@ class ConversationRendererTest {
 
         var inlineFindings = new LinkedHashMap<String, SubTaskFinding>();
         inlineFindings.put("st-1", new SubTaskFinding("st-1", "VERIFY", "REV", "RP-1",
-                "Bug confirmed", null, SubTaskStatus.COMPLETE));
+                "Bug confirmed", null, TaskStatus.COMPLETED));
         inlineFindings.put("st-2", new SubTaskFinding("st-2", "SUMMARY", "REV", null,
-                "Session wrap", null, SubTaskStatus.COMPLETE));
+                "Session wrap", null, TaskStatus.COMPLETED));
 
         var renderer = new ConversationRenderer(reviewConfig());
         var result = renderer.render(state(points, flags, memos, inlineFindings));
@@ -380,7 +381,7 @@ class ConversationRendererTest {
     void subTaskFinding_completedWithNullFinding_showsFallback() {
         var findings = new LinkedHashMap<String, SubTaskFinding>();
         findings.put("st-1", new SubTaskFinding("st-1", "VERIFY", "REV", null,
-                null, null, SubTaskStatus.COMPLETE));
+                null, null, TaskStatus.COMPLETED));
 
         var renderer = new ConversationRenderer(emptyConfig());
         var result = renderer.render(state(Map.of(), List.of(), List.of(), findings));

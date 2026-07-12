@@ -1,5 +1,6 @@
 package io.casehub.blocks.conversation;
 
+import io.casehub.api.model.TaskStatus;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 
@@ -89,7 +90,7 @@ public final class ConversationFold {
                                                     String pointId) {
         var findings = new LinkedHashMap<>(state.subTaskFindings());
         findings.put(subTaskId, new SubTaskFinding(subTaskId, taskType, requestingRole,
-                pointId, null, null, SubTaskStatus.PENDING));
+                pointId, null, null, TaskStatus.PENDING));
 
         return new ConversationState(state.points(), new ArrayList<>(state.humanFlags()),
                 new ArrayList<>(state.memos()), findings);
@@ -109,7 +110,7 @@ public final class ConversationFold {
                 ? existing.pointId() : pointId;
 
         findings.put(subTaskId, new SubTaskFinding(subTaskId, taskType, requestedBy,
-                resolvedPointId, finding, null, SubTaskStatus.COMPLETE));
+                resolvedPointId, finding, null, TaskStatus.COMPLETED));
 
         return new ConversationState(state.points(), new ArrayList<>(state.humanFlags()),
                 new ArrayList<>(state.memos()), findings);
@@ -127,7 +128,7 @@ public final class ConversationFold {
         String resolvedPointId = existing != null ? existing.pointId() : null;
 
         findings.put(subTaskId, new SubTaskFinding(subTaskId, taskType, requestedBy,
-                resolvedPointId, null, reason, SubTaskStatus.ERROR));
+                resolvedPointId, null, reason, TaskStatus.FAULTED));
 
         return new ConversationState(state.points(), new ArrayList<>(state.humanFlags()),
                 new ArrayList<>(state.memos()), findings);

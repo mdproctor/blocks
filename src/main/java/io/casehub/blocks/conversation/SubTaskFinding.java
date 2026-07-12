@@ -1,5 +1,7 @@
 package io.casehub.blocks.conversation;
 
+import io.casehub.api.model.TaskStatus;
+
 public record SubTaskFinding(
         String subTaskId,
         String taskType,       // string-typed task type (e.g., "VERIFY", "ARBITRATE", "CUSTOM")
@@ -7,5 +9,5 @@ public record SubTaskFinding(
         String pointId,        // null for neutral summaries or custom tasks
         String finding,        // null while PENDING or on ERROR
         String errorReason,    // fixed sanitized string — never exception messages
-        SubTaskStatus status
+        TaskStatus status
 ) {}
