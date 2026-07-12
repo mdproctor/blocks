@@ -3,8 +3,36 @@
 **Date:** 2026-07-10
 **Issue:** casehubio/engine#700
 **Related:** casehubio/engine#101 (LLM supervisor mode), casehubio/blocks#44 (agentic planning epic)
-**Status:** Design reasoning — not yet a spec. Captures the architectural argument
-for why unification is necessary and what the shared model should look like.
+**Status:** Design reasoning. Captures the architectural argument for why
+unification is necessary and what the shared model should look like.
+
+## Implementation Status (updated 2026-07-12)
+
+Phases 1 and 4 are complete. The shared types are in engine-api. Sections §3–4
+below describe the pre-unification state that motivated this work — types
+referenced there (`PlanItemStatus`, `AgentAssignment`, bare `workerName` String)
+have been replaced by their shared equivalents.
+
+| Phase | Status | What shipped |
+|-------|--------|-------------|
+| Phase 1 — shared identity | ✅ Done (engine#700) | `TaskDescriptor`, `ExecutorRef`, `TaskStatus`, `RoutingResult`, `Assignment`, `TaskSnapshot`, `OutcomeKind` in engine-api. `PlanItem` implements `TaskDescriptor` with `ExecutorRef`. |
+| Phase 4 — Context Bridge | ✅ Done (engine#203) | `ContextBridge<T>` SPI with 3 built-in bridges (Map, POJO, JsonNode). `WorkerFunction<T>` parameterised. |
+| Blocks adoption | Open (#50, #51, #52) | `AgentRef extends ExecutorRef` (#50), `LeafTask extends TaskDescriptor` (#51, scope widened from PlannedTask-only), `SubTaskStatus → TaskStatus` (#52) |
+| Phase 2 — DAG plan | Open (engine#694, #695) | Not started |
+| Phase 3 — CoordinationStrategy | Future | Depends on Phase 2 |
+| Phase 5 — retire layering | Future | Depends on Phases 2–3 |
+
+**Design evolution:** §6.1 proposed `TaskIdentity` as a shared record. Engine shipped
+`TaskDescriptor` as an interface instead — better, because both `PlanItem` (mutable)
+and `LeafTask` (immutable) can implement the same contract without forcing one lifecycle
+model. §6.1 also proposed separate `PlanTask`/`ExecutionTask` types — engine unified
+these under `TaskDescriptor` as a single interface with `status()` distinguishing
+lifecycle stage.
+
+**#51 scope note:** After first-principles review, widened from "PlannedTask implements
+TaskDescriptor" to "LeafTask extends TaskDescriptor" — both leaf variants are units of
+work that should be monitorable. `LeafTask` provides a default `executor()` delegating
+to `agent()` to bridge the agentic and shared vocabularies.
 
 ---
 
