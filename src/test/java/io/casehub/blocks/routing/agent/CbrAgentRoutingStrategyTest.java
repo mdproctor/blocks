@@ -8,6 +8,9 @@ import io.casehub.api.spi.routing.ExperiencePlanStep;
 import io.casehub.api.spi.routing.RetrievedExperience;
 import io.casehub.api.spi.routing.RoutingOutcome;
 import io.casehub.api.spi.routing.RoutingResult;
+import io.casehub.api.spi.routing.RoutingSignal;
+import io.casehub.api.spi.routing.RoutingSignalAssembler;
+import io.casehub.api.spi.routing.RoutingSignalProvider;
 import io.casehub.api.spi.routing.TrustRoutingPolicy;
 import io.casehub.api.spi.routing.TrustRoutingPolicyProvider;
 import io.casehub.eidos.api.AgentGraphQuery;
@@ -61,20 +64,20 @@ class CbrAgentRoutingStrategyTest {
 
   @Test
   void idIsCbr() {
-    var strategy = new CbrAgentRoutingStrategy((AgentGraphQuery) null, null, null, null, new DefaultCbrOutcomeWeights());
+    var strategy = new CbrAgentRoutingStrategy((AgentGraphQuery) null, null, null, null, new DefaultCbrOutcomeWeights(), null);
     assertThat(strategy.id()).isEqualTo("cbr");
   }
 
   @Test
   void emptyCandidatesReturnsUnresolvable() {
-    var strategy = new CbrAgentRoutingStrategy((AgentGraphQuery) null, null, null, null, new DefaultCbrOutcomeWeights());
+    var strategy = new CbrAgentRoutingStrategy((AgentGraphQuery) null, null, null, null, new DefaultCbrOutcomeWeights(), null);
     var result = strategy.select(context("cap", List.of()), List.of()).await().indefinitely();
     assertThat(result).isInstanceOf(RoutingResult.Unresolvable.class);
   }
 
   @Test
   void emptyExperiencesNoGraphReturnsUnresolvable() {
-    var strategy = new CbrAgentRoutingStrategy((AgentGraphQuery) null, null, null, null, new DefaultCbrOutcomeWeights());
+    var strategy = new CbrAgentRoutingStrategy((AgentGraphQuery) null, null, null, null, new DefaultCbrOutcomeWeights(), null);
     var result =
         strategy
             .select(context("analysis", List.of()), List.of(candidate("agent-a")))
@@ -94,7 +97,7 @@ class CbrAgentRoutingStrategyTest {
               experience("analysis", "agent-b", "FAILURE"),
               experience("analysis", "agent-a", "SUCCESS"));
 
-      var strategy = new CbrAgentRoutingStrategy((AgentGraphQuery) null, null, null, null, new DefaultCbrOutcomeWeights());
+      var strategy = new CbrAgentRoutingStrategy((AgentGraphQuery) null, null, null, null, new DefaultCbrOutcomeWeights(), null);
       var result =
           strategy
               .select(
@@ -111,7 +114,7 @@ class CbrAgentRoutingStrategyTest {
     void ignoresWorkersNotInCandidateList() {
       var experiences = List.of(experience("analysis", "not-a-candidate", "SUCCESS"));
 
-      var strategy = new CbrAgentRoutingStrategy((AgentGraphQuery) null, null, null, null, new DefaultCbrOutcomeWeights());
+      var strategy = new CbrAgentRoutingStrategy((AgentGraphQuery) null, null, null, null, new DefaultCbrOutcomeWeights(), null);
       var result =
           strategy
               .select(context("analysis", experiences), List.of(candidate("agent-a")))
@@ -125,7 +128,7 @@ class CbrAgentRoutingStrategyTest {
     void ignoresExperiencesForDifferentCapability() {
       var experiences = List.of(experience("other-cap", "agent-a", "SUCCESS"));
 
-      var strategy = new CbrAgentRoutingStrategy((AgentGraphQuery) null, null, null, null, new DefaultCbrOutcomeWeights());
+      var strategy = new CbrAgentRoutingStrategy((AgentGraphQuery) null, null, null, null, new DefaultCbrOutcomeWeights(), null);
       var result =
           strategy
               .select(context("analysis", experiences), List.of(candidate("agent-a")))
@@ -151,7 +154,7 @@ class CbrAgentRoutingStrategyTest {
                   new ExperiencePlanStep("b", "analysis", "agent-b", "SUCCESS", 0, Map.of())),
               Map.of());
 
-      var strategy = new CbrAgentRoutingStrategy((AgentGraphQuery) null, null, null, null, new DefaultCbrOutcomeWeights());
+      var strategy = new CbrAgentRoutingStrategy((AgentGraphQuery) null, null, null, null, new DefaultCbrOutcomeWeights(), null);
       var result =
           strategy
               .select(
@@ -175,7 +178,7 @@ class CbrAgentRoutingStrategyTest {
               experience("analysis", "agent-a", "GATE_EXPIRED"),
               experience("analysis", "agent-b", "FAILURE"));
 
-      var strategy = new CbrAgentRoutingStrategy((AgentGraphQuery) null, null, null, null, new DefaultCbrOutcomeWeights());
+      var strategy = new CbrAgentRoutingStrategy((AgentGraphQuery) null, null, null, null, new DefaultCbrOutcomeWeights(), null);
       var result =
           strategy
               .select(
@@ -195,7 +198,7 @@ class CbrAgentRoutingStrategyTest {
               experience("analysis", "agent-a", "UNKNOWN_OUTCOME"),
               experience("analysis", "agent-b", "SUCCESS"));
 
-      var strategy = new CbrAgentRoutingStrategy((AgentGraphQuery) null, null, null, null, new DefaultCbrOutcomeWeights());
+      var strategy = new CbrAgentRoutingStrategy((AgentGraphQuery) null, null, null, null, new DefaultCbrOutcomeWeights(), null);
       var result =
           strategy
               .select(
@@ -217,7 +220,7 @@ class CbrAgentRoutingStrategyTest {
       when(graphQuery.topAgentsByOutcome(eq("analysis"), any(), any(), eq(10)))
           .thenReturn(List.of("agent-b", "agent-a"));
 
-      var strategy = new CbrAgentRoutingStrategy((AgentGraphQuery) graphQuery, null, null, null, new DefaultCbrOutcomeWeights());
+      var strategy = new CbrAgentRoutingStrategy((AgentGraphQuery) graphQuery, null, null, null, new DefaultCbrOutcomeWeights(), null);
       var result =
           strategy
               .select(
@@ -262,7 +265,7 @@ class CbrAgentRoutingStrategyTest {
       var experiences = List.of(experience("analysis", "qualified", "SUCCESS"));
 
       var strategy =
-          new CbrAgentRoutingStrategy((AgentGraphQuery) graphQuery, classifier, scoreSource, policyProvider, new DefaultCbrOutcomeWeights());
+          new CbrAgentRoutingStrategy((AgentGraphQuery) graphQuery, classifier, scoreSource, policyProvider, new DefaultCbrOutcomeWeights(), null);
       var result =
           strategy
               .select(context("analysis", experiences), List.of(good, bad))
@@ -295,7 +298,7 @@ class CbrAgentRoutingStrategyTest {
           experience("analysis", "agent-b", "SUCCESS"));
 
       var strategy = new CbrAgentRoutingStrategy(
-          (AgentGraphQuery) null, null, null, null, customWeights);
+          (AgentGraphQuery) null, null, null, null, customWeights, null);
       var result = strategy.select(
           context("analysis", experiences),
           List.of(candidate("agent-a"), candidate("agent-b")))
@@ -312,7 +315,7 @@ class CbrAgentRoutingStrategyTest {
           experience("analysis", "agent-b", "SUCCESS"));
 
       var strategy = new CbrAgentRoutingStrategy(
-          (AgentGraphQuery) null, null, null, null, new DefaultCbrOutcomeWeights());
+          (AgentGraphQuery) null, null, null, null, new DefaultCbrOutcomeWeights(), null);
       var result = strategy.select(
           context("analysis", experiences),
           List.of(candidate("agent-a"), candidate("agent-b")))
@@ -347,7 +350,7 @@ class CbrAgentRoutingStrategyTest {
           experienceWithSimilarity("analysis", "agent-b", "FAILURE", 0.95));
 
       var strategy = new CbrAgentRoutingStrategy(
-          (AgentGraphQuery) null, null, null, null, new DefaultCbrOutcomeWeights());
+          (AgentGraphQuery) null, null, null, null, new DefaultCbrOutcomeWeights(), null);
       var result = strategy.select(
           context("analysis", experiences),
           List.of(candidate("agent-a"), candidate("agent-b")))
@@ -366,7 +369,7 @@ class CbrAgentRoutingStrategyTest {
           experienceWithSimilarity("analysis", "agent-b", "SUCCESS", 0.7));
 
       var strategy = new CbrAgentRoutingStrategy(
-          (AgentGraphQuery) null, null, null, null, new DefaultCbrOutcomeWeights());
+          (AgentGraphQuery) null, null, null, null, new DefaultCbrOutcomeWeights(), null);
       var result = strategy.select(
           context("analysis", experiences),
           List.of(candidate("agent-a"), candidate("agent-b")))
@@ -383,7 +386,7 @@ class CbrAgentRoutingStrategyTest {
           experienceWithSimilarity("analysis", "agent-b", "SUCCESS", 0.8));
 
       var strategy = new CbrAgentRoutingStrategy(
-          (AgentGraphQuery) null, null, null, null, new DefaultCbrOutcomeWeights());
+          (AgentGraphQuery) null, null, null, null, new DefaultCbrOutcomeWeights(), null);
       var result = strategy.select(
           context("analysis", experiences),
           List.of(candidate("agent-a"), candidate("agent-b")))
@@ -391,6 +394,99 @@ class CbrAgentRoutingStrategyTest {
 
       assertThat(result).isInstanceOf(RoutingResult.Selected.class);
       assertThat(((RoutingResult.Selected) result).single().executorId()).isEqualTo("agent-b");
+    }
+  }
+
+  @Nested
+  class SignalIntegration {
+
+    private RoutingSignalProvider signalProvider(String id, RoutingSignal signal) {
+      return new RoutingSignalProvider() {
+        @Override public String id() { return id; }
+        @Override public RoutingSignal signal(AgentRoutingContext ctx, List<AgentCandidate> e) {
+          return signal;
+        }
+      };
+    }
+
+    @Test
+    void signalBoostsCandidateAboveExperienceOnlyWinner() {
+      var experiences = List.of(
+          experience("analysis", "agent-a", "GATE_EXPIRED"),
+          experience("analysis", "agent-b", "FAILURE"));
+
+      var signal = new RoutingSignal(Map.of(
+          "agent-b", new RoutingSignal.CandidateSignal(0.9, "plan-fit")));
+      var assembler = new RoutingSignalAssembler(
+          List.of(signalProvider("test", signal)));
+
+      var strategy = new CbrAgentRoutingStrategy(
+          (AgentGraphQuery) null, null, null, null,
+          new DefaultCbrOutcomeWeights(), assembler);
+      var result = strategy.select(
+          context("analysis", experiences),
+          List.of(candidate("agent-a"), candidate("agent-b")))
+          .await().indefinitely();
+
+      assertThat(result).isInstanceOf(RoutingResult.Selected.class);
+      assertThat(((RoutingResult.Selected) result).single().executorId()).isEqualTo("agent-b");
+    }
+
+    @Test
+    void signalOnlyNoExperiences() {
+      var signal = new RoutingSignal(Map.of(
+          "agent-a", new RoutingSignal.CandidateSignal(0.7, "signal-only")));
+      var assembler = new RoutingSignalAssembler(
+          List.of(signalProvider("test", signal)));
+
+      var strategy = new CbrAgentRoutingStrategy(
+          (AgentGraphQuery) null, null, null, null,
+          new DefaultCbrOutcomeWeights(), assembler);
+      var result = strategy.select(
+          context("analysis", List.of()),
+          List.of(candidate("agent-a"), candidate("agent-b")))
+          .await().indefinitely();
+
+      assertThat(result).isInstanceOf(RoutingResult.Selected.class);
+      assertThat(((RoutingResult.Selected) result).single().executorId()).isEqualTo("agent-a");
+    }
+
+    @Test
+    void noSignalsNoExperiencesFallsThrough() {
+      var assembler = new RoutingSignalAssembler(List.of());
+
+      var strategy = new CbrAgentRoutingStrategy(
+          (AgentGraphQuery) null, null, null, null,
+          new DefaultCbrOutcomeWeights(), assembler);
+      var result = strategy.select(
+          context("analysis", List.of()),
+          List.of(candidate("agent-a")))
+          .await().indefinitely();
+
+      assertThat(result).isInstanceOf(RoutingResult.Unresolvable.class);
+    }
+
+    @Test
+    void sparseCandidateMapHandledGracefully() {
+      var experiences = List.of(
+          experience("analysis", "agent-a", "SUCCESS"),
+          experience("analysis", "agent-b", "SUCCESS"));
+
+      var signal = new RoutingSignal(Map.of(
+          "agent-a", new RoutingSignal.CandidateSignal(0.5, "boosted")));
+      var assembler = new RoutingSignalAssembler(
+          List.of(signalProvider("test", signal)));
+
+      var strategy = new CbrAgentRoutingStrategy(
+          (AgentGraphQuery) null, null, null, null,
+          new DefaultCbrOutcomeWeights(), assembler);
+      var result = strategy.select(
+          context("analysis", experiences),
+          List.of(candidate("agent-a"), candidate("agent-b")))
+          .await().indefinitely();
+
+      assertThat(result).isInstanceOf(RoutingResult.Selected.class);
+      assertThat(((RoutingResult.Selected) result).single().executorId()).isEqualTo("agent-a");
     }
   }
 }

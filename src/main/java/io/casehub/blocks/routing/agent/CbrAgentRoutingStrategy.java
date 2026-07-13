@@ -21,6 +21,8 @@ import io.casehub.api.spi.routing.AgentRoutingStrategy;
 import io.casehub.api.spi.routing.RetrievedExperience;
 import io.casehub.api.spi.routing.RoutingOutcome;
 import io.casehub.api.spi.routing.RoutingResult;
+import io.casehub.api.spi.routing.RoutingSignal;
+import io.casehub.api.spi.routing.RoutingSignalAssembler;
 import io.casehub.api.spi.routing.TrustRoutingPolicyProvider;
 import io.casehub.eidos.api.AgentGraphQuery;
 import io.casehub.ledger.api.spi.TrustScoreSource;
@@ -60,6 +62,7 @@ public class CbrAgentRoutingStrategy implements AgentRoutingStrategy {
   private final @Nullable TrustScoreSource scoreSource;
   private final @Nullable TrustRoutingPolicyProvider policyProvider;
   private final CbrOutcomeWeights outcomeWeights;
+  private final @Nullable RoutingSignalAssembler signalAssembler;
 
   @Inject
   public CbrAgentRoutingStrategy(
@@ -67,12 +70,14 @@ public class CbrAgentRoutingStrategy implements AgentRoutingStrategy {
       final Instance<TrustCandidateClassifier> classifier,
       final Instance<TrustScoreSource> scoreSource,
       final Instance<TrustRoutingPolicyProvider> policyProvider,
-      final CbrOutcomeWeights outcomeWeights) {
+      final CbrOutcomeWeights outcomeWeights,
+      final Instance<RoutingSignalAssembler> signalAssembler) {
     this.graphQuery = graphQuery.isUnsatisfied() ? null : graphQuery.get();
     this.classifier = classifier.isUnsatisfied() ? null : classifier.get();
     this.scoreSource = scoreSource.isUnsatisfied() ? null : scoreSource.get();
     this.policyProvider = policyProvider.isUnsatisfied() ? null : policyProvider.get();
     this.outcomeWeights = outcomeWeights;
+    this.signalAssembler = signalAssembler.isUnsatisfied() ? null : signalAssembler.get();
   }
 
   CbrAgentRoutingStrategy(
@@ -80,12 +85,14 @@ public class CbrAgentRoutingStrategy implements AgentRoutingStrategy {
       @Nullable TrustCandidateClassifier classifier,
       @Nullable TrustScoreSource scoreSource,
       @Nullable TrustRoutingPolicyProvider policyProvider,
-      CbrOutcomeWeights outcomeWeights) {
+      CbrOutcomeWeights outcomeWeights,
+      @Nullable RoutingSignalAssembler signalAssembler) {
     this.graphQuery = graphQuery;
     this.classifier = classifier;
     this.scoreSource = scoreSource;
     this.policyProvider = policyProvider;
     this.outcomeWeights = outcomeWeights;
+    this.signalAssembler = signalAssembler;
   }
 
   @Override
@@ -123,9 +130,22 @@ public class CbrAgentRoutingStrategy implements AgentRoutingStrategy {
     final Map<String, Double> experienceScores =
         analyseExperiences(context.experiences(), eligibleIds, context.capabilityName());
 
+    final Map<String, Double> finalScores = new HashMap<>(experienceScores);
+    if (signalAssembler != null) {
+      final Map<String, RoutingSignal> signals = signalAssembler.assemble(context, eligible);
+      for (final var signalEntry : signals.values()) {
+        for (final var candidateEntry : signalEntry.candidates().entrySet()) {
+          if (eligibleIds.contains(candidateEntry.getKey())) {
+            finalScores.merge(
+                candidateEntry.getKey(), candidateEntry.getValue().score(), Double::sum);
+          }
+        }
+      }
+    }
+
     String bestCandidate = null;
     double bestScore = 0.0;
-    for (final var entry : experienceScores.entrySet()) {
+    for (final var entry : finalScores.entrySet()) {
       if (entry.getValue() > bestScore) {
         bestScore = entry.getValue();
         bestCandidate = entry.getKey();
