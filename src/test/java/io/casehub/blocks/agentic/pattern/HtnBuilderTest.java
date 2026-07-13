@@ -3,9 +3,10 @@ package io.casehub.blocks.agentic.pattern;
 import io.casehub.blocks.agentic.AgentRef;
 import io.casehub.blocks.agentic.AgentResult;
 import io.casehub.blocks.agentic.decomposition.DecompositionMethod;
+import io.casehub.blocks.agentic.decomposition.DecompositionStrategy;
 import io.casehub.blocks.agentic.decomposition.TaskNode;
-import io.casehub.blocks.agentic.plan.ExecutionPlan;
 import io.casehub.blocks.agentic.model.ExecutionResult;
+import io.casehub.blocks.agentic.plan.ExecutionPlan;
 import io.smallrye.mutiny.Uni;
 import org.junit.jupiter.api.Test;
 
@@ -95,4 +96,62 @@ class HtnBuilderTest {
 
         assertThat(log).containsExactly("hotfix");
     }
+
+    @Test
+    void flattenDelegatesToDecompositionStrategy() {
+        var log = new ArrayList<String>();
+        var agent = AgentRef.external((Object in) -> {
+            log.add("executed");
+            return CompletableFuture.completedFuture(AgentResult.success(null, "done"));
+        });
+
+        var customPlan = new TaskNode.PrimitiveTask<String>("c1", java.time.Instant.now(), null, agent, null, null);
+
+        DecompositionStrategy<String> customStrategy = (compound, ctx) ->
+                                                               Uni.createFrom().item(ExecutionPlan.singleton(customPlan));
+
+        var rootTask = new TaskNode.CompoundTask<String>("root", List.of(
+                new DecompositionMethod<>(s -> true,
+                                          (c, x) -> Uni.createFrom().failure(new AssertionError("should not be called — strategy should override")))));
+
+        var result = Patterns.<String>htn()
+                             .decompose(customStrategy)
+                             .agents(agent)
+                             .rootTask(rootTask)
+                             .task("delegate-test")
+                             .execute("state")
+                             .await().indefinitely();
+
+        assertThat(result).isInstanceOf(ExecutionResult.Completed.class);
+        assertThat(log).containsExactly("executed");
+    }
+
+    @Test
+    void agentsPassedToDecompositionContext() {
+        var agent = AgentRef.external((Object in) ->
+                                              CompletableFuture.completedFuture(AgentResult.success(null, "done")));
+        var captured = new java.util.concurrent.atomic.AtomicReference<io.casehub.blocks.agentic.decomposition.DecompositionContext<String>>();
+
+        DecompositionStrategy<String> capturing = (compound, ctx) -> {
+            captured.set(ctx);
+            var leaf = new TaskNode.PrimitiveTask<String>("c1", java.time.Instant.now(), null, agent, null, null);
+            return Uni.createFrom().item(ExecutionPlan.singleton(leaf));
+        };
+
+        var rootTask = new TaskNode.CompoundTask<String>("root", List.of());
+
+        Patterns.<String>htn()
+                .decompose(capturing)
+                .agents(agent)
+                .rootTask(rootTask)
+                .task("ctx-test")
+                .execute("my-state")
+                .await().indefinitely();
+
+        assertThat(captured.get()).isNotNull();
+        assertThat(captured.get().agents()).hasSize(1);
+        assertThat(captured.get().state()).isEqualTo("my-state");
+    }
+
+
 }

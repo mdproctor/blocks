@@ -199,7 +199,7 @@ class RoutingSupportTest {
             var classifier = mock(TrustCandidateClassifier.class);
             var scoreSource = mock(TrustScoreSource.class);
             var policyProvider = mock(TrustRoutingPolicyProvider.class);
-            var policy = new TrustRoutingPolicy(0.7, 5, 0.1, 0.5, Map.of(), true, null, Set.of());
+            var policy = new TrustRoutingPolicy(0.7, 5, 0.1, 0.5, Map.of(), true, null, Set.of(), 0.0);
             when(policyProvider.forCapability("analysis")).thenReturn(policy);
 
             var candidate = candidateNoDescriptor("bootstrap-agent");

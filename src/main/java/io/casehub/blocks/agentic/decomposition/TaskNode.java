@@ -41,7 +41,10 @@ public sealed interface TaskNode<T>
 
     record CompoundTask<T>(String name, List<DecompositionMethod<T>> methods)
             implements TaskNode<T> {
-        public CompoundTask {methods = List.copyOf(methods);}
+        public CompoundTask {
+            Objects.requireNonNull(name, "name");
+            methods = List.copyOf(methods);
+        }
     }
 
     record PlannedTask<T>(String id, Instant createdAt,

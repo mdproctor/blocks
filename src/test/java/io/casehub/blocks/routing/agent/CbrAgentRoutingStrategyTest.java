@@ -243,7 +243,7 @@ class CbrAgentRoutingStrategyTest {
 
     @Test
     void excludedCandidatesFilteredBeforeCbr() {
-      var policy = new TrustRoutingPolicy(0.7, 5, 0.1, 0.5, Map.of(), false, null, Set.of());
+      var policy = new TrustRoutingPolicy(0.7, 5, 0.1, 0.5, Map.of(), false, null, Set.of(), 0.0);
       when(policyProvider.forCapability("analysis")).thenReturn(policy);
       var good = candidate("qualified");
       var bad = candidate("excluded");

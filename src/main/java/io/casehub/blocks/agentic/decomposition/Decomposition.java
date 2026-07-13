@@ -19,6 +19,16 @@ public final class Decomposition {
         return new StaticDecomposition<>();
     }
 
+    public static <T> HybridDecomposition<T> hybrid(io.casehub.platform.agent.AgentProvider agentProvider) {
+        return new HybridDecomposition<>(agentProvider);
+    }
+
+    public static <T> HybridDecomposition<T> hybrid(io.casehub.platform.agent.AgentProvider agentProvider,
+                                                    java.util.function.Function<T, String> stateRenderer) {
+        return new HybridDecomposition<>(agentProvider, stateRenderer);
+    }
+
+
     public static <T> DecompositionMethod<T> method(Predicate<T> guard,
                                                     DecompositionStrategy<T> strategy) {
         return new DecompositionMethod<>(guard, strategy);
@@ -28,11 +38,11 @@ public final class Decomposition {
     @SuppressWarnings("unchecked")
     public static <T> DecompositionStrategy<T> sequence(TaskNode<T>... tasks) {
         var leafTasks = java.util.Arrays.stream(tasks)
-            .filter(t -> t instanceof TaskNode.LeafTask<T>)
-            .map(t -> (TaskNode.LeafTask<T>) t)
-            .toList();
+                                        .filter(t -> t instanceof TaskNode.LeafTask<T>)
+                                        .map(t -> (TaskNode.LeafTask<T>) t)
+                                        .toList();
         return (compound, ctx) -> io.smallrye.mutiny.Uni.createFrom()
-            .item(ExecutionPlan.sequence(leafTasks));
+                                                        .item(ExecutionPlan.sequence(leafTasks));
     }
 
     public static <T> TaskNode.PrimitiveTask<T> primitive(AgentRef agent) {

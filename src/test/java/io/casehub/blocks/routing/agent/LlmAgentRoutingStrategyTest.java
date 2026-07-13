@@ -179,7 +179,7 @@ class LlmAgentRoutingStrategyTest {
 
         @BeforeEach
         void setUp() {
-            policy = new TrustRoutingPolicy(0.7, 5, 0.1, 0.5, Map.of(), false, null, Set.of());
+            policy = new TrustRoutingPolicy(0.7, 5, 0.1, 0.5, Map.of(), false, null, Set.of(), 0.0);
             lenient().when(policyProvider.forCapability(anyString())).thenReturn(policy);
             strategy = new LlmAgentRoutingStrategy(
                     presentInstance(agentProvider), presentInstance(classifier),
@@ -228,7 +228,7 @@ class LlmAgentRoutingStrategyTest {
 
         @Test
         void bootstrapGuardEscalatesWhenPolicyRequires() {
-            var bootstrapPolicy = new TrustRoutingPolicy(0.7, 5, 0.1, 0.5, Map.of(), true, null, Set.of());
+            var bootstrapPolicy = new TrustRoutingPolicy(0.7, 5, 0.1, 0.5, Map.of(), true, null, Set.of(), 0.0);
             when(policyProvider.forCapability("analysis")).thenReturn(bootstrapPolicy);
             var a = candidate("bootstrap-agent");
             var classified = List.of(
@@ -267,7 +267,7 @@ class LlmAgentRoutingStrategyTest {
 
         @Test
         void qualifiedPlusBootstrapGuardOnFiltersBootstrap() {
-            var bootstrapPolicy = new TrustRoutingPolicy(0.7, 5, 0.1, 0.5, Map.of(), true, null, Set.of());
+            var bootstrapPolicy = new TrustRoutingPolicy(0.7, 5, 0.1, 0.5, Map.of(), true, null, Set.of(), 0.0);
             when(policyProvider.forCapability("analysis")).thenReturn(bootstrapPolicy);
             var qualified = candidate("qual-agent");
             var bootstrap = candidate("boot-agent");

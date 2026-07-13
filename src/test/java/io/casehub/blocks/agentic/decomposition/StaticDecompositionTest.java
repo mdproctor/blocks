@@ -15,17 +15,17 @@ class StaticDecompositionTest {
     @Test
     void selectsFirstMatchingMethod() {
         var agent1 = AgentRef.external(s -> CompletableFuture.completedFuture(null));
-        var prim1 = new TaskNode.PrimitiveTask<String>("s1", java.time.Instant.now(), null, agent1, null, null);
+        var prim1  = new TaskNode.PrimitiveTask<String>("s1", java.time.Instant.now(), null, agent1, null, null);
 
         DecompositionStrategy<String> strategy1 = (compound, ctx) ->
-                io.smallrye.mutiny.Uni.createFrom().item(ExecutionPlan.singleton(prim1));
+                                                          io.smallrye.mutiny.Uni.createFrom().item(ExecutionPlan.singleton(prim1));
 
         var method1 = new DecompositionMethod<String>(s -> s.equals("match"), strategy1);
         var method2 = new DecompositionMethod<String>(s -> true, new IdentityDecomposition<>());
 
         var compound = new TaskNode.CompoundTask<>("root", List.of(method1, method2));
-        var decomp = new StaticDecomposition<String>();
-        var ctx = new DecompositionContext<>("match", List.of(), 0);
+        var decomp   = new StaticDecomposition<String>();
+        var ctx      = new DecompositionContext<>("match", List.of(), 0);
 
         ExecutionPlan<String> result = decomp.decompose(compound, ctx).await().indefinitely();
         assertThat(result.nodes()).hasSize(1);
@@ -37,10 +37,12 @@ class StaticDecompositionTest {
         var compound = new TaskNode.CompoundTask<String>("root", List.of(
                 new DecompositionMethod<>(s -> false, new IdentityDecomposition<>())));
         var decomp = new StaticDecomposition<String>();
-        var ctx = new DecompositionContext<>("state", List.of(), 0);
+        var ctx    = new DecompositionContext<>("state", List.of(), 0);
 
         assertThatThrownBy(() -> decomp.decompose(compound, ctx).await().indefinitely())
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("No decomposition method guard matched");
+                .isInstanceOf(NoMethodMatchedException.class)
+                .hasMessageContaining("No decomposition method guard matched")
+                .extracting(e -> ((NoMethodMatchedException) e).taskName())
+                .isEqualTo("root");
     }
 }

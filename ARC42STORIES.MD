@@ -61,7 +61,7 @@ Compositional agentic orchestration framework — five SPIs for agent selection,
 |-------------|-----------------|
 | `io.casehub.blocks.agentic` | Foundation types: `AgentRef` (sealed, 5 variants), `AgentResult`, `RoutingCandidate`, `FailurePolicy` |
 | `io.casehub.blocks.agentic.routing` | Routing SPI: `RoutingStrategy<T>`, `RoutingDecision` (sealed), `FirstMatchRouting`, `RoundRobinRouting`, `SequentialRouting` |
-| `io.casehub.blocks.agentic.decomposition` | Decomposition SPI: `DecompositionStrategy<T>`, `TaskNode` (sealed), `IdentityDecomposition`, `StaticDecomposition` |
+| `io.casehub.blocks.agentic.decomposition` | Decomposition SPI: `DecompositionStrategy<T>`, `TaskNode` (sealed), `IdentityDecomposition`, `StaticDecomposition`, `LlmDecomposition`, `HybridDecomposition`, `NoMethodMatchedException` |
 | `io.casehub.blocks.agentic.activation` | Activation SPI: `ActivationRule<T>`, `OnExplicitDispatch`, `MaxIterationsGuard` |
 | `io.casehub.blocks.agentic.aggregation` | Aggregation SPI: `AggregationStrategy<T>`, `AggregationResult` (sealed), `PassThrough`, `CollectAll`, `MajorityVote` |
 | `io.casehub.blocks.agentic.termination` | Termination SPI: `TerminationCondition<T>`, `TerminationDecision` (sealed), `GoalReached`, `MaxIterationsTermination` |
