@@ -13,5 +13,5 @@ engine spec.
 
 **Companion documents (blocks-specific):**
 - Migration spec: casehubio/blocks#60
-- Execution backend architecture: `docs/execution-backend-architecture.md`
-- Agentic orchestration research: `docs/agentic-orchestration-research.md`
+- Execution backend architecture: [docs/execution-backend-architecture.md](execution-backend-architecture.md)
+- Agentic orchestration research: [docs/agentic-orchestration-research.md](agentic-orchestration-research.md)
