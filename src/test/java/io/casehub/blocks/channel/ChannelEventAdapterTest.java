@@ -8,12 +8,12 @@ import io.casehub.qhorus.api.gateway.MessageReceivedEvent;
 import io.casehub.qhorus.api.message.MessageType;
 import org.junit.jupiter.api.Test;
 
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+import static io.casehub.blocks.channel.TestMessages.received;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ChannelEventAdapterTest {
@@ -23,8 +23,7 @@ class ChannelEventAdapterTest {
 
     private MessageReceivedEvent event(MessageType type, String content,
                                        String correlationId, String sender) {
-        return new MessageReceivedEvent(null, "test-channel", CHANNEL_ID, "tenant-1",
-            type, sender, correlationId, Instant.ofEpochMilli(42_000), content, "general");
+        return received(CHANNEL_ID, type, content, correlationId, sender);
     }
 
     @Test
