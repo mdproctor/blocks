@@ -11,28 +11,48 @@ public record ConversationRendererConfig(
         Map<String, String> entryTypeLabel,
         Map<String, String> roleLabel,
         Set<String> resolvedStatuses,
-        Set<String> escalatedStatuses) {
+        Set<String> escalatedStatuses,
+        Map<io.casehub.qhorus.api.message.MessageType, String> messageTypeLabel,
+        boolean groupByTopic,
+        boolean showObligationChain) {
 
     public ConversationRendererConfig {
-        statusEmoji = Map.copyOf(statusEmoji);
-        priorityLabel = Map.copyOf(priorityLabel);
-        entryTypeLabel = Map.copyOf(entryTypeLabel);
-        roleLabel = Map.copyOf(roleLabel);
-        resolvedStatuses = Set.copyOf(resolvedStatuses);
+        statusEmoji       = Map.copyOf(statusEmoji);
+        priorityLabel     = Map.copyOf(priorityLabel);
+        entryTypeLabel    = Map.copyOf(entryTypeLabel);
+        roleLabel         = Map.copyOf(roleLabel);
+        resolvedStatuses  = Set.copyOf(resolvedStatuses);
         escalatedStatuses = Set.copyOf(escalatedStatuses);
+        messageTypeLabel  = Map.copyOf(messageTypeLabel);
     }
 
     public static Builder builder() {
         return new Builder();
     }
 
+    public Builder toBuilder() {
+        return new Builder()
+                       .statusEmoji(new java.util.HashMap<>(statusEmoji))
+                       .priorityLabel(new java.util.HashMap<>(priorityLabel))
+                       .entryTypeLabel(new java.util.HashMap<>(entryTypeLabel))
+                       .roleLabel(new java.util.HashMap<>(roleLabel))
+                       .resolvedStatuses(new java.util.HashSet<>(resolvedStatuses))
+                       .escalatedStatuses(new java.util.HashSet<>(escalatedStatuses))
+                       .messageTypeLabel(new java.util.HashMap<>(messageTypeLabel))
+                       .groupByTopic(groupByTopic)
+                       .showObligationChain(showObligationChain);
+    }
+
     public static final class Builder {
-        private Map<String, String> statusEmoji = Map.of();
-        private Map<Priority, String> priorityLabel = Map.of();
-        private Map<String, String> entryTypeLabel = Map.of();
-        private Map<String, String> roleLabel = Map.of();
-        private Set<String> resolvedStatuses = Set.of();
-        private Set<String> escalatedStatuses = Set.of();
+        private Map<String, String>                                    statusEmoji         = Map.of();
+        private Map<Priority, String>                                  priorityLabel       = Map.of();
+        private Map<String, String>                                    entryTypeLabel      = Map.of();
+        private Map<String, String>                                    roleLabel           = Map.of();
+        private Set<String>                                            resolvedStatuses    = Set.of();
+        private Set<String>                                            escalatedStatuses   = Set.of();
+        private Map<io.casehub.qhorus.api.message.MessageType, String> messageTypeLabel    = Map.of();
+        private boolean                                                groupByTopic        = false;
+        private boolean                                                showObligationChain = false;
 
         private Builder() {}
 
@@ -66,10 +86,26 @@ public record ConversationRendererConfig(
             return this;
         }
 
+        public Builder messageTypeLabel(Map<io.casehub.qhorus.api.message.MessageType, String> messageTypeLabel) {
+            this.messageTypeLabel = new java.util.HashMap<>(messageTypeLabel);
+            return this;
+        }
+
+        public Builder groupByTopic(boolean groupByTopic) {
+            this.groupByTopic = groupByTopic;
+            return this;
+        }
+
+        public Builder showObligationChain(boolean showObligationChain) {
+            this.showObligationChain = showObligationChain;
+            return this;
+        }
+
         public ConversationRendererConfig build() {
             return new ConversationRendererConfig(
                     statusEmoji, priorityLabel, entryTypeLabel, roleLabel,
-                    resolvedStatuses, escalatedStatuses);
+                    resolvedStatuses, escalatedStatuses, messageTypeLabel,
+                    groupByTopic, showObligationChain);
         }
     }
 }

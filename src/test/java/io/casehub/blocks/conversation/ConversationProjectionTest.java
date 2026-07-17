@@ -1,8 +1,8 @@
 package io.casehub.blocks.conversation;
 
+import io.casehub.api.model.TaskStatus;
 import io.casehub.blocks.channel.ChannelMessageMeta;
 import io.casehub.qhorus.api.message.MessageView;
-import io.casehub.api.model.TaskStatus;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -22,6 +22,9 @@ class ConversationProjectionTest {
         var msg = mock(MessageView.class);
         when(msg.content()).thenReturn(content);
         when(msg.correlationId()).thenReturn(correlationId);
+        when(msg.topic()).thenReturn("general");
+        when(msg.id()).thenReturn(null);
+        when(msg.type()).thenReturn(null);
         return msg;
     }
 
@@ -80,6 +83,47 @@ class ConversationProjectionTest {
         assertThat(entry.entryType()).isEqualTo("OPEN_TOPIC");
         assertThat(entry.content()).isEqualTo("This needs attention");
     }
+
+
+    @Test
+    void pointInitiation_recordsTopicFromMessage() {
+        var state = projection.identity();
+        var msg   = mock(MessageView.class);
+        when(msg.content()).thenReturn(encode(meta(
+                "entryType", "OPEN_TOPIC",
+                "role", "REVIEWER",
+                "round", "1",
+                "priority", "HIGH"), "point body"));
+        when(msg.correlationId()).thenReturn("point-1");
+        when(msg.topic()).thenReturn("risk-assessment");
+        when(msg.id()).thenReturn(42L);
+        when(msg.type()).thenReturn(io.casehub.qhorus.api.message.MessageType.COMMAND);
+
+        var result = projection.apply(state, msg);
+
+        assertThat(result.points().get("point-1").topic()).isEqualTo("risk-assessment");
+    }
+
+    @Test
+    void pointInitiation_recordsMessageIdAndType() {
+        var state = projection.identity();
+        var msg   = mock(MessageView.class);
+        when(msg.content()).thenReturn(encode(meta(
+                "entryType", "OPEN_TOPIC",
+                "role", "REVIEWER",
+                "round", "1"), "body"));
+        when(msg.correlationId()).thenReturn("point-1");
+        when(msg.topic()).thenReturn("general");
+        when(msg.id()).thenReturn(99L);
+        when(msg.type()).thenReturn(io.casehub.qhorus.api.message.MessageType.STATUS);
+
+        var result = projection.apply(state, msg);
+
+        ThreadEntry entry = result.points().get("point-1").thread().get(0);
+        assertThat(entry.messageId()).isEqualTo(99L);
+        assertThat(entry.messageType()).isEqualTo(io.casehub.qhorus.api.message.MessageType.STATUS);
+    }
+
 
     @Test
     void pointInitiation_nullCorrelationId_stateUnchanged() {

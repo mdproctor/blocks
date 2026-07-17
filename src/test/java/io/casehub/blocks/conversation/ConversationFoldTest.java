@@ -23,7 +23,7 @@ class ConversationFoldTest {
         void createsPointWithOpenStatus() {
             var classification = new PointClassification(Priority.HIGH, "global", "section 3.2");
             var result = ConversationFold.createPoint(empty,
-                    "point-1", classification, "REVIEWER", 1, "RAISE", "This needs attention");
+                    "point-1", "general", null, null, classification, "REVIEWER", 1, "RAISE", "This needs attention");
 
             assertThat(result.points()).containsKey("point-1");
             ConversationPoint point = result.points().get("point-1");
@@ -44,9 +44,9 @@ class ConversationFoldTest {
         void preservesExistingPoints() {
             var classification = new PointClassification(Priority.MEDIUM, null, null);
             var state = ConversationFold.createPoint(empty,
-                    "point-1", classification, "REV", 1, "RAISE", "first");
+                    "point-1", "general", null, null, classification, "REV", 1, "RAISE", "first");
             var result = ConversationFold.createPoint(state,
-                    "point-2", classification, "REV", 1, "RAISE", "second");
+                    "point-2", "general", null, null, classification, "REV", 1, "RAISE", "second");
 
             assertThat(result.points()).hasSize(2);
             assertThat(result.points()).containsKeys("point-1", "point-2");
@@ -55,11 +55,11 @@ class ConversationFoldTest {
         @Test
         void preservesExistingMemosAndFlags() {
             var stateWithMemo = ConversationFold.addMemo(empty, "REV", 1, "a memo");
-            var stateWithFlag = ConversationFold.flagHuman(stateWithMemo, null, "REV", 1, "help");
+            var stateWithFlag = ConversationFold.flagHuman(stateWithMemo, null, null, "REV", 1, "help");
 
             var classification = new PointClassification(Priority.LOW, null, null);
             var result = ConversationFold.createPoint(stateWithFlag,
-                    "point-1", classification, "REV", 1, "RAISE", "body");
+                    "point-1", "general", null, null, classification, "REV", 1, "RAISE", "body");
 
             assertThat(result.memos()).hasSize(1);
             assertThat(result.humanFlags()).hasSize(1);
@@ -69,7 +69,7 @@ class ConversationFoldTest {
         void nullPriorityUsedAsIs() {
             var classification = new PointClassification(null, null, null);
             var result = ConversationFold.createPoint(empty,
-                    "p1", classification, "REV", 0, "RAISE", "body");
+                    "p1", "general", null, null, classification, "REV", 0, "RAISE", "body");
 
             assertThat(result.points().get("p1").classification().priority()).isNull();
         }
@@ -84,10 +84,10 @@ class ConversationFoldTest {
         void appendsToThreadAndUpdatesStatus() {
             var classification = new PointClassification(Priority.MEDIUM, null, null);
             var state = ConversationFold.createPoint(empty,
-                    "point-1", classification, "REVIEWER", 1, "RAISE", "the point");
+                    "point-1", "general", null, null, classification, "REVIEWER", 1, "RAISE", "the point");
 
             var result = ConversationFold.respondToPoint(state,
-                    "point-1", "IMPLEMENTOR", 1, "AGREE", "I agree", "AGREED");
+                    "point-1", null, null, "IMPLEMENTOR", 1, "AGREE", "I agree", "AGREED");
 
             ConversationPoint point = result.points().get("point-1");
             assertThat(point.status()).isEqualTo("AGREED");
@@ -105,10 +105,10 @@ class ConversationFoldTest {
         void nullNewStatusPreservesExistingStatus() {
             var classification = new PointClassification(Priority.LOW, null, null);
             var state = ConversationFold.createPoint(empty,
-                    "point-1", classification, "REV", 1, "RAISE", "body");
+                    "point-1", "general", null, null, classification, "REV", 1, "RAISE", "body");
 
             var result = ConversationFold.respondToPoint(state,
-                    "point-1", "IMP", 1, "UNKNOWN_TYPE", "content", null);
+                    "point-1", null, null, "IMP", 1, "UNKNOWN_TYPE", "content", null);
 
             assertThat(result.points().get("point-1").status())
                     .isEqualTo(ConversationProtocol.STATUS_OPEN);
@@ -118,7 +118,7 @@ class ConversationFoldTest {
         @Test
         void nonExistentTargetReturnsStateUnchanged() {
             var result = ConversationFold.respondToPoint(empty,
-                    "no-such-point", "IMP", 1, "AGREE", "content", "AGREED");
+                    "no-such-point", null, null, "IMP", 1, "AGREE", "content", "AGREED");
 
             assertThat(result).isSameAs(empty);
         }
@@ -127,12 +127,12 @@ class ConversationFoldTest {
         void preservesOtherPoints() {
             var classification = new PointClassification(Priority.LOW, null, null);
             var state = ConversationFold.createPoint(empty,
-                    "p1", classification, "REV", 1, "RAISE", "first");
+                    "p1", "general", null, null, classification, "REV", 1, "RAISE", "first");
             state = ConversationFold.createPoint(state,
-                    "p2", classification, "REV", 1, "RAISE", "second");
+                    "p2", "general", null, null, classification, "REV", 1, "RAISE", "second");
 
             var result = ConversationFold.respondToPoint(state,
-                    "p1", "IMP", 1, "AGREE", "ok", "AGREED");
+                    "p1", null, null, "IMP", 1, "AGREE", "ok", "AGREED");
 
             assertThat(result.points().get("p1").status()).isEqualTo("AGREED");
             assertThat(result.points().get("p2").status()).isEqualTo(ConversationProtocol.STATUS_OPEN);
@@ -148,10 +148,10 @@ class ConversationFoldTest {
         void withTargetPointEscalatesAndAddsFlag() {
             var classification = new PointClassification(Priority.HIGH, null, null);
             var state = ConversationFold.createPoint(empty,
-                    "point-1", classification, "REV", 1, "RAISE", "a point");
+                    "point-1", "general", null, null, classification, "REV", 1, "RAISE", "a point");
 
             var result = ConversationFold.flagHuman(state,
-                    "point-1", "REV", 2, "human help needed");
+                    "point-1", null, "REV", 2, "human help needed");
 
             ConversationPoint point = result.points().get("point-1");
             assertThat(point.thread()).hasSize(2);
@@ -169,7 +169,7 @@ class ConversationFoldTest {
         @Test
         void withNonExistentTargetAddsFlagOnly() {
             var result = ConversationFold.flagHuman(empty,
-                    "no-such-point", "REV", 1, "general escalation");
+                    "no-such-point", null, "REV", 1, "general escalation");
 
             assertThat(result.points()).isEmpty();
             assertThat(result.humanFlags()).hasSize(1);
@@ -179,7 +179,7 @@ class ConversationFoldTest {
         @Test
         void withNullTargetAddsFlagOnly() {
             var result = ConversationFold.flagHuman(empty,
-                    null, "REV", 1, "escalation without target");
+                    null, null, "REV", 1, "escalation without target");
 
             assertThat(result.points()).isEmpty();
             assertThat(result.humanFlags()).hasSize(1);
@@ -187,8 +187,8 @@ class ConversationFoldTest {
 
         @Test
         void accumulatesMultipleFlags() {
-            var state = ConversationFold.flagHuman(empty, null, "REV", 1, "first");
-            var result = ConversationFold.flagHuman(state, null, "IMP", 2, "second");
+            var state = ConversationFold.flagHuman(empty, null, null, "REV", 1, "first");
+            var result = ConversationFold.flagHuman(state, null, null, "IMP", 2, "second");
 
             assertThat(result.humanFlags()).hasSize(2);
         }
@@ -222,7 +222,7 @@ class ConversationFoldTest {
         void preservesExistingPoints() {
             var classification = new PointClassification(Priority.LOW, null, null);
             var state = ConversationFold.createPoint(empty,
-                    "p1", classification, "REV", 1, "RAISE", "body");
+                    "p1", "general", null, null, classification, "REV", 1, "RAISE", "body");
 
             var result = ConversationFold.addMemo(state, "REV", 1, "memo");
 

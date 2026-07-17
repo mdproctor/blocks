@@ -6,7 +6,9 @@ import io.casehub.qhorus.api.spi.ChannelProjection;
 
 import java.lang.System.Logger;
 import java.lang.System.Logger.Level;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 /**
  * Abstract base class for conversation-style channel projections.
@@ -66,14 +68,14 @@ public abstract class ConversationProjection implements ChannelProjection<Conver
     private ConversationState doApply(ConversationState state, MessageView message) {
         // 1. Parse meta — no sentinel → plain content, return unchanged
         Map<String, String> meta = ChannelMessageMeta.parseMeta(sentinel(), message.content());
-        if (meta.isEmpty()) return state;
+        if (meta.isEmpty()) {return state;}
 
         // 2. Extract entryType — absent → return unchanged
         String entryType = meta.get(ConversationProtocol.ENTRY_TYPE);
-        if (entryType == null) return state;
+        if (entryType == null) {return state;}
 
         // 3. RESTART_CONTEXT → transparent (protocol PP-20260610-073663)
-        if (ConversationProtocol.RESTART_CONTEXT.equals(entryType)) return state;
+        if (ConversationProtocol.RESTART_CONTEXT.equals(entryType)) {return state;}
 
         // 4. Infrastructure dispatch
         return switch (entryType) {
@@ -104,8 +106,8 @@ public abstract class ConversationProjection implements ChannelProjection<Conver
     }
 
     private ConversationState handlePointInitiation(ConversationState state, MessageView message,
-                                                     Map<String, String> meta, String role,
-                                                     String entryType) {
+                                                    Map<String, String> meta, String role,
+                                                    String entryType) {
         String pointId = message.correlationId();
         if (pointId == null) {
             LOG.log(Level.WARNING, "Point initiation without correlationId — discarded");
@@ -113,97 +115,99 @@ public abstract class ConversationProjection implements ChannelProjection<Conver
         }
 
         Priority priority = parsePriority(meta.get(ConversationProtocol.PRIORITY));
-        String scope = meta.get(ConversationProtocol.SCOPE);
-        String location = meta.get(ConversationProtocol.LOCATION);
-        if (location != null && location.isBlank()) location = null;
+        String   scope    = meta.get(ConversationProtocol.SCOPE);
+        String   location = meta.get(ConversationProtocol.LOCATION);
+        if (location != null && location.isBlank()) {location = null;}
         var classification = new PointClassification(priority, scope, location);
 
-        int round = ChannelMessageMeta.parseInt(meta, ConversationProtocol.ROUND);
-        String body = ChannelMessageMeta.bodyContent(sentinel(), message.content());
+        int    round = ChannelMessageMeta.parseInt(meta, ConversationProtocol.ROUND);
+        String body  = ChannelMessageMeta.bodyContent(sentinel(), message.content());
 
-        return ConversationFold.createPoint(state, pointId, classification, role, round, entryType, body);
+        return ConversationFold.createPoint(state, pointId, message.topic(), message.id(), message.type(),
+                                            classification, role, round, entryType, body);
     }
 
     private ConversationState handlePointResponse(ConversationState state, MessageView message,
-                                                    Map<String, String> meta, String role,
-                                                    String entryType) {
+                                                  Map<String, String> meta, String role,
+                                                  String entryType) {
         String targetId = message.correlationId();
-        if (targetId == null) return state;
+        if (targetId == null) {return state;}
         if (!state.points().containsKey(targetId)) {
             LOG.log(Level.WARNING,
                     "Response ({0}) references unknown point: {1} — discarded", entryType, targetId);
             return state;
         }
 
-        int round = ChannelMessageMeta.parseInt(meta, ConversationProtocol.ROUND);
-        String body = ChannelMessageMeta.bodyContent(sentinel(), message.content());
+        int    round = ChannelMessageMeta.parseInt(meta, ConversationProtocol.ROUND);
+        String body  = ChannelMessageMeta.bodyContent(sentinel(), message.content());
 
-        return ConversationFold.respondToPoint(state, targetId, role, round, entryType, body,
-                statusAfter(entryType));
+        return ConversationFold.respondToPoint(state, targetId, message.id(), message.type(),
+                                               role, round, entryType, body, statusAfter(entryType));
     }
 
     // ── infrastructure handlers ─────────────────────────────────────────────
 
     private ConversationState handleMemo(ConversationState state, MessageView message,
-                                          Map<String, String> meta) {
-        String role = meta.getOrDefault(ConversationProtocol.ROLE, "UNKNOWN");
-        int round = ChannelMessageMeta.parseInt(meta, ConversationProtocol.ROUND);
+                                         Map<String, String> meta) {
+        String role    = meta.getOrDefault(ConversationProtocol.ROLE, "UNKNOWN");
+        int    round   = ChannelMessageMeta.parseInt(meta, ConversationProtocol.ROUND);
         String content = ChannelMessageMeta.bodyContent(sentinel(), message.content());
         return ConversationFold.addMemo(state, role, round, content);
     }
 
     private ConversationState handleSubTaskRequest(ConversationState state, MessageView message,
-                                                     Map<String, String> meta) {
+                                                   Map<String, String> meta) {
         String subTaskId = meta.getOrDefault(ConversationProtocol.SUB_TASK_ID,
-                message.correlationId() != null ? message.correlationId() : "unknown");
-        String taskType = meta.getOrDefault(ConversationProtocol.TASK_TYPE, "CUSTOM");
+                                             message.correlationId() != null ? message.correlationId() : "unknown");
+        String taskType       = meta.getOrDefault(ConversationProtocol.TASK_TYPE, "CUSTOM");
         String requestingRole = meta.getOrDefault(ConversationProtocol.ROLE, "UNKNOWN");
-        String pointId = meta.get(ConversationProtocol.POINT_ID);
+        String pointId        = meta.get(ConversationProtocol.POINT_ID);
 
         return ConversationFold.requestSubTask(state, subTaskId, taskType, requestingRole, pointId);
     }
 
     private ConversationState handleSubTaskFinding(ConversationState state, MessageView message,
-                                                     Map<String, String> meta) {
+                                                   Map<String, String> meta) {
         String subTaskId = meta.getOrDefault(ConversationProtocol.SUB_TASK_ID,
-                message.correlationId() != null ? message.correlationId() : "unknown");
+                                             message.correlationId() != null ? message.correlationId() : "unknown");
         String taskType = meta.getOrDefault(ConversationProtocol.TASK_TYPE, "CUSTOM");
-        String role = meta.getOrDefault(ConversationProtocol.ROLE, "UNKNOWN");
-        String pointId = meta.get(ConversationProtocol.POINT_ID);
-        String finding = ChannelMessageMeta.bodyContent(sentinel(), message.content());
+        String role     = meta.getOrDefault(ConversationProtocol.ROLE, "UNKNOWN");
+        String pointId  = meta.get(ConversationProtocol.POINT_ID);
+        String finding  = ChannelMessageMeta.bodyContent(sentinel(), message.content());
 
         return ConversationFold.completeSubTask(state, subTaskId, taskType, role, pointId, finding);
     }
 
     private ConversationState handleSubTaskError(ConversationState state, MessageView message,
-                                                   Map<String, String> meta) {
+                                                 Map<String, String> meta) {
         String subTaskId = meta.getOrDefault(ConversationProtocol.SUB_TASK_ID,
-                message.correlationId() != null ? message.correlationId() : "unknown");
+                                             message.correlationId() != null ? message.correlationId() : "unknown");
         String taskType = meta.getOrDefault(ConversationProtocol.TASK_TYPE, "CUSTOM");
-        String role = meta.getOrDefault(ConversationProtocol.ROLE, "UNKNOWN");
-        String reason = ChannelMessageMeta.bodyContent(sentinel(), message.content());
+        String role     = meta.getOrDefault(ConversationProtocol.ROLE, "UNKNOWN");
+        String reason   = ChannelMessageMeta.bodyContent(sentinel(), message.content());
 
         return ConversationFold.errorSubTask(state, subTaskId, taskType, role, reason);
     }
 
     private ConversationState handleFlagHuman(ConversationState state, MessageView message,
-                                                Map<String, String> meta) {
+                                              Map<String, String> meta) {
         String content = ChannelMessageMeta.bodyContent(sentinel(),
-                Objects.requireNonNullElse(message.content(), ""));
-        int round = ChannelMessageMeta.parseInt(meta, ConversationProtocol.ROUND);
-        String role = meta.get(ConversationProtocol.ROLE);
+                                                        Objects.requireNonNullElse(message.content(), ""));
+        int    round = ChannelMessageMeta.parseInt(meta, ConversationProtocol.ROUND);
+        String role  = meta.get(ConversationProtocol.ROLE);
         if (role == null) {
             LOG.log(Level.WARNING, "FLAG_HUMAN missing role — discarded");
             return state;
         }
 
-        return ConversationFold.flagHuman(state, message.correlationId(), role, round, content);
+        return ConversationFold.flagHuman(state, message.correlationId(), message.id(),
+                                          role, round, content);
     }
 
     // ── utility ─────────────────────────────────────────────────────────────
 
     private Priority parsePriority(String s) {
-        if (s == null) return Priority.LOW;
+        if (s == null) {return Priority.LOW;}
         try {
             return Priority.valueOf(s.toUpperCase());
         } catch (IllegalArgumentException e) {

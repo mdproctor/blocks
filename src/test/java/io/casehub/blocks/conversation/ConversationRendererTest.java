@@ -48,12 +48,12 @@ class ConversationRendererTest {
     }
 
     static ConversationPoint point(String id, Priority priority, String scope, String location,
-                                    String status, List<ThreadEntry> thread) {
-        return new ConversationPoint(id, new PointClassification(priority, scope, location), thread, status);
+                                   String status, List<ThreadEntry> thread) {
+        return new ConversationPoint(id, "general", new PointClassification(priority, scope, location), thread, status);
     }
 
     static ThreadEntry entry(String role, String entryType, String content) {
-        return new ThreadEntry(null, role, 1, entryType, content);
+        return new ThreadEntry(null, null, null, role, 1, entryType, content);
     }
 
     static ConversationState state(Map<String, ConversationPoint> points,
@@ -447,4 +447,118 @@ class ConversationRendererTest {
         assertThat(result).contains("Second unresolved");
         assertThat(result).contains("Third unresolved");
     }
+
+    @Test
+    void topicGrouping_pointsGroupedByTopic() {
+        var config = reviewConfig().toBuilder()
+                                   .groupByTopic(true)
+                                   .build();
+
+        var points = new java.util.LinkedHashMap<String, ConversationPoint>();
+        points.put("RP-1", new ConversationPoint("RP-1", "review",
+                                                 new PointClassification(Priority.HIGH, "bug", null),
+                                                 List.of(entry("REV", "RAISE", "Bug in review")), "OPEN"));
+        points.put("RP-2", new ConversationPoint("RP-2", "analysis",
+                                                 new PointClassification(Priority.MEDIUM, "design", null),
+                                                 List.of(entry("REV", "RAISE", "Design issue")), "OPEN"));
+        points.put("RP-3", new ConversationPoint("RP-3", "review",
+                                                 new PointClassification(Priority.LOW, "style", null),
+                                                 List.of(entry("REV", "RAISE", "Style nit")), "OPEN"));
+
+        var renderer = new ConversationRenderer(config);
+        var result   = renderer.render(state(points, List.of(), List.of(), Map.of()));
+
+        assertThat(result).contains("## review");
+        assertThat(result).contains("## analysis");
+        int firstReview  = result.indexOf("Bug in review");
+        int secondReview = result.indexOf("Style nit");
+        int analysis     = result.indexOf("Design issue");
+        assertThat(firstReview).isLessThan(secondReview);
+        assertThat(secondReview).isLessThan(analysis);
+    }
+
+    @Test
+    void obligationChain_rendersMessageTypeProgression() {
+        var config = reviewConfig().toBuilder()
+                                   .groupByTopic(true)
+                                   .showObligationChain(true)
+                                   .messageTypeLabel(Map.of(
+                                           io.casehub.qhorus.api.message.MessageType.COMMAND, "commanded",
+                                           io.casehub.qhorus.api.message.MessageType.STATUS, "progress",
+                                           io.casehub.qhorus.api.message.MessageType.DONE, "completed"))
+                                   .build();
+
+        var points = new java.util.LinkedHashMap<String, ConversationPoint>();
+        points.put("RP-1", new ConversationPoint("RP-1", "review",
+                                                 new PointClassification(Priority.HIGH, "bug", null),
+                                                 List.of(
+                                                         new ThreadEntry("RP-1", 1L, io.casehub.qhorus.api.message.MessageType.COMMAND, "REV", 1, "RAISE", "Review this"),
+                                                         new ThreadEntry(null, 2L, io.casehub.qhorus.api.message.MessageType.STATUS, "IMP", 1, "QUALIFY", "Working on it"),
+                                                         new ThreadEntry(null, 3L, io.casehub.qhorus.api.message.MessageType.DONE, "IMP", 1, "AGREE", "Fixed")),
+                                                 "AGREED"));
+
+        var renderer = new ConversationRenderer(config);
+        var result   = renderer.render(state(points, List.of(), List.of(), Map.of()));
+
+        assertThat(result).contains("commanded → progress → completed ✓");
+    }
+
+    @Test
+    void obligationChain_incompleteShowsHourglass() {
+        var config = reviewConfig().toBuilder()
+                                   .groupByTopic(true)
+                                   .showObligationChain(true)
+                                   .messageTypeLabel(Map.of(
+                                           io.casehub.qhorus.api.message.MessageType.COMMAND, "commanded",
+                                           io.casehub.qhorus.api.message.MessageType.STATUS, "progress"))
+                                   .build();
+
+        var points = new java.util.LinkedHashMap<String, ConversationPoint>();
+        points.put("RP-1", new ConversationPoint("RP-1", "analysis",
+                                                 new PointClassification(Priority.MEDIUM, "design", null),
+                                                 List.of(
+                                                         new ThreadEntry("RP-1", 1L, io.casehub.qhorus.api.message.MessageType.COMMAND, "REV", 1, "RAISE", "Analyse this"),
+                                                         new ThreadEntry(null, 2L, io.casehub.qhorus.api.message.MessageType.STATUS, "IMP", 1, "QUALIFY", "In progress")),
+                                                 "OPEN"));
+
+        var renderer = new ConversationRenderer(config);
+        var result   = renderer.render(state(points, List.of(), List.of(), Map.of()));
+
+        assertThat(result).contains("commanded → progress ⏳");
+    }
+
+    @Test
+    void reactions_renderedInlineAfterThreadEntries() {
+        var points = new java.util.LinkedHashMap<String, ConversationPoint>();
+        points.put("RP-1", new ConversationPoint("RP-1", "general",
+                                                 new PointClassification(Priority.HIGH, "bug", null),
+                                                 List.of(new ThreadEntry("RP-1", 10L, io.casehub.qhorus.api.message.MessageType.COMMAND, "REV", 1, "RAISE", "Bug found")),
+                                                 "OPEN"));
+
+        var reactions = Map.of(10L, List.of(
+                new io.casehub.qhorus.api.message.ReactionGroup("👍", 3, List.of("a1", "a2", "a3")),
+                new io.casehub.qhorus.api.message.ReactionGroup("✅", 1, List.of("a4"))));
+
+        var renderer = new ConversationRenderer(emptyConfig());
+        var result   = renderer.render(state(points, List.of(), List.of(), Map.of()), reactions);
+
+        assertThat(result).contains("👍×3");
+        assertThat(result).contains("✅×1");
+    }
+
+    @Test
+    void reactions_noReactionsForMessage_noDecoration() {
+        var points = new java.util.LinkedHashMap<String, ConversationPoint>();
+        points.put("RP-1", new ConversationPoint("RP-1", "general",
+                                                 new PointClassification(Priority.HIGH, "bug", null),
+                                                 List.of(new ThreadEntry("RP-1", 10L, null, "REV", 1, "RAISE", "No reactions")),
+                                                 "OPEN"));
+
+        var renderer = new ConversationRenderer(emptyConfig());
+        var result   = renderer.render(state(points, List.of(), List.of(), Map.of()), Map.of());
+
+        assertThat(result).doesNotContain("×");
+    }
+
+
 }
