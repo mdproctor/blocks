@@ -130,4 +130,113 @@ class CbrRoutingPromptSectionTest {
     assertThat(result).contains("\"agent-a\": 2 cases");
     assertThat(result).contains("50% success");
   }
+
+    @Test
+    void adaptedStepShowsAnnotation() {
+        var exp =
+                new RetrievedExperience(
+                        "AML investigation",
+                        "Assigned to agent-a",
+                        "COMPLETED",
+                        0.9,
+                        0.85,
+                        Map.of(),
+                        List.of(
+                                new ExperiencePlanStep(
+                                        "assess-risk", "analysis", "agent-a", "SUCCESS", 0, Map.of(),
+                                        "BOOSTED", "high relevance")),
+                        Map.of());
+
+        var result =
+                section.render(
+                        context("analysis", List.of(exp)), List.of(candidate("agent-a")));
+
+        assertThat(result).isNotNull();
+        assertThat(result).contains("[BOOSTED: high relevance]");
+    }
+
+  @Test
+  void retainedStepNotAnnotated() {
+    var exp =
+            new RetrievedExperience(
+                    "AML investigation",
+                    "Assigned to agent-a",
+                    "COMPLETED",
+                    0.9,
+                    0.85,
+                    Map.of(),
+                    List.of(
+                            new ExperiencePlanStep(
+                                    "assess-risk", "analysis", "agent-a", "SUCCESS", 0, Map.of(),
+                                    "RETAINED", null)),
+                    Map.of());
+
+    var result =
+            section.render(
+                    context("analysis", List.of(exp)), List.of(candidate("agent-a")));
+
+    assertThat(result).isNotNull();
+    assertThat(result).doesNotContain("[RETAINED");
+    assertThat(result).contains("SUCCESS");
+  }
+
+  @Test
+  void addedStepExcludedFromOutcomeCount() {
+    var exp =
+            new RetrievedExperience(
+                    "AML investigation",
+                    "solution",
+                    "COMPLETED",
+                    0.9,
+                    0.85,
+                    Map.of(),
+                    List.of(
+                            new ExperiencePlanStep(
+                                    "b1", "analysis", "agent-a", "SUCCESS", 0, Map.of(),
+                                    "ADDED", "adapter recommendation"),
+                            new ExperiencePlanStep(
+                                    "b2", "analysis", "agent-b", "SUCCESS", 0, Map.of(),
+                                    "RETAINED", null)),
+                    Map.of());
+
+    var result =
+            section.render(
+                    context("analysis", List.of(exp)),
+                    List.of(candidate("agent-a"), candidate("agent-b")));
+
+    assertThat(result).isNotNull();
+    assertThat(result).contains("\"agent-b\": 1 cases");
+    assertThat(result).doesNotContain("\"agent-a\": 1 cases");
+  }
+
+  @Test
+  void substitutedStepExcludedFromOutcomeCount() {
+    var exp =
+            new RetrievedExperience(
+                    "AML investigation",
+                    "solution",
+                    "COMPLETED",
+                    0.9,
+                    0.85,
+                    Map.of(),
+                    List.of(
+                            new ExperiencePlanStep(
+                                    "b1", "analysis", "agent-a", "SUCCESS", 0, Map.of(),
+                                    "SUBSTITUTED", "replaced original-worker"),
+                            new ExperiencePlanStep(
+                                    "b2", "analysis", "agent-b", "FAILURE", 0, Map.of(),
+                                    "RETAINED", null)),
+                    Map.of());
+
+    var result =
+            section.render(
+                    context("analysis", List.of(exp)),
+                    List.of(candidate("agent-a"), candidate("agent-b")));
+
+    assertThat(result).isNotNull();
+    assertThat(result).contains("\"agent-b\": 1 cases");
+    assertThat(result).doesNotContain("\"agent-a\": 1 cases");
+  }
+
+
 }

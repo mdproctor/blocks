@@ -166,6 +166,75 @@ class CbrAgentRoutingStrategyTest {
       assertThat(result).isInstanceOf(RoutingResult.Selected.class);
       assertThat(((RoutingResult.Selected) result).single().executorId()).isEqualTo("agent-b");
     }
+
+      @Test
+      void addedStepsExcludedFromAnalysis() {
+          var exp =
+                  new RetrievedExperience(
+                          "problem",
+                          "solution",
+                          "COMPLETED",
+                          0.9,
+                          0.85,
+                          Map.of(),
+                          List.of(
+                                  new ExperiencePlanStep(
+                                          "b1", "analysis", "agent-a", "SUCCESS", 0, Map.of(),
+                                          "ADDED", "adapter recommendation"),
+                                  new ExperiencePlanStep(
+                                          "b2", "analysis", "agent-b", "SUCCESS", 0, Map.of(),
+                                          "RETAINED", null)),
+                          Map.of());
+
+          var strategy = new CbrAgentRoutingStrategy(
+                  (AgentGraphQuery) null, null, null, null, new DefaultCbrOutcomeWeights(), null);
+          var result =
+                  strategy
+                          .select(
+                                  context("analysis", List.of(exp)),
+                                  List.of(candidate("agent-a"), candidate("agent-b")))
+                          .await()
+                          .indefinitely();
+
+          assertThat(result).isInstanceOf(RoutingResult.Selected.class);
+          assertThat(((RoutingResult.Selected) result).single().executorId()).isEqualTo("agent-b");
+      }
+
+    @Test
+    void substitutedStepsExcludedFromAnalysis() {
+      var exp =
+              new RetrievedExperience(
+                      "problem",
+                      "solution",
+                      "COMPLETED",
+                      0.9,
+                      0.85,
+                      Map.of(),
+                      List.of(
+                              new ExperiencePlanStep(
+                                      "b1", "analysis", "agent-a", "SUCCESS", 0, Map.of(),
+                                      "SUBSTITUTED", "replaced original-worker"),
+                              new ExperiencePlanStep(
+                                      "b2", "analysis", "agent-b", "FAILURE", 0, Map.of(),
+                                      "RETAINED", null)),
+                      Map.of());
+
+      var strategy = new CbrAgentRoutingStrategy(
+              (AgentGraphQuery) null, null, null, null, new DefaultCbrOutcomeWeights(), null);
+      var result =
+              strategy
+                      .select(
+                              context("analysis", List.of(exp)),
+                              List.of(candidate("agent-a"), candidate("agent-b")))
+                      .await()
+                      .indefinitely();
+
+      // agent-a excluded (SUBSTITUTED), agent-b has FAILURE (0.0 score)
+      // Both have no positive score — should be unresolvable
+      assertThat(result).isInstanceOf(RoutingResult.Unresolvable.class);
+    }
+
+
   }
 
   @Nested

@@ -16,10 +16,10 @@
 package io.casehub.blocks.routing.agent;
 
 import io.casehub.api.spi.routing.AgentCandidate;
+import io.casehub.api.spi.routing.ExperienceAnalyser;
 import io.casehub.api.spi.routing.AgentRoutingContext;
 import io.casehub.api.spi.routing.AgentRoutingStrategy;
 import io.casehub.api.spi.routing.RetrievedExperience;
-import io.casehub.api.spi.routing.RoutingOutcome;
 import io.casehub.api.spi.routing.RoutingResult;
 import io.casehub.api.spi.routing.RoutingSignal;
 import io.casehub.api.spi.routing.RoutingSignalAssembler;
@@ -33,12 +33,13 @@ import io.smallrye.mutiny.infrastructure.Infrastructure;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
+import org.jspecify.annotations.Nullable;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.jspecify.annotations.Nullable;
 
 /**
  * {@link AgentRoutingStrategy} that uses case-based reasoning (CBR) to select agents based on
@@ -175,48 +176,13 @@ public class CbrAgentRoutingStrategy implements AgentRoutingStrategy {
     return RoutingResult.unresolvable("no CBR or graph match found");
   }
 
-  Map<String, Double> analyseExperiences(
-      final List<RetrievedExperience> experiences,
-      final Set<String> eligibleIds,
-      final String capabilityName) {
-    final Map<String, double[]> workerStats = new HashMap<>();
-    final var weights = outcomeWeights.weights();
-
-    for (final var exp : experiences) {
-      final double relevance = Math.max(0.0, exp.similarityScore());
-      if (relevance == 0.0) {
-        continue;
-      }
-
-      for (final var step : exp.planTrace()) {
-        if (capabilityName.equals(step.capabilityName())
-            && step.workerName() != null
-            && eligibleIds.contains(step.workerName())) {
-          final var stats =
-              workerStats.computeIfAbsent(step.workerName(), k -> new double[] {0.0, 0.0});
-          RoutingOutcome outcome;
-          try {
-            outcome = RoutingOutcome.valueOf(step.stepOutcome());
-          } catch (IllegalArgumentException e) {
-            outcome = null;
-          }
-          final double outcomeWeight =
-              outcome != null ? weights.getOrDefault(outcome, 0.0) : 0.0;
-          stats[0] += outcomeWeight * relevance;
-          stats[1] += relevance;
-        }
-      }
+    Map<String, Double> analyseExperiences(
+            final List<RetrievedExperience> experiences,
+            final Set<String> eligibleIds,
+            final String capabilityName) {
+        return ExperienceAnalyser.workerSuccessRates(
+                experiences, eligibleIds, capabilityName, outcomeWeights.weights());
     }
-
-    final Map<String, Double> scores = new HashMap<>();
-    for (final var entry : workerStats.entrySet()) {
-      final double evidenceMass = entry.getValue()[1];
-      if (evidenceMass > 0.0) {
-        scores.put(entry.getKey(), entry.getValue()[0] / evidenceMass);
-      }
-    }
-    return scores;
-  }
 
   private @Nullable String tryGraphQuery(
       final AgentRoutingContext context, final Set<String> eligibleIds) {
