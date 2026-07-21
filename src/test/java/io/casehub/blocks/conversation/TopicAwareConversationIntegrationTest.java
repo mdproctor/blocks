@@ -107,7 +107,7 @@ class TopicAwareConversationIntegrationTest {
                 .build();
 
         var renderer = new ConversationRenderer(config);
-        var result = renderer.render(state, reactions);
+        var result = renderer.render(state, RenderContext.withReactions(reactions));
 
         // Topic sections present
         assertThat(result).contains("## review");

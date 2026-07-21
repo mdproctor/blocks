@@ -53,7 +53,7 @@ class ConversationRendererTest {
     }
 
     static ThreadEntry entry(String role, String entryType, String content) {
-        return new ThreadEntry(null, null, null, role, 1, entryType, content);
+        return new ThreadEntry(null, null, null, null, null, role, 1, entryType, content);
     }
 
     static ConversationState state(Map<String, ConversationPoint> points,
@@ -492,9 +492,9 @@ class ConversationRendererTest {
         points.put("RP-1", new ConversationPoint("RP-1", "review",
                                                  new PointClassification(Priority.HIGH, "bug", null),
                                                  List.of(
-                                                         new ThreadEntry("RP-1", 1L, io.casehub.qhorus.api.message.MessageType.COMMAND, "REV", 1, "RAISE", "Review this"),
-                                                         new ThreadEntry(null, 2L, io.casehub.qhorus.api.message.MessageType.STATUS, "IMP", 1, "QUALIFY", "Working on it"),
-                                                         new ThreadEntry(null, 3L, io.casehub.qhorus.api.message.MessageType.DONE, "IMP", 1, "AGREE", "Fixed")),
+                                                         new ThreadEntry("RP-1", 1L, io.casehub.qhorus.api.message.MessageType.COMMAND, null, null, "REV", 1, "RAISE", "Review this"),
+                                                         new ThreadEntry(null, 2L, io.casehub.qhorus.api.message.MessageType.STATUS, null, null, "IMP", 1, "QUALIFY", "Working on it"),
+                                                         new ThreadEntry(null, 3L, io.casehub.qhorus.api.message.MessageType.DONE, null, null, "IMP", 1, "AGREE", "Fixed")),
                                                  "AGREED"));
 
         var renderer = new ConversationRenderer(config);
@@ -517,8 +517,8 @@ class ConversationRendererTest {
         points.put("RP-1", new ConversationPoint("RP-1", "analysis",
                                                  new PointClassification(Priority.MEDIUM, "design", null),
                                                  List.of(
-                                                         new ThreadEntry("RP-1", 1L, io.casehub.qhorus.api.message.MessageType.COMMAND, "REV", 1, "RAISE", "Analyse this"),
-                                                         new ThreadEntry(null, 2L, io.casehub.qhorus.api.message.MessageType.STATUS, "IMP", 1, "QUALIFY", "In progress")),
+                                                         new ThreadEntry("RP-1", 1L, io.casehub.qhorus.api.message.MessageType.COMMAND, null, null, "REV", 1, "RAISE", "Analyse this"),
+                                                         new ThreadEntry(null, 2L, io.casehub.qhorus.api.message.MessageType.STATUS, null, null, "IMP", 1, "QUALIFY", "In progress")),
                                                  "OPEN"));
 
         var renderer = new ConversationRenderer(config);
@@ -532,7 +532,7 @@ class ConversationRendererTest {
         var points = new java.util.LinkedHashMap<String, ConversationPoint>();
         points.put("RP-1", new ConversationPoint("RP-1", "general",
                                                  new PointClassification(Priority.HIGH, "bug", null),
-                                                 List.of(new ThreadEntry("RP-1", 10L, io.casehub.qhorus.api.message.MessageType.COMMAND, "REV", 1, "RAISE", "Bug found")),
+                                                 List.of(new ThreadEntry("RP-1", 10L, io.casehub.qhorus.api.message.MessageType.COMMAND, null, null, "REV", 1, "RAISE", "Bug found")),
                                                  "OPEN"));
 
         var reactions = Map.of(10L, List.of(
@@ -540,7 +540,7 @@ class ConversationRendererTest {
                 new io.casehub.qhorus.api.message.ReactionGroup("✅", 1, List.of("a4"))));
 
         var renderer = new ConversationRenderer(emptyConfig());
-        var result   = renderer.render(state(points, List.of(), List.of(), Map.of()), reactions);
+        var result   = renderer.render(state(points, List.of(), List.of(), Map.of()), RenderContext.withReactions(reactions));
 
         assertThat(result).contains("👍×3");
         assertThat(result).contains("✅×1");
@@ -551,14 +551,89 @@ class ConversationRendererTest {
         var points = new java.util.LinkedHashMap<String, ConversationPoint>();
         points.put("RP-1", new ConversationPoint("RP-1", "general",
                                                  new PointClassification(Priority.HIGH, "bug", null),
-                                                 List.of(new ThreadEntry("RP-1", 10L, null, "REV", 1, "RAISE", "No reactions")),
+                                                 List.of(new ThreadEntry("RP-1", 10L, null, null, null, "REV", 1, "RAISE", "No reactions")),
                                                  "OPEN"));
 
         var renderer = new ConversationRenderer(emptyConfig());
-        var result   = renderer.render(state(points, List.of(), List.of(), Map.of()), Map.of());
+        var result   = renderer.render(state(points, List.of(), List.of(), Map.of()), RenderContext.withReactions(Map.of()));
 
         assertThat(result).doesNotContain("×");
     }
 
 
+    @Test
+    void epistemicBadges_renderedPerPoint() {
+        var thread = List.of(entry("REV", "RAISE", "a claim"));
+        var points = Map.of("p1", point("p1", Priority.HIGH, "test", null, "OPEN", thread));
+        var config = reviewConfig().toBuilder()
+                                   .showEpistemicStatus(true).build();
+        var renderer = new ConversationRenderer(config);
+        var cg = new CommonGroundState(
+                Map.of("p1", new GroundedFact("p1", "general", EpistemicStatus.ESTABLISHED,
+                                              "a claim", java.util.Set.of("agent-a"), java.util.Set.of(), 1)),
+                Map.of(), Map.of());
+        var ctx    = new RenderContext(Map.of(), cg, null);
+        var result = renderer.render(state(points, List.of(), List.of(), Map.of()), ctx);
+        assertThat(result).contains("[established by agent-a]");
+    }
+
+    @Test
+    void epistemicBadge_pending_showsAwaitingAcknowledgement() {
+        var thread = List.of(entry("REV", "RAISE", "a claim"));
+        var points = Map.of("p1", point("p1", Priority.HIGH, "test", null, "OPEN", thread));
+        var config = reviewConfig().toBuilder()
+                                   .showEpistemicStatus(true).build();
+        var renderer = new ConversationRenderer(config);
+        var cg = new CommonGroundState(Map.of(),
+                                       Map.of("p1", new GroundedFact("p1", "general", EpistemicStatus.PENDING,
+                                                                     "a claim", java.util.Set.of(), java.util.Set.of(), 1)),
+                                       Map.of());
+        var ctx    = new RenderContext(Map.of(), cg, null);
+        var result = renderer.render(state(points, List.of(), List.of(), Map.of()), ctx);
+        assertThat(result).contains("[pending — awaiting acknowledgement]");
+    }
+
+    @Test
+    void epistemicBadge_disputed_showsDisputedBy() {
+        var thread = List.of(entry("REV", "RAISE", "a claim"));
+        var points = Map.of("p1", point("p1", Priority.HIGH, "test", null, "OPEN", thread));
+        var config = reviewConfig().toBuilder()
+                                   .showEpistemicStatus(true).build();
+        var renderer = new ConversationRenderer(config);
+        var cg = new CommonGroundState(Map.of(), Map.of(),
+                                       Map.of("p1", new GroundedFact("p1", "general", EpistemicStatus.DISPUTED,
+                                                                     "a claim", java.util.Set.of(), java.util.Set.of("agent-b"), 1)));
+        var ctx    = new RenderContext(Map.of(), cg, null);
+        var result = renderer.render(state(points, List.of(), List.of(), Map.of()), ctx);
+        assertThat(result).contains("[disputed by agent-b]");
+    }
+
+    @Test
+    void convergenceHeader_renderedAtTop() {
+        var config = reviewConfig().toBuilder()
+                                   .showConvergenceSignal(true).build();
+        var renderer = new ConversationRenderer(config);
+        var signal = new ConvergenceSignal(ConvergenceState.CONVERGING, 0.78,
+                                           "common ground growing, 1 disputed point remaining");
+        var ctx = new RenderContext(Map.of(), null, signal);
+        var result = renderer.render(
+                state(Map.of(), List.of(), List.of(), Map.of()), ctx);
+        assertThat(result).contains("**Convergence:** CONVERGING (0.78)");
+        assertThat(result).contains("common ground growing, 1 disputed point remaining");
+    }
+
+    @Test
+    void epistemicBadges_notRendered_whenConfigDisabled() {
+        var thread   = List.of(entry("REV", "RAISE", "a claim"));
+        var points   = Map.of("p1", point("p1", Priority.HIGH, "test", null, "OPEN", thread));
+        var config   = reviewConfig(); // showEpistemicStatus defaults to false
+        var renderer = new ConversationRenderer(config);
+        var cg = new CommonGroundState(
+                Map.of("p1", new GroundedFact("p1", "general", EpistemicStatus.ESTABLISHED,
+                                              "a claim", java.util.Set.of("agent-a"), java.util.Set.of(), 1)),
+                Map.of(), Map.of());
+        var ctx    = new RenderContext(Map.of(), cg, null);
+        var result = renderer.render(state(points, List.of(), List.of(), Map.of()), ctx);
+        assertThat(result).doesNotContain("[established");
+    }
 }

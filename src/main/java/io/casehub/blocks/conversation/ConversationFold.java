@@ -21,11 +21,13 @@ public final class ConversationFold {
                                                 String topic,
                                                 Long messageId,
                                                 io.casehub.qhorus.api.message.MessageType messageType,
+                                                String sender,
+                                                java.time.Instant createdAt,
                                                 PointClassification classification,
                                                 String role, int round,
                                                 String entryType, String content) {
         var thread = new ArrayList<ThreadEntry>();
-        thread.add(new ThreadEntry(pointId, messageId, messageType, role, round, entryType, content));
+        thread.add(new ThreadEntry(pointId, messageId, messageType, sender, createdAt, role, round, entryType, content));
         var point = new ConversationPoint(pointId, topic, classification, thread,
                                           ConversationProtocol.STATUS_OPEN);
 
@@ -40,6 +42,8 @@ public final class ConversationFold {
                                                    String targetId,
                                                    Long messageId,
                                                    io.casehub.qhorus.api.message.MessageType messageType,
+                                                   String sender,
+                                                   java.time.Instant createdAt,
                                                    String role, int round,
                                                    String entryType, String content,
                                                    String newStatus) {
@@ -47,7 +51,7 @@ public final class ConversationFold {
 
         ConversationPoint existing = state.points().get(targetId);
         var               thread   = new ArrayList<>(existing.thread());
-        thread.add(new ThreadEntry(null, messageId, messageType, role, round, entryType, content));
+        thread.add(new ThreadEntry(null, messageId, messageType, sender, createdAt, role, round, entryType, content));
 
         String resolvedStatus = newStatus != null ? newStatus : existing.status();
         var updated = new ConversationPoint(existing.id(), existing.topic(), existing.classification(),
@@ -63,13 +67,15 @@ public final class ConversationFold {
     public static ConversationState flagHuman(ConversationState state,
                                               String targetId,
                                               Long messageId,
+                                              String sender,
+                                              java.time.Instant createdAt,
                                               String role, int round,
                                               String content) {
         var points = new LinkedHashMap<>(state.points());
         if (targetId != null && points.containsKey(targetId)) {
             ConversationPoint p      = points.get(targetId);
             var               thread = new ArrayList<>(p.thread());
-            thread.add(new ThreadEntry(null, messageId, null, role, round, ConversationProtocol.FLAG_HUMAN, content));
+            thread.add(new ThreadEntry(null, messageId, null, sender, createdAt, role, round, ConversationProtocol.FLAG_HUMAN, content));
             points.put(targetId, new ConversationPoint(p.id(), p.topic(), p.classification(),
                                                        thread, ConversationProtocol.STATUS_ESCALATED));
         }

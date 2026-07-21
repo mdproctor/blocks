@@ -98,7 +98,7 @@ No Quarkus runtime — plain JUnit 5 tests with Mockito. No CDI container in tes
 | `src/test/java/io/casehub/blocks/channel/` | Tests for channel blocks |
 | `src/main/java/io/casehub/blocks/agentic/` | Compositional agentic orchestration — five SPIs, execution drivers, pattern builders |
 | `src/test/java/io/casehub/blocks/agentic/` | Tests for agentic orchestration blocks |
-| `src/main/java/io/casehub/blocks/conversation/` | Structured conversation protocol — projections, fold state, rendering, point classification |
+| `src/main/java/io/casehub/blocks/conversation/` | Structured conversation protocol — projections, fold state, rendering, point classification, epistemic common ground, convergence detection |
 | `src/test/java/io/casehub/blocks/conversation/` | Tests for conversation blocks |
 | `src/main/java/io/casehub/blocks/oversight/` | Oversight gate lifecycle + risk classification — SPIs, classifier chaining, gate outcomes |
 | `src/test/java/io/casehub/blocks/oversight/` | Tests for oversight blocks |
@@ -146,6 +146,20 @@ Structured conversation protocol — reusable infrastructure for multi-agent del
 | `RoundMemo` | Summary memo for a completed conversation round — key outcomes, unresolved points. |
 | `FlagEntry` | Flag raised during conversation — attention markers for moderators or supervisors. |
 | `SubTaskFinding` | Result from a sub-agent task (verify, analyse, etc.) attached to a conversation point. |
+| `EpistemicStatus` | Enum: ESTABLISHED, PENDING, DISPUTED — classification outcome for common ground derivation. |
+| `ParticipantContext` | Pre-computed participant tracking per point: allParticipants, respondedBy, acknowledgedBy, completedBy, disputedBy, failedBy, roundsSinceLastActivity. |
+| `EpistemicRule` | `@FunctionalInterface` strategy for classifying conversation points by epistemic status. Composable via `and()` (conservative) / `or()` (permissive). |
+| `EpistemicRules` | Three provided rules: `explicitAcknowledgement(minParticipants)`, `tacitAcceptance(windowRounds)`, `commitmentResolution()`. |
+| `GroundedFact` | Epistemic metadata per point: pointId, topic, status, content, acknowledgedBy, disputedBy, round. |
+| `CommonGroundState` | Derived view partitioning conversation points into establishedFacts, pendingClaims, disputedPoints. |
+| `CommonGroundAnalyser` | Stateless utility: `analyse(ConversationState, EpistemicRule) → CommonGroundState`. Builds `ParticipantContext` per point and delegates classification to the rule. |
+| `ConvergenceState` | Enum: PROGRESSING, CONVERGING, CONSENSUS, DEADLOCK, DIMINISHING_RETURNS. |
+| `ConvergenceSignal` | Record: state, confidence (0.0–1.0), reason (human-readable). |
+| `ConvergenceContext` | Pre-computed convergence indicators: totalPoints, established/pending/disputed counts, recentSimilarity, messageLengthTrend, roundsSinceNewPoint, roundsSinceStatusChange, recentMessageTypeCounts. |
+| `ConvergencePolicy` | `@FunctionalInterface` strategy for evaluating convergence from conversation and common ground state. |
+| `ConvergencePolicies` | Three provided policies: `structural(similarityThreshold, staleRounds)`, `commonGroundRatio(consensusThreshold, deadlockDisputeRatio)`, `composite(policies...)`. |
+| `ConvergenceAnalyser` | Stateless utility: `analyse(ConversationState, CommonGroundState, ConvergencePolicy, recentWindow) → ConvergenceSignal`. |
+| `RenderContext` | Supplementary render-time inputs: reactions, commonGround, convergence. Replaces renderer overloads. |
 
 ## Package: `io.casehub.blocks.oversight`
 
@@ -174,7 +188,7 @@ Compositional agentic orchestration framework — eight sub-packages implementin
 | `agentic.decomposition` | Decomposition SPI: `DecompositionStrategy<T>`, `TaskNode` (sealed: LeafTask \| CompoundTask; LeafTask sealed: PrimitiveTask, PlannedTask; LeafTask extends `TaskDescriptor` — both variants carry `id`, `createdAt`, `status()` → PENDING, `executor()` delegates to `agent()`), `DecompositionMethod`, `DecompositionContext`, `IdentityDecomposition`, `StaticDecomposition`, `LlmDecomposition`, `HybridDecomposition`, `NoMethodMatchedException` |
 | `agentic.activation` | Activation SPI: `ActivationRule<T>`, `ActivationContext`, `OnExplicitDispatch`, `MaxIterationsGuard` |
 | `agentic.aggregation` | Aggregation SPI: `AggregationStrategy<T>`, `AggregationResult` (sealed: Resolved, Partial, Deadlocked), `PassThrough`, `CollectAll`, `MajorityVote` |
-| `agentic.termination` | Termination SPI: `TerminationCondition<T>`, `TerminationDecision` (sealed: Continue, Complete, Failed, Escalate), `GoalReached`, `MaxIterationsTermination`, `JudgeConvergence` |
+| `agentic.termination` | Termination SPI: `TerminationCondition<T>`, `TerminationDecision` (sealed: Continue, Complete, Failed, Escalate), `GoalReached`, `MaxIterationsTermination`, `JudgeConvergence`, `ConvergenceTermination` (bridges `ConvergencePolicy` → `TerminationCondition`) |
 | `agentic.model` | Execution model: `ExecutionModel<T>`, `ExecutionDriver<T>`, `AbstractExecutionDriver`, `OrchestratedDriver`, `ChoreographedDriver`, `AgentInvoker<T>`, `ExecutionResult` (sealed: Completed, Failed, Escalated, Cancelled), `ExecutionState` (sealed: Idle, Running, WaitingForAgent, WaitingForEvent, Complete, Faulted, Cancelled), `ExecutionEventListener` |
 | `agentic.listener` | Accountability listeners: `OrchestrationEventType`, `EventLogListener` (operational audit via EventSink), `LedgerExecutionListener` (compliance audit via LedgerSink), `MetricsListener` (OTel metrics via Meter) |
 | `agentic.pattern` | Pattern DSL: `Patterns` entry point, `AbstractPatternBuilder`, 8 builders (Supervisor, Sequence, Loop, Parallel, Voting, Debate, Conditional, HTN) |

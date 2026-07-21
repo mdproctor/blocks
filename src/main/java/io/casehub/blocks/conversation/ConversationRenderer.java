@@ -11,17 +11,24 @@ public class ConversationRenderer {
     }
 
     public String render(ConversationState state) {
-        return render(state, java.util.Map.of());
+        return render(state, RenderContext.EMPTY);
     }
 
-    public String render(ConversationState state, java.util.Map<Long, java.util.List<io.casehub.qhorus.api.message.ReactionGroup>> reactions) {
+    public String render(ConversationState state, RenderContext ctx) {
         var sb = new StringBuilder();
         sb.append("# Conversation Summary\n\n---\n\n");
 
+        if (config.showConvergenceSignal() && ctx.convergence() != null) {
+            ConvergenceSignal signal = ctx.convergence();
+            sb.append("**Convergence:** ").append(signal.state())
+              .append(" (").append(String.format("%.2f", signal.confidence())).append(")")
+              .append(" — ").append(signal.reason()).append("\n\n");
+        }
+
         if (config.groupByTopic()) {
-            renderByTopic(sb, state, reactions);
+            renderByTopic(sb, state, ctx);
         } else {
-            renderFlat(sb, state, reactions);
+            renderFlat(sb, state, ctx);
         }
 
         if (!state.humanFlags().isEmpty()) {
@@ -53,8 +60,7 @@ public class ConversationRenderer {
         return sb.toString();
     }
 
-    private void renderFlat(StringBuilder sb, ConversationState state,
-                            java.util.Map<Long, java.util.List<io.casehub.qhorus.api.message.ReactionGroup>> reactions) {
+    private void renderFlat(StringBuilder sb, ConversationState state, RenderContext ctx) {
         java.util.List<ConversationPoint> unresolved = new java.util.ArrayList<>();
         java.util.List<ConversationPoint> escalated  = new java.util.ArrayList<>();
         java.util.List<ConversationPoint> resolved   = new java.util.ArrayList<>();
@@ -69,13 +75,12 @@ public class ConversationRenderer {
             }
         }
 
-        renderPoints(sb, unresolved, state, false, reactions);
-        renderPoints(sb, escalated, state, false, reactions);
-        renderPoints(sb, resolved, state, true, reactions);
+        renderPoints(sb, unresolved, state, false, ctx);
+        renderPoints(sb, escalated, state, false, ctx);
+        renderPoints(sb, resolved, state, true, ctx);
     }
 
-    private void renderByTopic(StringBuilder sb, ConversationState state,
-                               java.util.Map<Long, java.util.List<io.casehub.qhorus.api.message.ReactionGroup>> reactions) {
+    private void renderByTopic(StringBuilder sb, ConversationState state, RenderContext ctx) {
         var topicOrder = new java.util.LinkedHashMap<String, java.util.List<ConversationPoint>>();
         for (ConversationPoint point : state.points().values()) {
             String topic = point.topic() != null ? point.topic() : "general";
@@ -92,6 +97,14 @@ public class ConversationRenderer {
                 }
             }
 
+            if (config.showEpistemicStatus() && ctx.commonGround() != null) {
+                CommonGroundState cg   = ctx.commonGround();
+                long              est  = entry.getValue().stream().filter(p -> cg.establishedFacts().containsKey(p.id())).count();
+                long              pend = entry.getValue().stream().filter(p -> cg.pendingClaims().containsKey(p.id())).count();
+                long              disp = entry.getValue().stream().filter(p -> cg.disputedPoints().containsKey(p.id())).count();
+                sb.append(est).append(" established, ").append(pend).append(" pending, ").append(disp).append(" disputed\n\n");
+            }
+
             java.util.List<ConversationPoint> unresolved = new java.util.ArrayList<>();
             java.util.List<ConversationPoint> escalated  = new java.util.ArrayList<>();
             java.util.List<ConversationPoint> resolved   = new java.util.ArrayList<>();
@@ -106,9 +119,9 @@ public class ConversationRenderer {
                 }
             }
 
-            renderPoints(sb, unresolved, state, false, reactions);
-            renderPoints(sb, escalated, state, false, reactions);
-            renderPoints(sb, resolved, state, true, reactions);
+            renderPoints(sb, unresolved, state, false, ctx);
+            renderPoints(sb, escalated, state, false, ctx);
+            renderPoints(sb, resolved, state, true, ctx);
         }
     }
 
@@ -137,8 +150,7 @@ public class ConversationRenderer {
     }
 
     private void renderPoints(StringBuilder sb, java.util.List<ConversationPoint> points,
-                              ConversationState state, boolean strikethrough,
-                              java.util.Map<Long, java.util.List<io.casehub.qhorus.api.message.ReactionGroup>> reactions) {
+                              ConversationState state, boolean strikethrough, RenderContext ctx) {
         for (ConversationPoint point : points) {
             String emoji        = config.statusEmoji().getOrDefault(point.status(), DEFAULT_EMOJI);
             String firstContent = point.thread().isEmpty() ? "" : point.thread().get(0).content();
@@ -161,6 +173,10 @@ public class ConversationRenderer {
                 sb.append("## ").append(emoji).append(" ").append(header).append("\n");
             }
 
+            if (config.showEpistemicStatus() && ctx.commonGround() != null) {
+                renderEpistemicBadge(sb, point, ctx.commonGround());
+            }
+
             for (ThreadEntry entry : point.thread()) {
                 String typeLabel = config.entryTypeLabel()
                                          .getOrDefault(entry.entryType(), entry.entryType().toLowerCase());
@@ -169,8 +185,8 @@ public class ConversationRenderer {
                 sb.append("> **").append(roleDisplay).append(" (").append(typeLabel).append("):** ")
                   .append(entry.content()).append("\n");
 
-                if (entry.messageId() != null && reactions.containsKey(entry.messageId())) {
-                    var groups = reactions.get(entry.messageId());
+                if (entry.messageId() != null && ctx.reactions().containsKey(entry.messageId())) {
+                    var groups = ctx.reactions().get(entry.messageId());
                     if (!groups.isEmpty()) {
                         sb.append("> ");
                         for (int i = 0; i < groups.size(); i++) {
@@ -187,6 +203,19 @@ public class ConversationRenderer {
                  .forEach(f -> sb.append(renderFinding(f)));
 
             sb.append("\n---\n\n");
+        }
+    }
+
+    private void renderEpistemicBadge(StringBuilder sb, ConversationPoint point, CommonGroundState cg) {
+        GroundedFact fact = cg.establishedFacts().get(point.id());
+        if (fact == null) {fact = cg.pendingClaims().get(point.id());}
+        if (fact == null) {fact = cg.disputedPoints().get(point.id());}
+        if (fact == null) {return;}
+
+        switch (fact.status()) {
+            case ESTABLISHED -> sb.append("[established by ").append(String.join(", ", fact.acknowledgedBy())).append("]\n");
+            case PENDING -> sb.append("[pending — awaiting acknowledgement]\n");
+            case DISPUTED -> sb.append("[disputed by ").append(String.join(", ", fact.disputedBy())).append("]\n");
         }
     }
 

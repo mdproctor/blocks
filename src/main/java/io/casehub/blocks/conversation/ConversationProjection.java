@@ -124,8 +124,8 @@ public abstract class ConversationProjection implements ChannelProjection<Conver
         String body  = ChannelMessageMeta.bodyContent(sentinel(), message.content());
 
         return ConversationFold.createPoint(state, pointId, message.topic(), message.id(), message.type(),
-                                            classification, role, round, entryType, body);
-    }
+                                            message.sender(), message.createdAt(),
+                                            classification, role, round, entryType, body);}
 
     private ConversationState handlePointResponse(ConversationState state, MessageView message,
                                                   Map<String, String> meta, String role,
@@ -142,8 +142,8 @@ public abstract class ConversationProjection implements ChannelProjection<Conver
         String body  = ChannelMessageMeta.bodyContent(sentinel(), message.content());
 
         return ConversationFold.respondToPoint(state, targetId, message.id(), message.type(),
-                                               role, round, entryType, body, statusAfter(entryType));
-    }
+                                               message.sender(), message.createdAt(),
+                                               role, round, entryType, body, statusAfter(entryType));}
 
     // ── infrastructure handlers ─────────────────────────────────────────────
 
@@ -201,8 +201,8 @@ public abstract class ConversationProjection implements ChannelProjection<Conver
         }
 
         return ConversationFold.flagHuman(state, message.correlationId(), message.id(),
-                                          role, round, content);
-    }
+                                          message.sender(), message.createdAt(),
+                                          role, round, content);}
 
     // ── utility ─────────────────────────────────────────────────────────────
 
