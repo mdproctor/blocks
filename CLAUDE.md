@@ -96,6 +96,8 @@ No Quarkus runtime — plain JUnit 5 tests with Mockito. No CDI container in tes
 |------|----------|
 | `src/main/java/io/casehub/blocks/channel/` | Channel utility blocks — message meta, context tracking, bounded projection |
 | `src/test/java/io/casehub/blocks/channel/` | Tests for channel blocks |
+| `src/main/java/io/casehub/blocks/channel/summary/` | Channel summary hooks — heuristic (@DefaultBean) and LLM (@Alternative) SummaryUpdateHook implementations |
+| `src/test/java/io/casehub/blocks/channel/summary/` | Tests for channel summary hooks |
 | `src/main/java/io/casehub/blocks/agentic/` | Compositional agentic orchestration — five SPIs, execution drivers, pattern builders |
 | `src/test/java/io/casehub/blocks/agentic/` | Tests for agentic orchestration blocks |
 | `src/main/java/io/casehub/blocks/conversation/` | Structured conversation protocol — projections, fold state, rendering, point classification, epistemic common ground, convergence detection |
@@ -126,6 +128,16 @@ No Quarkus runtime — plain JUnit 5 tests with Mockito. No CDI container in tes
 | `AgentResultParseException` | Unchecked exception for handler parse failures |
 | `ChannelEventAdapter<E>` | Direction 1 bridge: implements `MessageObserver`, extracts domain events via a `Function<MessageReceivedEvent, E>`, publishes `LevelEvent<E>` to an `EventStreamBus`. Null return from extractor filters. Extractor exceptions caught and logged. |
 | `ChannelEventPublisher<E>` | Direction 2 bridge: subscribes to `EventStreamBus<E>`, converts events to `MessageDispatch` via a builder function, dispatches via `MessageDispatcher`. Best-effort — catches + logs, never propagates. |
+
+## Package: `io.casehub.blocks.channel.summary`
+
+Channel summary hook implementations — connect blocks' summarisation intelligence to qhorus's channel summary slot via `SummaryUpdateHook` SPI.
+
+| Class | What it does |
+|-------|-------------|
+| `SummaryMode` | Enum: `APPEND` (delta only) or `EDIT` (rewrite entire summary) |
+| `HeuristicChannelSummariser` | `@DefaultBean` `SummaryUpdateHook` — append-only structural summary from message metadata (participants, count, topics, time span). Zero LLM cost. |
+| `LlmChannelSummariser` | `@Alternative @Priority(1)` `SummaryUpdateHook` — LLM-powered via `AgentProvider`. Edit mode by default (rewrites surrounding context). Configurable via `casehub.blocks.channel.summary.mode`. |
 
 ## Package: `io.casehub.blocks.conversation`
 
