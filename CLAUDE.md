@@ -237,6 +237,9 @@ AI-powered `AgentRoutingStrategy` implementations for the engine's routing pipel
 | `DefaultCbrCaseOutcomeWeights` | `@DefaultBean` — COMPLETED=1.0, FAULTED=0.2, CANCELLED=0.0. |
 | `PlanCompositionAnalyser` | `RoutingSignalProvider` (id: `"plan-composition"`). Scores candidates based on case-level outcomes in multi-step plans (planTrace.size >= 2). Uses `CbrCaseOutcomeWeights` for case outcome weighting and similarity-weighted scoring. Returns null when no multi-step plan data exists. |
 | `CbrRoutingPromptSection` | `RoutingPromptSection` implementation — formats historical CBR outcomes per eligible agent for LLM routing prompts. |
+| `CoordinationSignalProvider` | `RoutingSignalProvider` (id: `"coordination"`). Scores candidates by historical team composition outcomes with adaptation-guided retrieval (AGR). Extracts team membership from experience plan traces, computes weighted mean of case-level outcomes where each candidate appeared in a multi-agent team, and weights by team re-assembly feasibility (`\|team ∩ candidatePool\| / \|team\|`). Uses `CoordinationOutcomeWeights` for case outcome weighting. |
+| `CoordinationOutcomeWeights` | SPI for case-level outcome weights used by `CoordinationSignalProvider`. Returns `Map<String, Double>` (string keys — case outcomes are domain-dependent). Domain repos override `DefaultCoordinationOutcomeWeights` with `@ApplicationScoped`. |
+| `DefaultCoordinationOutcomeWeights` | `@DefaultBean` — COMPLETED=1.0, FAULTED=0.2, CANCELLED=0.0. |
 | `RoutingSupport` | Package-private utility — shared prompt building, response parsing, `AgentProvider` invocation, and trust classification extraction (`TrustFilterOutcome` sealed interface). Used by both `LlmAgentRoutingStrategy` and `CbrAgentRoutingStrategy`. |
 
 ## Package: `io.casehub.blocks.summarisation`
