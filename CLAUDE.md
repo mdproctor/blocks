@@ -96,8 +96,8 @@ No Quarkus runtime — plain JUnit 5 tests with Mockito. No CDI container in tes
 |------|----------|
 | `src/main/java/io/casehub/blocks/channel/` | Channel utility blocks — message meta, context tracking, bounded projection |
 | `src/test/java/io/casehub/blocks/channel/` | Tests for channel blocks |
-| `src/main/java/io/casehub/blocks/channel/summary/` | Channel summary hooks — heuristic (@DefaultBean) and LLM (@Alternative) SummaryUpdateHook implementations |
-| `src/test/java/io/casehub/blocks/channel/summary/` | Tests for channel summary hooks |
+| `src/main/java/io/casehub/blocks/channel/summary/` | Channel summary integration — `ContentSummariser<Message>` implementations + `SummaryUpdateHook` adapter |
+| `src/test/java/io/casehub/blocks/channel/summary/` | Tests for channel summary integration |
 | `src/main/java/io/casehub/blocks/agentic/` | Compositional agentic orchestration — five SPIs, execution drivers, pattern builders |
 | `src/test/java/io/casehub/blocks/agentic/` | Tests for agentic orchestration blocks |
 | `src/main/java/io/casehub/blocks/conversation/` | Structured conversation protocol — projections, fold state, rendering, point classification, epistemic common ground, convergence detection |
@@ -108,8 +108,10 @@ No Quarkus runtime — plain JUnit 5 tests with Mockito. No CDI container in tes
 | `src/test/java/io/casehub/blocks/routing/` | Tests for routing utilities |
 | `src/main/java/io/casehub/blocks/routing/agent/` | AI-powered AgentRoutingStrategy implementations — LLM-reasoned and CBR-evidence agent selection, composable prompt enrichment pipeline, feature extraction SPI, outcome recording |
 | `src/test/java/io/casehub/blocks/routing/agent/` | Tests for AI routing strategies |
-| `src/main/java/io/casehub/blocks/summarisation/` | Temporal abstraction framework — event levels, windowed accumulation, pluggable summarisation |
+| `src/main/java/io/casehub/blocks/summarisation/` | Temporal abstraction framework + reusable content summarisation SPI — event levels, windowed accumulation, pluggable summarisation, `ContentSummariser<T>` with tiered dispatch |
 | `src/test/java/io/casehub/blocks/summarisation/` | Tests for summarisation framework |
+| `src/main/java/io/casehub/blocks/summarisation/llm/` | LLM-backed `ContentSummariser<T>` — generic synthesis via `AgentProvider` |
+| `src/test/java/io/casehub/blocks/summarisation/llm/` | Tests for LLM content summariser |
 | `src/main/java/io/casehub/blocks/summarisation/observation/` | Observation accumulator — tiered, demand-driven rendering for LLM agent prompts with RAG-able chunks |
 | `src/test/java/io/casehub/blocks/summarisation/observation/` | Tests for observation accumulator |
 | `src/main/java/io/casehub/blocks/summarisation/observation/affordance/` | Affordance grounding — per-entity observation rendering for LLM agents |
@@ -135,13 +137,12 @@ No Quarkus runtime — plain JUnit 5 tests with Mockito. No CDI container in tes
 
 ## Package: `io.casehub.blocks.channel.summary`
 
-Channel summary hook implementations — connect blocks' summarisation intelligence to qhorus's channel summary slot via `SummaryUpdateHook` SPI.
+Channel summary integration — Message-specific `ContentSummariser<Message>` implementations and the `SummaryUpdateHook` adapter that bridges blocks' summarisation framework to qhorus's channel summary slot.
 
 | Class | What it does |
 |-------|-------------|
-| `SummaryMode` | Enum: `APPEND` (delta only) or `EDIT` (rewrite entire summary) |
-| `HeuristicChannelSummariser` | `@DefaultBean` `SummaryUpdateHook` — append-only structural summary from message metadata (participants, count, topics, time span). Zero LLM cost. |
-| `LlmChannelSummariser` | `@Alternative @Priority(1)` `SummaryUpdateHook` — LLM-powered via `AgentProvider`. Edit mode by default (rewrites surrounding context). Configurable via `casehub.blocks.channel.summary.mode`. |
+| `HeuristicMessageSummariser` | `@DefaultBean` `ContentSummariser<Message>` — append-only structural summary from message metadata (participants, topics, time span). Merges annotations across invocations. Zero LLM cost. |
+| `ChannelSummariser` | `@ApplicationScoped` `SummaryUpdateHook` adapter — delegates to injected `ContentSummariser<Message>`. Mutiny-aware blocking, channel-context error logging. |
 
 ## Package: `io.casehub.blocks.conversation`
 
@@ -201,11 +202,11 @@ Compositional agentic orchestration framework — eight sub-packages implementin
 |-------------|-----------------|
 | `agentic` | Foundation types: `AgentRef` (sealed: WorkerAgent, ChannelAgent, HumanAgent, ExternalAgent, ComposedAgent; extends `ExecutorRef` — each variant implements `name()`/`description()`), `AgentResult`, `RoutingCandidate`, `FailurePolicy`, `AgentCardSupport` (shared card-building via `ExecutorRef`; no more pattern matching) |
 | `agentic.routing` | Routing SPI: `RoutingStrategy<T>`, `RoutingDecision` (sealed: Selected, Unresolvable, Escalate), `FirstMatchRouting`, `RoundRobinRouting`, `SequentialRouting`, `LlmSelectedRouting` |
-| `agentic.decomposition` | Decomposition SPI: `DecompositionStrategy<T>`, `TaskNode` (sealed: LeafTask \| CompoundTask; LeafTask sealed: PrimitiveTask, PlannedTask; LeafTask extends `TaskDescriptor` — both variants carry `id`, `createdAt`, `status()` → PENDING, `executor()` delegates to `agent()`), `DecompositionMethod`, `DecompositionContext`, `IdentityDecomposition`, `StaticDecomposition`, `LlmDecomposition`, `HybridDecomposition`, `NoMethodMatchedException` |
+| `agentic.decomposition` | Decomposition SPI: `DecompositionStrategy<T>`, `TaskNode` (sealed: LeafTask \| CompoundTask; LeafTask sealed: PrimitiveTask, PlannedTask; LeafTask extends `TaskDescriptor` — both variants carry `id`, `createdAt`, `status()` → PENDING, `executor()` delegates to `agent()`), `DecompositionMethod`, `DecompositionContext`, `IdentityDecomposition`, `StaticDecomposition`, `LlmDecomposition`, `HybridDecomposition`, `GoalOrientedDecomposition` (GOAP backward-chaining via `AgentCapability.inputTypes`/`outputTypes`; `GoapDecompositionContext` carries `goalTypes` + `availableTypes`), `NoMethodMatchedException` |
 | `agentic.activation` | Activation SPI: `ActivationRule<T>`, `ActivationContext`, `OnExplicitDispatch`, `MaxIterationsGuard` |
 | `agentic.aggregation` | Aggregation SPI: `AggregationStrategy<T>`, `AggregationResult` (sealed: Resolved, Partial, Deadlocked), `PassThrough`, `CollectAll`, `MajorityVote` |
 | `agentic.termination` | Termination SPI: `TerminationCondition<T>`, `TerminationDecision` (sealed: Continue, Complete, Failed, Escalate), `GoalReached`, `MaxIterationsTermination`, `JudgeConvergence`, `ConvergenceTermination` (bridges `ConvergencePolicy` → `TerminationCondition`) |
-| `agentic.model` | Execution model: `ExecutionModel<T>`, `ExecutionDriver<T>`, `AbstractExecutionDriver`, `OrchestratedDriver`, `ChoreographedDriver`, `AgentInvoker<T>`, `ExecutionResult` (sealed: Completed, Failed, Escalated, Cancelled), `ExecutionState` (sealed: Idle, Running, WaitingForAgent, WaitingForEvent, Complete, Faulted, Cancelled), `ExecutionEventListener` |
+| `agentic.model` | Execution model: `ExecutionModel<T>` (carries `PatternType`), `ExecutionDriver<T>`, `AbstractExecutionDriver`, `OrchestratedDriver`, `ChoreographedDriver`, `AgentInvoker<T>` (handles ExternalAgent + ComposedAgent; `withFallback()` for composition), `ExecutionBackend<T>` (pluggable execution — `orchestrated()` default, consumers supply Flow or custom), `PatternType` (SEQUENCE/PARALLEL/LOOP/CONDITIONAL workflow-shaped; SUPERVISOR/DEBATE/VOTING/HTN custom-driver), `ExecutionResult` (sealed: Completed, Failed, Escalated, Cancelled), `ExecutionState` (sealed: Idle, Running, WaitingForAgent, WaitingForEvent, Complete, Faulted, Cancelled), `ExecutionEventListener` |
 | `agentic.listener` | Accountability listeners: `OrchestrationEventType`, `EventLogListener` (operational audit via EventSink), `LedgerExecutionListener` (compliance audit via LedgerSink), `MetricsListener` (OTel metrics via Meter) |
 | `agentic.pattern` | Pattern DSL: `Patterns` entry point, `AbstractPatternBuilder`, 8 builders (Supervisor, Sequence, Loop, Parallel, Voting, Debate, Conditional, HTN) |
 
@@ -237,7 +238,12 @@ AI-powered `AgentRoutingStrategy` implementations for the engine's routing pipel
 | `DefaultCbrCaseOutcomeWeights` | `@DefaultBean` — COMPLETED=1.0, FAULTED=0.2, CANCELLED=0.0. |
 | `PlanCompositionAnalyser` | `RoutingSignalProvider` (id: `"plan-composition"`). Scores candidates based on case-level outcomes in multi-step plans (planTrace.size >= 2). Uses `CbrCaseOutcomeWeights` for case outcome weighting and similarity-weighted scoring. Returns null when no multi-step plan data exists. |
 | `CbrRoutingPromptSection` | `RoutingPromptSection` implementation — formats historical CBR outcomes per eligible agent for LLM routing prompts. |
+| `CoordinationSignalProvider` | `RoutingSignalProvider` (id: `"coordination"`). Scores candidates by historical team composition outcomes with adaptation-guided retrieval (AGR). Extracts team membership from experience plan traces, computes weighted mean of case-level outcomes where each candidate appeared in a multi-agent team, and weights by team re-assembly feasibility (`\|team ∩ candidatePool\| / \|team\|`). Uses `CoordinationOutcomeWeights` for case outcome weighting. |
+| `CoordinationOutcomeWeights` | SPI for case-level outcome weights used by `CoordinationSignalProvider`. Returns `Map<String, Double>` (string keys — case outcomes are domain-dependent). Domain repos override `DefaultCoordinationOutcomeWeights` with `@ApplicationScoped`. |
+| `DefaultCoordinationOutcomeWeights` | `@DefaultBean` — COMPLETED=1.0, FAULTED=0.2, CANCELLED=0.0. |
 | `RoutingSupport` | Package-private utility — shared prompt building, response parsing, `AgentProvider` invocation, and trust classification extraction (`TrustFilterOutcome` sealed interface). Used by both `LlmAgentRoutingStrategy` and `CbrAgentRoutingStrategy`. |
+| `DispositionAwareRouting` | `RoutingSignalProvider` (id: `"disposition"`). Scores candidates by personality/disposition match against a desired `DispositionProfile` extracted from case context (`_routing.disposition.<capabilityName>` or `default`). Exact-match scoring per `DispositionAxis` with optional per-axis weights. No-op when profile absent or no candidates have dispositions. |
+| `DispositionProfile` | Record: `Map<DispositionAxis, String> desired` + `Map<DispositionAxis, Double> weights`. Compact value type for desired agent personality traits. |
 
 ## Package: `io.casehub.blocks.summarisation`
 
@@ -254,6 +260,11 @@ Temporal abstraction framework for summarising high-frequency event streams into
 | `SummarisationRunner<IN, OUT>` | Wires accumulator → summariser → output bus. `collect()`, `tick()` (returns `CompletionStage<Void>`), `clear()`, `size()`. |
 | `KeyedAccumulator<K, E>` | Groups events by key (via `Function<E, K>`), emits each group independently on completion predicate or stale timeout. Thread-safe. `collect()`, `drain(long now)`, `clear()`, `groupCount()`, `eventCount()`. Clock-from-last-event staleness semantics. |
 | `KeyedSummarisationRunner<K, IN, OUT>` | Wires `KeyedAccumulator` → `Summariser` → output bus. Per-group at-most-once error semantics. `collect()`, `tick(long now)`, `clear()`, `groupCount()`, `eventCount()`. |
+| `SummaryMode` | Enum: `APPEND` (delta only) or `EDIT` (rewrite entire summary). Used by `LlmContentSummariser`. |
+| `ContentSummariser<T>` | `@FunctionalInterface` SPI: `CompletionStage<SummaryResult> summarise(List<T>, @Nullable SummaryResult)`. Reusable batch summarisation — decoupled from pipeline event model. Returns `SummaryResult` (text + annotations). |
+| `VerbatimContentSummariser<T>` | Renders each item as a bullet list via `Function<T, String>`. Preserves previous text and propagates annotations. |
+| `TieredContentSummariser<T>` | Dispatches to delegates based on batch size thresholds. 2-tier `(small, large, threshold)` and 3-tier `(small, medium, large, t1, t2)` constructors. |
+| `ContentSummariserToSummariser<T>` | Pipeline adapter: bridges `ContentSummariser<T>` → `Summariser<T, String>` for use in `SummarisationRunner`. Passes null previous (pipeline batches are independent). |
 
 Two integration patterns: **Pattern A** (SummarisationRunner pipeline — sync heuristics, microsecond latency) and **Pattern B** (direct EventAccumulator — async LLM dispatch, caller manages). `KeyedSummarisationRunner` is the grouped counterpart to `SummarisationRunner` — same compositional role, groups by key instead of flat windowing. See spec for details.
 
@@ -283,11 +294,26 @@ Grounded observation rendering for LLM agents. Per-entity affordance chains (ide
 | `ActionDescriptor` | Record: action type in the vocabulary `(String actionType, String description, @Nullable String parameterFormat)` |
 | `AffordanceRenderer` | Concrete class: `renderEntities()` (core grounding chains), `renderObservation()` (section assembly), `renderActionVocabulary()` (action vocabulary). Configurable header formatter via `withHeaderFormatter()` |
 
+## Sub-package: `io.casehub.blocks.summarisation.llm`
+
+LLM-backed content summarisation. Separated from the pure-Java `blocks.summarisation` package because it depends on `AgentProvider` (platform-agent-api) and Mutiny.
+
+| Class | What it does |
+|-------|-------------|
+| `LlmContentSummariser<T>` | Generic `ContentSummariser<T>` backed by `AgentProvider`. EDIT/APPEND modes via `SummaryMode`. Optional `preamble` for static context (e.g., channel name). Propagates previous annotations. |
+
 ## Dependencies
 
 **Compile:** `casehub-qhorus-api`, `casehub-work-api`, `casehub-engine-api`, `casehub-eidos-api`, `casehub-worker-api`, `org.jspecify:jspecify`
 **Provided:** `io.smallrye.reactive:mutiny`, `casehub-platform-agent-api`, `casehub-platform-api`, `casehub-engine-ledger`, `casehub-ledger-api`, `casehub-neocortex-memory-api`, `io.opentelemetry:opentelemetry-api`
 **Test:** `casehub-qhorus`, `casehub-qhorus-testing`, `casehub-engine`, `casehub-engine-testing`, `assertj`, `mockito`, `awaitility`, `io.opentelemetry:opentelemetry-sdk-testing`
+
+**No Jandex index.** blocks does not include a Jandex index — its CDI beans are not auto-discovered by Quarkus. Consumers that need blocks' CDI beans (routing strategies, channel summarisers) must opt in:
+```properties
+quarkus.index-dependency.casehub-blocks.group-id=io.casehub
+quarkus.index-dependency.casehub-blocks.artifact-id=casehub-blocks
+```
+Consumers that only use blocks' pure types (records, sealed interfaces, plain classes) need no configuration.
 
 ## Consumers
 
