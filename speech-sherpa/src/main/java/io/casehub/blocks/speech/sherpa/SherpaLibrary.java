@@ -3,10 +3,8 @@ package io.casehub.blocks.speech.sherpa;
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.Linker;
-import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SymbolLookup;
-import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
 import java.nio.file.Path;
 import java.util.Optional;
@@ -71,12 +69,35 @@ final class SherpaLibrary {
     }
 
     static SherpaLibrary load() {
-        if (INSTANCE != null) return INSTANCE;
+        if (INSTANCE != null) {return INSTANCE;}
         synchronized (SherpaLibrary.class) {
-            if (INSTANCE != null) return INSTANCE;
-            SymbolLookup lookup = SymbolLookup.libraryLookup("sherpa-onnx-c-api", Arena.global());
-            INSTANCE = new SherpaLibrary(lookup);
-            return INSTANCE;
+            if (INSTANCE != null) {return INSTANCE;}
+
+            // Tier 1: system library path
+            try {
+                SymbolLookup lookup = SymbolLookup.libraryLookup("sherpa-onnx-c-api", Arena.global());
+                INSTANCE = new SherpaLibrary(lookup);
+                return INSTANCE;
+            } catch (IllegalArgumentException | UnsatisfiedLinkError ignored) {
+            }
+
+            // Tier 2: local cache
+            Path cacheDir = resolveNativeDir();
+            if (cacheDir != null) {
+                Path onnxRuntime = cacheDir.resolve(onnxRuntimeLibName());
+                Path sherpaLib   = cacheDir.resolve(sherpaLibName());
+                if (java.nio.file.Files.exists(sherpaLib) && java.nio.file.Files.exists(onnxRuntime)) {
+                    SymbolLookup.libraryLookup(onnxRuntime, Arena.global());
+                    SymbolLookup lookup = SymbolLookup.libraryLookup(sherpaLib, Arena.global());
+                    INSTANCE = new SherpaLibrary(lookup);
+                    return INSTANCE;
+                }
+            }
+
+            throw new UnsatisfiedLinkError(
+                    "sherpa-onnx native library not found. Install it system-wide or place "
+                    + sherpaLibName() + " + " + onnxRuntimeLibName()
+                    + " in " + defaultCacheDir());
         }
     }
 
@@ -101,4 +122,55 @@ final class SherpaLibrary {
         }
         return linker.downcallHandle(symbol.get(), descriptor);
     }
+
+    private static Path resolveNativeDir() {
+        String override = System.getProperty("sherpa.native.dir");
+        if (override != null) {return Path.of(override);}
+
+        Path cacheDir = defaultCacheDir();
+        if (java.nio.file.Files.isDirectory(cacheDir)) {return cacheDir;}
+
+        // Search versioned subdirectories (latest first)
+        Path parent = cacheDir.getParent();
+        if (parent != null && java.nio.file.Files.isDirectory(parent)) {
+            try (var dirs = java.nio.file.Files.list(parent)) {
+                return dirs.filter(java.nio.file.Files::isDirectory)
+                           .max(java.util.Comparator.comparing(p -> p.getFileName().toString()))
+                           .map(v -> v.resolve(platformId()))
+                           .filter(java.nio.file.Files::isDirectory)
+                           .orElse(null);
+            } catch (java.io.IOException e) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    static Path defaultCacheDir() {
+        return Path.of(System.getProperty("user.home"), ".casehub", "native", "sherpa-onnx", VERSION, platformId());
+    }
+
+    static String platformId() {
+        String os      = System.getProperty("os.name", "").toLowerCase();
+        String arch    = System.getProperty("os.arch", "");
+        String osKey   = os.contains("mac") ? "osx" : os.contains("linux") ? "linux" : "win";
+        String archKey = arch.equals("aarch64") || arch.equals("arm64") ? "arm64" : "x64";
+        return osKey + "-" + archKey;
+    }
+
+    private static String sherpaLibName() {
+        String os = System.getProperty("os.name", "").toLowerCase();
+        if (os.contains("mac")) {return "libsherpa-onnx-c-api.dylib";}
+        if (os.contains("win")) {return "sherpa-onnx-c-api.dll";}
+        return "libsherpa-onnx-c-api.so";
+    }
+
+    private static String onnxRuntimeLibName() {
+        String os = System.getProperty("os.name", "").toLowerCase();
+        if (os.contains("mac")) {return "libonnxruntime.dylib";}
+        if (os.contains("win")) {return "onnxruntime.dll";}
+        return "libonnxruntime.so";
+    }
+
+    static final String VERSION = "1.13.6";
 }

@@ -93,20 +93,21 @@ public final class SherpaOnnxTextToSpeech implements TextToSpeechService {
     }
 
     private MemorySegment buildTtsConfig(Arena arena) {
-        MemorySegment seg = arena.allocate(SherpaLayouts.TTS_CONFIG);
+        MemorySegment seg = arena.allocate(SherpaLayouts.CONFIG_ALLOC_SIZE);
         seg.fill((byte) 0);
 
         Path modelDir = config.modelDir();
-        SherpaLayouts.VITS_MODEL_PATH.set(seg, 0L, arena.allocateFrom(
-                modelDir.resolve("model.onnx").toString()));
-        SherpaLayouts.VITS_TOKENS.set(seg, 0L, arena.allocateFrom(
-                modelDir.resolve("tokens.txt").toString()));
-        SherpaLayouts.VITS_DATA_DIR.set(seg, 0L, arena.allocateFrom(
-                modelDir.resolve("espeak-ng-data").toString()));
-        SherpaLayouts.VITS_LENGTH_SCALE.set(seg, 0L, 1.0f);
+        seg.set(java.lang.foreign.ValueLayout.ADDRESS, SherpaLayouts.VITS_MODEL_PATH,
+                arena.allocateFrom(modelDir.resolve("model.onnx").toString()));
+        seg.set(java.lang.foreign.ValueLayout.ADDRESS, SherpaLayouts.VITS_TOKENS,
+                arena.allocateFrom(modelDir.resolve("tokens.txt").toString()));
+        seg.set(java.lang.foreign.ValueLayout.ADDRESS, SherpaLayouts.VITS_DATA_DIR,
+                arena.allocateFrom(modelDir.resolve("espeak-ng-data").toString()));
+        seg.set(java.lang.foreign.ValueLayout.JAVA_FLOAT, SherpaLayouts.VITS_LENGTH_SCALE, 1.0f);
 
-        SherpaLayouts.TTS_NUM_THREADS.set(seg, 0L, config.numThreads());
-        SherpaLayouts.TTS_PROVIDER.set(seg, 0L, arena.allocateFrom(config.provider()));
+        seg.set(java.lang.foreign.ValueLayout.JAVA_INT, SherpaLayouts.TTS_NUM_THREADS, config.numThreads());
+        seg.set(java.lang.foreign.ValueLayout.ADDRESS, SherpaLayouts.TTS_PROVIDER,
+                arena.allocateFrom(config.provider()));
 
         return seg;
     }

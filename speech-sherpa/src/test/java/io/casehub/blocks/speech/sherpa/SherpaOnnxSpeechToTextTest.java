@@ -46,24 +46,24 @@ class SherpaOnnxSpeechToTextTest {
     }
 
     @Test
-    void libraryNotAvailableByDefault() {
-        assertThat(SherpaLibrary.isAvailable()).isFalse();
-    }
-
-    @Test
-    @EnabledIf("io.casehub.blocks.speech.sherpa.SherpaLibrary#isAvailable")
+    @EnabledIf("hasModels")
     void transcribesWithSherpa() throws IOException {
-        // Integration test — only runs when sherpa-onnx native lib is installed
-        Path modelDir = Path.of(System.getProperty("sherpa.model.dir", "/usr/local/share/sherpa-onnx/models"));
+        Path modelDir = Path.of(System.getProperty("sherpa.model.dir", "/tmp/sherpa-onnx/sherpa-onnx-whisper-tiny"));
         var config = SherpaConfig.defaults(modelDir);
         var stt = new SherpaOnnxSpeechToText(config);
 
-        short[] silence = new short[16000]; // 1 second of silence
+        short[] silence = new short[16000];
         Path wavFile = tempDir.resolve("silence.wav");
         Files.write(wavFile, WavReaderTest.buildWavBytes(1, 16000, 16, silence));
 
         var result = stt.transcribe(wavFile, TranscriptionOptions.defaults());
         assertThat(result).isNotNull();
         assertThat(result.text()).isNotNull();
+    }
+
+    static boolean hasModels() {
+        return SherpaLibrary.isAvailable()
+                && java.nio.file.Files.exists(Path.of(System.getProperty("sherpa.model.dir",
+                        "/tmp/sherpa-onnx/sherpa-onnx-whisper-tiny/tiny-encoder.onnx")));
     }
 }

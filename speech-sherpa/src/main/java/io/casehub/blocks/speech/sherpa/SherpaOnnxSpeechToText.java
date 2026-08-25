@@ -106,27 +106,29 @@ public final class SherpaOnnxSpeechToText implements SpeechToTextService {
     }
 
     private MemorySegment buildRecognizerConfig(Arena arena, TranscriptionOptions options) {
-        MemorySegment seg = arena.allocate(SherpaLayouts.OFFLINE_RECOGNIZER_CONFIG);
+        MemorySegment seg = arena.allocate(SherpaLayouts.CONFIG_ALLOC_SIZE);
         seg.fill((byte) 0);
 
-        SherpaLayouts.FEAT_SAMPLE_RATE.set(seg, 0L, 16000);
-        SherpaLayouts.FEAT_FEATURE_DIM.set(seg, 0L, 80);
+        seg.set(java.lang.foreign.ValueLayout.JAVA_INT, SherpaLayouts.FEAT_SAMPLE_RATE, 16000);
+        seg.set(java.lang.foreign.ValueLayout.JAVA_INT, SherpaLayouts.FEAT_FEATURE_DIM, 80);
 
         String modelSize = options.modelSize() != null ? options.modelSize() : "tiny";
-        Path modelDir = config.modelDir();
-        SherpaLayouts.WHISPER_ENCODER.set(seg, 0L, arena.allocateFrom(
-                modelDir.resolve(modelSize + "-encoder.onnx").toString()));
-        SherpaLayouts.WHISPER_DECODER.set(seg, 0L, arena.allocateFrom(
-                modelDir.resolve(modelSize + "-decoder.onnx").toString()));
+        Path   modelDir  = config.modelDir();
+        seg.set(java.lang.foreign.ValueLayout.ADDRESS, SherpaLayouts.WHISPER_ENCODER,
+                arena.allocateFrom(modelDir.resolve(modelSize + "-encoder.onnx").toString()));
+        seg.set(java.lang.foreign.ValueLayout.ADDRESS, SherpaLayouts.WHISPER_DECODER,
+                arena.allocateFrom(modelDir.resolve(modelSize + "-decoder.onnx").toString()));
 
         if (options.languageHint() != null) {
-            SherpaLayouts.WHISPER_LANGUAGE.set(seg, 0L, arena.allocateFrom(options.languageHint()));
+            seg.set(java.lang.foreign.ValueLayout.ADDRESS, SherpaLayouts.WHISPER_LANGUAGE,
+                    arena.allocateFrom(options.languageHint()));
         }
 
-        SherpaLayouts.MODEL_TOKENS.set(seg, 0L, arena.allocateFrom(
-                modelDir.resolve(modelSize + "-tokens.txt").toString()));
-        SherpaLayouts.MODEL_NUM_THREADS.set(seg, 0L, config.numThreads());
-        SherpaLayouts.MODEL_PROVIDER.set(seg, 0L, arena.allocateFrom(config.provider()));
+        seg.set(java.lang.foreign.ValueLayout.ADDRESS, SherpaLayouts.MODEL_TOKENS,
+                arena.allocateFrom(modelDir.resolve(modelSize + "-tokens.txt").toString()));
+        seg.set(java.lang.foreign.ValueLayout.JAVA_INT, SherpaLayouts.MODEL_NUM_THREADS, config.numThreads());
+        seg.set(java.lang.foreign.ValueLayout.ADDRESS, SherpaLayouts.MODEL_PROVIDER,
+                arena.allocateFrom(config.provider()));
 
         return seg;
     }

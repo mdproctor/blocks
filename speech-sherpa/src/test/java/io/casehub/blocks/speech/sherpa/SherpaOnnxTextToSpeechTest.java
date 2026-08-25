@@ -31,9 +31,9 @@ class SherpaOnnxTextToSpeechTest {
     }
 
     @Test
-    @EnabledIf("io.casehub.blocks.speech.sherpa.SherpaLibrary#isAvailable")
+    @EnabledIf("hasTtsModels")
     void synthesisesWithSherpa() {
-        Path modelDir = Path.of(System.getProperty("sherpa.model.dir", "/usr/local/share/sherpa-onnx/models"));
+        Path modelDir = Path.of(System.getProperty("sherpa.tts.model.dir", "/tmp/sherpa-onnx/vits-model"));
         var config = SherpaConfig.defaults(modelDir);
         var tts = new SherpaOnnxTextToSpeech(config);
 
@@ -41,5 +41,11 @@ class SherpaOnnxTextToSpeechTest {
         assertThat(result).isNotNull();
         assertThat(result.audioData()).isNotEmpty();
         assertThat(result.audioFormat()).isEqualTo("wav");
+    }
+
+    static boolean hasTtsModels() {
+        return SherpaLibrary.isAvailable()
+                && java.nio.file.Files.exists(Path.of(System.getProperty("sherpa.tts.model.dir",
+                        "/tmp/sherpa-onnx/vits-model")).resolve("model.onnx"));
     }
 }
