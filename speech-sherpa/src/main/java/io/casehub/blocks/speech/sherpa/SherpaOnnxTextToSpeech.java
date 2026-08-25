@@ -36,7 +36,7 @@ public final class SherpaOnnxTextToSpeech implements TextToSpeechService {
         Objects.requireNonNull(options, "options");
 
         try (Arena arena = Arena.ofConfined()) {
-            MemorySegment configSeg = buildTtsConfig(arena, options);
+            MemorySegment configSeg = buildTtsConfig(arena);
             MemorySegment tts;
             try {
                 tts = (MemorySegment) lib.createTts.invokeExact(configSeg);
@@ -92,7 +92,7 @@ public final class SherpaOnnxTextToSpeech implements TextToSpeechService {
         }
     }
 
-    private MemorySegment buildTtsConfig(Arena arena, SynthesisOptions options) {
+    private MemorySegment buildTtsConfig(Arena arena) {
         MemorySegment seg = arena.allocate(SherpaLayouts.TTS_CONFIG);
         seg.fill((byte) 0);
 
