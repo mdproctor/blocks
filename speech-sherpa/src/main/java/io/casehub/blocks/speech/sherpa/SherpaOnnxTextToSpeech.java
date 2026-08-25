@@ -1,0 +1,126 @@
+package io.casehub.blocks.speech.sherpa;
+
+import io.casehub.blocks.speech.PhonemeTiming;
+import io.casehub.blocks.speech.SynthesisOptions;
+import io.casehub.blocks.speech.SynthesisResult;
+import io.casehub.blocks.speech.TextToSpeechService;
+
+import java.lang.foreign.Arena;
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Objects;
+
+public final class SherpaOnnxTextToSpeech implements TextToSpeechService {
+
+    private final SherpaConfig config;
+    private final SherpaLibrary lib;
+
+    public SherpaOnnxTextToSpeech(SherpaConfig config) {
+        this(config, SherpaLibrary.load());
+    }
+
+    public SherpaOnnxTextToSpeech(SherpaConfig config, Path libraryPath) {
+        this(config, SherpaLibrary.load(libraryPath));
+    }
+
+    SherpaOnnxTextToSpeech(SherpaConfig config, SherpaLibrary lib) {
+        this.config = Objects.requireNonNull(config);
+        this.lib = lib;
+    }
+
+    @Override
+    public SynthesisResult synthesise(String text, SynthesisOptions options) {
+        Objects.requireNonNull(text, "text");
+        Objects.requireNonNull(options, "options");
+
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment configSeg = buildTtsConfig(arena, options);
+            MemorySegment tts;
+            try {
+                tts = (MemorySegment) lib.createTts.invokeExact(configSeg);
+            } catch (Throwable t) {
+                throw new SherpaException("Failed to create TTS engine", t);
+            }
+
+            if (tts.equals(MemorySegment.NULL)) {
+                throw new SherpaException("sherpa-onnx returned null TTS — check model paths in " + config.modelDir());
+            }
+
+            try {
+                return doSynthesise(arena, tts, text, options);
+            } finally {
+                destroyQuietly(() -> lib.destroyTts.invokeExact(tts));
+            }
+        }
+    }
+
+    private SynthesisResult doSynthesise(Arena arena, MemorySegment tts, String text, SynthesisOptions options) {
+        MemorySegment textSeg = arena.allocateFrom(text);
+        int speakerId = 0;
+        float speed = 1.0f;
+
+        MemorySegment audioPtr;
+        try {
+            audioPtr = (MemorySegment) lib.ttsGenerate.invokeExact(tts, textSeg, speakerId, speed);
+        } catch (Throwable t) {
+            throw new SherpaException("Failed to generate audio", t);
+        }
+
+        if (audioPtr.equals(MemorySegment.NULL)) {
+            throw new SherpaException("sherpa-onnx returned null audio for text: " + text);
+        }
+
+        try {
+            MemorySegment audio = audioPtr.reinterpret(SherpaLayouts.GENERATED_AUDIO.byteSize());
+            int sampleCount = (int) SherpaLayouts.AUDIO_N.get(audio, 0L);
+            int sampleRate = (int) SherpaLayouts.AUDIO_SAMPLE_RATE.get(audio, 0L);
+            MemorySegment samplesPtr = (MemorySegment) SherpaLayouts.AUDIO_SAMPLES.get(audio, 0L);
+
+            float[] samples = samplesPtr
+                    .reinterpret((long) sampleCount * ValueLayout.JAVA_FLOAT.byteSize())
+                    .toArray(ValueLayout.JAVA_FLOAT);
+
+            String format = options.audioFormat() != null ? options.audioFormat() : "wav";
+            byte[] audioData = WavWriter.encode(samples, sampleRate, 1);
+            List<PhonemeTiming> phonemes = List.of();
+
+            return new SynthesisResult(audioData, format, phonemes);
+        } finally {
+            destroyQuietly(() -> lib.destroyGeneratedAudio.invokeExact(audioPtr));
+        }
+    }
+
+    private MemorySegment buildTtsConfig(Arena arena, SynthesisOptions options) {
+        MemorySegment seg = arena.allocate(SherpaLayouts.TTS_CONFIG);
+        seg.fill((byte) 0);
+
+        Path modelDir = config.modelDir();
+        SherpaLayouts.VITS_MODEL_PATH.set(seg, 0L, arena.allocateFrom(
+                modelDir.resolve("model.onnx").toString()));
+        SherpaLayouts.VITS_TOKENS.set(seg, 0L, arena.allocateFrom(
+                modelDir.resolve("tokens.txt").toString()));
+        SherpaLayouts.VITS_DATA_DIR.set(seg, 0L, arena.allocateFrom(
+                modelDir.resolve("espeak-ng-data").toString()));
+        SherpaLayouts.VITS_LENGTH_SCALE.set(seg, 0L, 1.0f);
+
+        SherpaLayouts.TTS_NUM_THREADS.set(seg, 0L, config.numThreads());
+        SherpaLayouts.TTS_PROVIDER.set(seg, 0L, arena.allocateFrom(config.provider()));
+
+        return seg;
+    }
+
+    private static void destroyQuietly(DestroyAction action) {
+        try {
+            action.run();
+        } catch (Throwable t) {
+            // native cleanup — log and continue
+        }
+    }
+
+    @FunctionalInterface
+    private interface DestroyAction {
+        void run() throws Throwable;
+    }
+}
