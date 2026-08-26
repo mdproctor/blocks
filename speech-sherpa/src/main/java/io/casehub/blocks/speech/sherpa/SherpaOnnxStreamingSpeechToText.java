@@ -1,5 +1,6 @@
 package io.casehub.blocks.speech.sherpa;
 
+import io.casehub.blocks.speech.CleanupConfig;
 import io.casehub.blocks.speech.RecognitionStream;
 import io.casehub.blocks.speech.StreamingSpeechToTextService;
 import io.casehub.blocks.speech.TranscriptionOptions;
@@ -17,7 +18,7 @@ public final class SherpaOnnxStreamingSpeechToText implements StreamingSpeechToT
     private final SherpaLibrary lib;
     private final MemorySegment recognizer;
     private final Arena recognizerArena;
-    private final @org.jspecify.annotations.Nullable SherpaTextCleanup cleanup;
+    private final @org.jspecify.annotations.Nullable CleanupConfig cleanupConfig;
 
     public SherpaOnnxStreamingSpeechToText(SherpaConfig config) {
         this(config, SherpaLibrary.load());
@@ -28,8 +29,7 @@ public final class SherpaOnnxStreamingSpeechToText implements StreamingSpeechToT
         this.lib = lib;
         this.recognizerArena = Arena.ofShared();
         this.recognizer = createRecognizer();
-        this.cleanup = config.punctuationModelDir() != null
-                ? new SherpaTextCleanup(config.punctuationModelDir(), lib) : null;
+        this.cleanupConfig = resolveCleanup(config, lib);
     }
 
     @Override
@@ -39,7 +39,13 @@ public final class SherpaOnnxStreamingSpeechToText implements StreamingSpeechToT
     }
 
     public void close() {
-        if (cleanup != null) cleanup.close();
+        if (cleanupConfig != null) {
+            cleanupConfig.filters().forEach(f -> {
+                if (f instanceof AutoCloseable ac) {
+                    try { ac.close(); } catch (Exception e) { /* cleanup */ }
+                }
+            });
+        }
         if (recognizer != null && !recognizer.equals(MemorySegment.NULL)) {
             try {
                 lib.destroyOnlineRecognizer.invokeExact(recognizer);
@@ -48,6 +54,28 @@ public final class SherpaOnnxStreamingSpeechToText implements StreamingSpeechToT
             }
         }
         recognizerArena.close();
+    }
+
+    public static CleanupConfig defaultFilters(Path punctuationModelDir) {
+        return defaultFilters(punctuationModelDir, SherpaLibrary.load());
+    }
+
+    static CleanupConfig defaultFilters(Path punctuationModelDir, SherpaLibrary lib) {
+        return CleanupConfig.of(
+                new CasingFilter(),
+                new FillerRemovalFilter(),
+                new PunctuationFilter(punctuationModelDir, lib));
+    }
+
+    private static CleanupConfig resolveCleanup(SherpaConfig config, SherpaLibrary lib) {
+        if (config.cleanupConfig() != null) return config.cleanupConfig();
+        if (config.punctuationModelDir() != null) return defaultFilters(config.punctuationModelDir(), lib);
+        return null;
+    }
+
+    private String applyCleanup(String raw) {
+        if (cleanupConfig == null || raw.isBlank()) return raw;
+        return cleanupConfig.apply(raw);
     }
 
     private MemorySegment createRecognizer() {
@@ -98,11 +126,6 @@ public final class SherpaOnnxStreamingSpeechToText implements StreamingSpeechToT
         } catch (java.io.IOException e) {
             throw new SherpaException("Failed to scan model directory: " + modelDir, e);
         }
-    }
-
-    private String applyCleanup(String raw) {
-        if (cleanup == null || raw.isBlank()) return raw;
-        return cleanup.cleanup(raw);
     }
 
     private final class SherpaRecognitionStream implements RecognitionStream {
