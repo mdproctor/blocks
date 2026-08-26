@@ -17,6 +17,7 @@ public final class SherpaOnnxStreamingSpeechToText implements StreamingSpeechToT
     private final SherpaLibrary lib;
     private final MemorySegment recognizer;
     private final Arena recognizerArena;
+    private final @org.jspecify.annotations.Nullable SherpaTextCleanup cleanup;
 
     public SherpaOnnxStreamingSpeechToText(SherpaConfig config) {
         this(config, SherpaLibrary.load());
@@ -27,6 +28,8 @@ public final class SherpaOnnxStreamingSpeechToText implements StreamingSpeechToT
         this.lib = lib;
         this.recognizerArena = Arena.ofShared();
         this.recognizer = createRecognizer();
+        this.cleanup = config.punctuationModelDir() != null
+                ? new SherpaTextCleanup(config.punctuationModelDir(), lib) : null;
     }
 
     @Override
@@ -36,11 +39,12 @@ public final class SherpaOnnxStreamingSpeechToText implements StreamingSpeechToT
     }
 
     public void close() {
+        if (cleanup != null) cleanup.close();
         if (recognizer != null && !recognizer.equals(MemorySegment.NULL)) {
             try {
                 lib.destroyOnlineRecognizer.invokeExact(recognizer);
             } catch (Throwable t) {
-                // cleanup
+                // native cleanup
             }
         }
         recognizerArena.close();
@@ -96,6 +100,11 @@ public final class SherpaOnnxStreamingSpeechToText implements StreamingSpeechToT
         }
     }
 
+    private String applyCleanup(String raw) {
+        if (cleanup == null || raw.isBlank()) return raw;
+        return cleanup.cleanup(raw);
+    }
+
     private final class SherpaRecognitionStream implements RecognitionStream {
         private final MemorySegment stream;
         private final Arena streamArena;
@@ -135,12 +144,12 @@ public final class SherpaOnnxStreamingSpeechToText implements StreamingSpeechToT
 
         @Override
         public String partialResult() {
-            return readResult();
+            return applyCleanup(readResult());
         }
 
         @Override
         public TranscriptionResult finalResult() {
-            String text = readResult();
+            String text = applyCleanup(readResult());
             return new TranscriptionResult(text, text.isEmpty() ? "" : "en", 1.0);
         }
 
@@ -151,7 +160,7 @@ public final class SherpaOnnxStreamingSpeechToText implements StreamingSpeechToT
             try {
                 lib.destroyOnlineStream.invokeExact(stream);
             } catch (Throwable t) {
-                // cleanup
+                // native cleanup
             }
             streamArena.close();
         }
