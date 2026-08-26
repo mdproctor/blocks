@@ -117,12 +117,16 @@ public final class SherpaOnnxStreamingSpeechToText implements StreamingSpeechToT
 
     private String findModel(Path modelDir, String component) {
         try (var files = java.nio.file.Files.list(modelDir)) {
-            return files
-                    .filter(p -> p.getFileName().toString().contains(component))
-                    .filter(p -> p.toString().endsWith(".onnx"))
-                    .findFirst()
-                    .orElseThrow(() -> new SherpaException("No " + component + " model found in " + modelDir))
-                    .toString();
+            var candidates = files
+                                     .filter(p -> p.getFileName().toString().contains(component))
+                                     .filter(p -> p.toString().endsWith(".onnx"))
+                                     .sorted(java.util.Comparator.<Path, Boolean>comparing(
+                                             p -> p.getFileName().toString().contains("int8")).reversed())
+                                     .toList();
+            if (candidates.isEmpty()) {
+                throw new SherpaException("No " + component + " model found in " + modelDir);
+            }
+            return candidates.getFirst().toString();
         } catch (java.io.IOException e) {
             throw new SherpaException("Failed to scan model directory: " + modelDir, e);
         }
