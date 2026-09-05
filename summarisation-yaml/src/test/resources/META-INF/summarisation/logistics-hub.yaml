@@ -1,0 +1,54 @@
+pipeline:
+  name: logistics-hub
+  source:
+    cloud-event-type: io.casehub.logistics.scan.v1
+  levels:
+    - name: anomalies
+      grouping:
+        type: windowed
+        count: 10
+      summariser:
+        type: threshold-classify
+        rules:
+          - name: weight-mismatch
+            when: "weight > 50.0"
+            category: WEIGHT_MISMATCH
+            severity: HIGH
+          - name: fragile-alert
+            when: "fragile == true"
+            category: FRAGILE_ALERT
+            severity: MEDIUM
+      emit:
+        cloud-event-type: io.casehub.logistics.anomaly.v1
+
+    - name: phases
+      grouping:
+        type: windowed
+        age: 300000
+      aggregate-fields:
+        - severity
+      summariser:
+        type: phase-detect
+        initial: NORMAL_FLOW
+        states:
+          - NORMAL_FLOW
+          - CONGESTION
+          - RECOVERY
+        transitions:
+          - from: NORMAL_FLOW
+            to: CONGESTION
+            count-field: severity
+            count-value: HIGH
+            op: ">="
+            threshold: 3
+          - from: CONGESTION
+            to: RECOVERY
+            count-field: severity
+            count-value: HIGH
+            op: "=="
+            threshold: 0
+          - from: RECOVERY
+            to: NORMAL_FLOW
+            min-batch-size: 1
+      emit:
+        cloud-event-type: io.casehub.logistics.phase.v1

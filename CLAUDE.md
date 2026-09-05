@@ -112,6 +112,13 @@ No Quarkus runtime — plain JUnit 5 tests with Mockito. No CDI container in tes
 |------|----------|
 | `summarisation-api/src/main/java/io/casehub/blocks/summarisation/` | Unified summarisation SPI — `Summariser<IN,OUT>`, `StatefulSummariser<IN,OUT,S>` (framework-managed state per partition), `ContentSummariser<T,R>` (with `asSummariser()` bridge to `StatefulSummariser`), `LevelEvent<E>` (with `@Nullable String tenancyId`), `EventStreamBus<E>`, `EventAccumulator<E>`, `WindowPolicy`, `SummarisationRunner<IN,OUT>` (state-aware), `KeyedAccumulator<K,E>` (key extractor: `Function<LevelEvent<E>, K>`), `KeyedSummarisationRunner<K,IN,OUT>`, `Compactor<E>`, `VerbatimContentSummariser<T>` |
 | `summarisation-api/src/test/java/io/casehub/blocks/summarisation/` | Tests for summarisation SPI |
+| `cloudevents/src/main/java/io/casehub/blocks/summarisation/cloudevents/` | CloudEvent bridge — `EventSink<T>` (`@FunctionalInterface`), `CloudEventIngestionAdapter<E>` (type-prefix filter, tenancyId extraction), `CloudEventEmitter<E>` (wraps `LevelEvent` as CloudEvent), `PipelineTickScheduler` (ScheduledExecutorService tick loop) |
+| `cloudevents/src/test/java/io/casehub/blocks/summarisation/cloudevents/` | Tests for CloudEvent bridge |
+| `summarisation-yaml/src/main/java/io/casehub/blocks/summarisation/yaml/` | YAML pipeline surface — `PipelineDefinition`, `PipelineCompiler`, `CompiledPipeline<IN>`, `SummariserRegistry`, `PipelineValidator`, `ExpressionEngine`-backed expression evaluation, Jackson YAML deserialization |
+| `summarisation-yaml/src/main/java/io/casehub/blocks/summarisation/yaml/builtin/` | Built-in summariser types — `ThresholdClassifySummariser` (per-event MVEL3 predicates), `PhaseDetectSummariser` (stateful state machine with structured predicates), `CountSummariser`, `FieldExtractSummariser`, `BatchContext`/`BatchContextView` |
+| `summarisation-yaml/src/test/java/io/casehub/blocks/summarisation/yaml/` | Tests for YAML surface |
+| `summarisation-yaml-deployment/src/main/java/io/casehub/blocks/summarisation/yaml/deployment/` | Quarkus deployment module — `SummarisationYamlProcessor` (YAML discovery, validation), `SummarisationRecorder` (runtime bean registration) |
+| `docs/summarisation/CAPABILITY-MATRIX.md` | Summarisation capability matrix — maps 29 capabilities across 11 examples |
 | `src/main/java/io/casehub/blocks/attestation/` | Attestation write-path types — `AttestationIntent`, `AttestationIntentWriter` (+ `NoOpAttestationIntentWriter` `@DefaultBean`), `LifecycleAttestationObserver<E>` SPI, `AttestationContext` |
 | `src/test/java/io/casehub/blocks/attestation/` | Tests for attestation types |
 | `src/main/java/io/casehub/blocks/trust/` | Trust-lifecycle SPIs — `IntakeClassifier<S>`, `VouchService` with pluggable `VouchConstraint` chain |
@@ -614,6 +621,15 @@ quarkus.index-dependency.casehub-blocks.group-id=io.casehub
 quarkus.index-dependency.casehub-blocks.artifact-id=casehub-blocks
 ```
 Consumers that only use blocks' pure types (records, sealed interfaces, plain classes) need no configuration.
+
+**cloudevents module:**
+**Compile:** `casehub-blocks-summarisation-api`, `io.cloudevents:cloudevents-api`, `io.cloudevents:cloudevents-core`
+**Test:** JUnit 5, AssertJ, Mockito
+
+**summarisation-yaml module:**
+**Compile:** `casehub-blocks-summarisation-api`, `casehub-blocks-cloudevents`, `com.fasterxml.jackson.dataformat:jackson-dataformat-yaml`
+**Provided:** `casehub-platform-api` (ExpressionEngine SPI), `io.quarkus:quarkus-core` (recorder annotation)
+**Test:** JUnit 5, AssertJ, `casehub-platform-expression` (MvelExpressionEngine)
 
 **speech-sherpa module:**
 **Compile:** `casehub-blocks-speech-api`, `org.jspecify:jspecify`, `com.google.code.gson:gson`, `com.google.protobuf:protobuf-java`

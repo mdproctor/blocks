@@ -1,0 +1,19 @@
+pipeline:
+  name: sensor-monitoring
+  source:
+    cloud-event-type: io.casehub.sensor.reading.v1
+  levels:
+    - name: raw-readings
+      grouping:
+        type: windowed
+        count: 5
+      summariser:
+        type: pass-through
+
+    - name: category-counts
+      grouping:
+        type: windowed
+        count: 5
+      summariser:
+        type: count
+        category-field: category

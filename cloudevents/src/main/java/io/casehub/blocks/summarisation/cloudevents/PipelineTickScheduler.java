@@ -31,6 +31,9 @@ public class PipelineTickScheduler {
     }
 
     public void start() {
+        if (executor != null) {
+            throw new IllegalStateException("Scheduler already started");
+        }
         executor = Executors.newSingleThreadScheduledExecutor(r -> {
             var t = new Thread(r, "summarisation-tick");
             t.setDaemon(true);
