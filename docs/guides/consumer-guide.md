@@ -487,7 +487,7 @@ Affordance grounding -- per-entity observation rendering for LLM agents.
 
 ### `io.casehub.blocks.speech` (module: `blocks-speech-api`)
 
-Speech capability SPIs — provider-agnostic interfaces for audio-to-text and text-to-audio. Zero foundation dependencies.
+Speech pipeline SPIs — provider-agnostic interfaces for audio, prompt assembly, and avatar cognition. Zero foundation dependencies.
 
 | Class | Type | What it does |
 |-------|------|-------------|
@@ -496,6 +496,44 @@ Speech capability SPIs — provider-agnostic interfaces for audio-to-text and te
 | `TranscriptionResult` | record | `text`, `language`, `origin` |
 | `SynthesisResult` | record | `audioData` (byte[]), `audioFormat`, `phonemes` (List<PhonemeTiming>) |
 | `PhonemeTiming` | record | `phoneme`, `startMs`, `endMs` — for downstream lip-sync |
+| `SpeechPromptAssembler` | @FunctionalInterface | `assemble(userMessage, history) → AssembledPrompt`. Prompt assembly SPI for speech sessions. |
+| `AssembledPrompt` | record | `systemPrompt`, `userPrompt`, optional `model` override |
+| `ConversationTurn` | record | `role`, `content` — conversation history entry |
+| `PromptContext` | record | `agentId`, `tenantId`, `@Nullable subjectId` — per-turn context for PromptSections |
+| `PromptSection` | @FunctionalInterface | `@Nullable contribute(PromptContext)`. Reads orchestrator cached state, returns formatted text section or null. |
+| `AvatarCognition` | interface | Composition root — `wrapAssembler()`, `initialize()`, `tick()`, `evaluateProactive()`, `recordInteraction()`. speech-ws injects via `Instance<AvatarCognition>`. |
+
+### `io.casehub.blocks.agentic.social.prompt` (module: `blocks`)
+
+Social cognition speech integration — wires all 9 social cognition orchestrators into the speech pipeline via the `AvatarCognition` SPI.
+
+| Class | Type | What it does |
+|-------|------|-------------|
+| `SocialAvatarCognition` | @ApplicationScoped | `AvatarCognition` implementation. Wires MoodOrchestrator, DriveOrchestrator, MentalModelOrchestrator, UserModelOrchestrator, StrategyLearningOrchestrator, NarrativeOrchestrator (optional), GoalProposalOrchestrator (optional), InnerLifeOrchestrator (optional). Constructs PromptSections, handles signal recording and proactive evaluation. |
+| `SocialPromptAssembler` | class | Wraps a base `SpeechPromptAssembler`, appends all `PromptSection` contributions to the system prompt. Fault-tolerant — a failing section is logged and skipped. |
+| `ProactiveSpeechSupport` | class | Encapsulates `InnerLifeOrchestrator` integration for proactive initiation. Returns content from `InnerLifeTick.Initiated` or null from `Silent`. |
+| `MoodPromptSection` | PromptSection | PAD emotional state with natural-language interpretation (positive/negative/energetic/calm/confident/submissive). |
+| `DrivePromptSection` | PromptSection | Motivational state via `CognitiveObservationSections.motivationalStateSection()`. |
+| `PersonalityPromptSection` | PromptSection | Session-static personality traits from `AgentDescriptor.disposition()`. |
+| `MentalModelPromptSection` | PromptSection | BDI Theory of Mind — beliefs, desires, intentions with confidence filtering. Subject-scoped. |
+| `UserModelPromptSection` | PromptSection | Per-subject user profile — familiarity, relationship stage, preferences. Subject-scoped. |
+| `StrategyPromptSection` | PromptSection | Learned interaction strategies via `StrategyProfile.toPromptSection()`. |
+| `NarrativePromptSection` | PromptSection | Self-narrative via `CognitiveObservationSections`. Optional (requires NarrativeOrchestrator). |
+| `GoalPromptSection` | PromptSection | Autonomous drive-generated goal proposals. Optional (requires GoalProposalOrchestrator). |
+
+**Quick start — avatar cognition:**
+```java
+// Consumer adds blocks as compile dep + Jandex indexing:
+// quarkus.index-dependency.casehub-blocks.group-id=io.casehub
+// quarkus.index-dependency.casehub-blocks.artifact-id=casehub-blocks
+//
+// Configure in application.properties:
+// casehub.avatar.agent-id=my-avatar
+// casehub.avatar.tenant-id=my-tenant
+//
+// SocialAvatarCognition is auto-discovered via CDI.
+// speech-ws injects Instance<AvatarCognition> and wraps the base assembler.
+```
 
 ### `io.casehub.blocks.speech.sherpa` (module: `blocks-speech-sherpa`)
 

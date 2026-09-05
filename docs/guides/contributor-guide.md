@@ -31,6 +31,7 @@ Single module -- `casehub-blocks` is a flat library, not a multi-module reactor.
 | `src/main/java/io/casehub/blocks/summarisation/llm/` | LLM-backed `ContentSummariser<T>` -- generic synthesis via `AgentProvider` |
 | `src/main/java/io/casehub/blocks/summarisation/observation/` | Observation accumulator -- tiered, demand-driven rendering for LLM agent prompts (4 files) |
 | `src/main/java/io/casehub/blocks/summarisation/observation/affordance/` | Affordance grounding -- per-entity observation rendering for LLM agents (5 files) |
+| `src/main/java/io/casehub/blocks/agentic/social/prompt/` | Social cognition speech integration -- SocialAvatarCognition, SocialPromptAssembler, ProactiveSpeechSupport, 8 PromptSection implementations (12 files) |
 
 Tests mirror source layout under `src/test/java/`. Integration test examples exist in:
 - `summarisation/examples/clinical/` -- L1-L4 clinical pipeline (vital readings -> care phases -> narratives)
@@ -273,6 +274,20 @@ Layer 3b -- collective behaviors emerging from multi-agent interaction.
 - **CollectiveGoalFormation** (compositor, not CDI-managed) -- reads N agents' `DriveProfile`s, computes pairwise alignment (`1 - |diff|` per axis), forms groups via connected components, proposes `CollectiveGoalProposal`s when composite alignment exceeds threshold. Per-group cooldown. `toJointIntention()` bridges proposals to `JointIntention.form()`.
 
 **Consumer construction:** `CollectiveGoalFormation` takes `DriveOrchestrator`, `List<String> agentIds`, and `CollectiveGoalConfig` at construction. The agent set is deployment-time configuration -- consumers produce the bean via `@Produces` or construct directly.
+
+### Social Cognition Speech Integration
+
+The prompt sub-package (`agentic.social.prompt`) wires all social cognition orchestrators into the speech pipeline. Three-layer architecture: speech-api defines the SPIs, blocks provides the integration, speech-ws consumes via `Instance<>`.
+
+**AvatarCognition SPI** (speech-api): composition root with five methods -- `wrapAssembler()` decorates a base `SpeechPromptAssembler` with social context, `initialize()` hydrates orchestrator state at session open, `tick()` processes accumulated signals across all orchestrators, `evaluateProactive()` checks for proactive initiation, `recordInteraction()` dispatches per-turn signals.
+
+**SocialAvatarCognition** (`@ApplicationScoped`): the blocks-side implementation. Injects direct orchestrators (Mood, Drives, MentalModel, UserModel, Strategy) and optional orchestrators via `Instance<>` (Narrative, Goals, InnerLife, AgentRegistry). `buildSections()` constructs all 8 `PromptSection` implementations -- each reads cached orchestrator state and returns formatted text (or null). Exception isolation: a failing section is logged and skipped, not propagated.
+
+**PromptSection lifecycle:** Sections are plain classes (not CDI beans) constructed by `buildSections()`. Each implements `@Nullable contribute(PromptContext)` -- the context carries `agentId`, `tenantId`, and `@Nullable subjectId` (resolved per-turn by `SpeechSession` via speaker identification). Subject-scoped sections (`MentalModelPromptSection`, `UserModelPromptSection`) return null when `subjectId` is null (no identified speaker).
+
+**Signal recording:** `recordInteraction()` dispatches to four orchestrators with per-call exception isolation. Subject-scoped signals (UserModel, MentalModel, Strategy) require an identified speaker. MoodOrchestrator is intentionally excluded -- computing meaningful PAD deltas from conversation turns requires sentiment analysis not available in the speech pipeline. InnerLifeOrchestrator receives `observeResponse()` to reset proactive initiation counters.
+
+**Proactive speech:** `ProactiveSpeechSupport` wraps `InnerLifeOrchestrator.tick()` and extracts the `content` field from `InnerLifeTick.Initiated`. The proactive path in speech-ws differs from user-initiated turns: no second LLM call (content is the utterance), no signal recording (self-initiated, not user interaction), content added to history as "assistant" role.
 
 ## Trust Routing Architecture
 
