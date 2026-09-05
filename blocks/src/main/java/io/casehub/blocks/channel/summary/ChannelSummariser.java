@@ -15,10 +15,10 @@ public class ChannelSummariser implements SummaryUpdateHook {
     private static final System.Logger LOG =
             System.getLogger(ChannelSummariser.class.getName());
 
-    private final ContentSummariser<Message> delegate;
+    private final ContentSummariser<Message, SummaryResult> delegate;
 
     @Inject
-    public ChannelSummariser(ContentSummariser<Message> delegate) {
+    public ChannelSummariser(ContentSummariser<Message, SummaryResult> delegate) {
         this.delegate = delegate;
     }
 

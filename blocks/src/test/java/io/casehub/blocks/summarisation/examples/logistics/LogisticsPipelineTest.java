@@ -236,8 +236,6 @@ class LogisticsPipelineTest {
 
     private void feedScan(String scanId, String warehouseId, double weight,
                           String destination, ScanType scanType, long timestamp) {
-        scanBus.publish(new LevelEvent<>(
-            new PackageScan(scanId, warehouseId, weight, destination, scanType),
-            timestamp, L1_SCANS));
+        scanBus.publish(new LevelEvent<>(new PackageScan(scanId, warehouseId, weight, destination, scanType), timestamp, L1_SCANS, null));
     }
 }

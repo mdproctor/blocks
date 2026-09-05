@@ -13,7 +13,7 @@ import java.util.concurrent.CompletionStage;
 
 @DefaultBean
 @ApplicationScoped
-public class HeuristicMessageSummariser implements ContentSummariser<Message> {
+public class HeuristicMessageSummariser implements ContentSummariser<Message, SummaryResult> {
 
     @Override
     public CompletionStage<SummaryResult> summarise(

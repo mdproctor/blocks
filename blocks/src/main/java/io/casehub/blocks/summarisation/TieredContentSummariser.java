@@ -6,25 +6,25 @@ import org.jspecify.annotations.Nullable;
 import java.util.List;
 import java.util.concurrent.CompletionStage;
 
-public class TieredContentSummariser<T> implements ContentSummariser<T> {
+public class TieredContentSummariser<T> implements ContentSummariser<T, SummaryResult> {
 
-    private final ContentSummariser<T> small;
-    private final ContentSummariser<T> medium;
-    private final ContentSummariser<T> large;
+    private final ContentSummariser<T, SummaryResult> small;
+    private final ContentSummariser<T, SummaryResult> medium;
+    private final ContentSummariser<T, SummaryResult> large;
     private final int smallThreshold;
     private final int mediumThreshold;
 
     public TieredContentSummariser(
-            ContentSummariser<T> small,
-            ContentSummariser<T> large,
+            ContentSummariser<T, SummaryResult> small,
+            ContentSummariser<T, SummaryResult> large,
             int smallThreshold) {
         this(small, large, large, smallThreshold, smallThreshold);
     }
 
     public TieredContentSummariser(
-            ContentSummariser<T> small,
-            ContentSummariser<T> medium,
-            ContentSummariser<T> large,
+            ContentSummariser<T, SummaryResult> small,
+            ContentSummariser<T, SummaryResult> medium,
+            ContentSummariser<T, SummaryResult> large,
             int smallThreshold,
             int mediumThreshold) {
         if (smallThreshold < 1)

@@ -32,7 +32,7 @@ import static org.mockito.Mockito.*;
 class ThreadSummaryObserverTest {
 
     private ThreadSummaryObserver observer;
-    private ContentSummariser<Message> summariser;
+    private ContentSummariser<Message, SummaryResult> summariser;
     private CrossTenantMessageStore messageStore;
     private ThreadSummaryStore threadSummaryStore;
     private Event<ThreadSummaryUpdatedEvent> summaryEvents;

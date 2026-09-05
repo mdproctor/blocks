@@ -18,6 +18,7 @@
   <url>https://github.com/casehubio/blocks</url>
 
   <modules>
+    <module>summarisation-api</module>
     <module>blocks</module>
     <module>engine-adapter</module>
     <module>speech-api</module>

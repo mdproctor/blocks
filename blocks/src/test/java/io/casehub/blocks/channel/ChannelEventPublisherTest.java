@@ -49,7 +49,7 @@ class ChannelEventPublisherTest {
         new ChannelEventPublisher<>(bus, dispatcher,
             event -> buildDispatch("content:" + event.payload()));
 
-        bus.publish(new LevelEvent<>("hello", 1, LEVEL));
+        bus.publish(new LevelEvent<>("hello", 1, LEVEL, null));
 
         assertThat(dispatched).hasSize(1);
         assertThat(dispatched.get(0).content()).isEqualTo("content:hello");
@@ -67,8 +67,8 @@ class ChannelEventPublisherTest {
         new ChannelEventPublisher<>(bus, dispatcher,
             event -> buildDispatch(event.payload()));
 
-        bus.publish(new LevelEvent<>("first", 1, LEVEL));
-        bus.publish(new LevelEvent<>("second", 2, LEVEL));
+        bus.publish(new LevelEvent<>("first", 1, LEVEL, null));
+        bus.publish(new LevelEvent<>("second", 2, LEVEL, null));
 
         assertThat(dispatched).hasSize(2);
         assertThat(dispatched.get(0).content()).isEqualTo("first");
@@ -85,8 +85,8 @@ class ChannelEventPublisherTest {
         new ChannelEventPublisher<>(bus, dispatcher,
             event -> buildDispatch(event.payload()));
 
-        bus.publish(new LevelEvent<>("hello", 1, LEVEL));
-        bus.publish(new LevelEvent<>("world", 2, LEVEL));
+        bus.publish(new LevelEvent<>("hello", 1, LEVEL, null));
+        bus.publish(new LevelEvent<>("world", 2, LEVEL, null));
     }
 
     @Test
@@ -101,9 +101,9 @@ class ChannelEventPublisherTest {
         new ChannelEventPublisher<>(bus, dispatcher,
             event -> event.payload().equals("skip") ? null : buildDispatch(event.payload()));
 
-        bus.publish(new LevelEvent<>("keep", 1, LEVEL));
-        bus.publish(new LevelEvent<>("skip", 2, LEVEL));
-        bus.publish(new LevelEvent<>("keep2", 3, LEVEL));
+        bus.publish(new LevelEvent<>("keep", 1, LEVEL, null));
+        bus.publish(new LevelEvent<>("skip", 2, LEVEL, null));
+        bus.publish(new LevelEvent<>("keep2", 3, LEVEL, null));
 
         assertThat(dispatched).hasSize(2);
         assertThat(dispatched.get(0).content()).isEqualTo("keep");

@@ -47,8 +47,7 @@ public class ChannelEventAdapter<E> implements MessageObserver {
             return;
         }
         if (extracted == null) return;
-        outputBus.publish(new LevelEvent<>(extracted,
-            event.occurredAt().toEpochMilli(), level));
+        outputBus.publish(new LevelEvent<>(extracted, event.occurredAt().toEpochMilli(), level, null));
     }
 
     @Override

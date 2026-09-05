@@ -6,7 +6,6 @@ import io.casehub.blocks.agentic.model.AgentInvoker;
 import io.casehub.blocks.agentic.termination.MaxIterationsTermination;
 import io.casehub.blocks.agentic.termination.TerminationCondition;
 import io.casehub.blocks.agentic.termination.TerminationDecision;
-import io.casehub.blocks.channel.ChannelMessageMeta;
 import io.casehub.blocks.conversation.ConversationProjection;
 import io.casehub.blocks.conversation.ConversationState;
 import io.casehub.blocks.summarisation.EventLevel;
@@ -21,7 +20,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 

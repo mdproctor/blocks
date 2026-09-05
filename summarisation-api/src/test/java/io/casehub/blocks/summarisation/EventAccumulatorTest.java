@@ -16,7 +16,7 @@ class EventAccumulatorTest {
     @Test
     void shouldEmit_timestampTrigger_firesWhenMaxAgeExceeded() {
         var acc = new EventAccumulator<String>(new WindowPolicy(100, 0));
-        acc.collect(new LevelEvent<>("a", 10, LEVEL));
+        acc.collect(new LevelEvent<>("a", 10, LEVEL, null));
         assertThat(acc.shouldEmit(50)).isFalse();
         assertThat(acc.shouldEmit(111)).isTrue();
     }
@@ -24,30 +24,30 @@ class EventAccumulatorTest {
     @Test
     void shouldEmit_countTrigger_firesWhenMaxCountReached() {
         var acc = new EventAccumulator<String>(new WindowPolicy(0, 3));
-        acc.collect(new LevelEvent<>("a", 1, LEVEL));
-        acc.collect(new LevelEvent<>("b", 2, LEVEL));
+        acc.collect(new LevelEvent<>("a", 1, LEVEL, null));
+        acc.collect(new LevelEvent<>("b", 2, LEVEL, null));
         assertThat(acc.shouldEmit(999)).isFalse();
-        acc.collect(new LevelEvent<>("c", 3, LEVEL));
+        acc.collect(new LevelEvent<>("c", 3, LEVEL, null));
         assertThat(acc.shouldEmit(999)).isTrue();
     }
 
     @Test
     void shouldEmit_dualTrigger_firesOnEitherCondition() {
         var acc = new EventAccumulator<String>(new WindowPolicy(100, 5));
-        acc.collect(new LevelEvent<>("a", 10, LEVEL));
+        acc.collect(new LevelEvent<>("a", 10, LEVEL, null));
         assertThat(acc.shouldEmit(111)).as("timestamp trigger").isTrue();
 
         var acc2 = new EventAccumulator<String>(new WindowPolicy(100, 2));
-        acc2.collect(new LevelEvent<>("a", 10, LEVEL));
-        acc2.collect(new LevelEvent<>("b", 11, LEVEL));
+        acc2.collect(new LevelEvent<>("a", 10, LEVEL, null));
+        acc2.collect(new LevelEvent<>("b", 11, LEVEL, null));
         assertThat(acc2.shouldEmit(12)).as("count trigger").isTrue();
     }
 
     @Test
     void drain_returnsAndClears() {
         var acc = new EventAccumulator<String>(new WindowPolicy(0, 1));
-        acc.collect(new LevelEvent<>("a", 1, LEVEL));
-        acc.collect(new LevelEvent<>("b", 2, LEVEL));
+        acc.collect(new LevelEvent<>("a", 1, LEVEL, null));
+        acc.collect(new LevelEvent<>("b", 2, LEVEL, null));
         var drained = acc.drain();
         assertThat(drained).hasSize(2);
         assertThat(acc.size()).isZero();
@@ -57,7 +57,7 @@ class EventAccumulatorTest {
     @Test
     void clear_resetsAllState() {
         var acc = new EventAccumulator<String>(new WindowPolicy(0, 1));
-        acc.collect(new LevelEvent<>("a", 1, LEVEL));
+        acc.collect(new LevelEvent<>("a", 1, LEVEL, null));
         acc.clear();
         assertThat(acc.size()).isZero();
         assertThat(acc.drain()).isEmpty();
@@ -74,17 +74,17 @@ class EventAccumulatorTest {
     @Test
     void shouldEmit_countBoundary_exactlyAtThreshold() {
         var acc = new EventAccumulator<String>(new WindowPolicy(0, 3));
-        acc.collect(new LevelEvent<>("a", 1, LEVEL));
-        acc.collect(new LevelEvent<>("b", 2, LEVEL));
+        acc.collect(new LevelEvent<>("a", 1, LEVEL, null));
+        acc.collect(new LevelEvent<>("b", 2, LEVEL, null));
         assertThat(acc.shouldEmit(999)).as("below threshold").isFalse();
-        acc.collect(new LevelEvent<>("c", 3, LEVEL));
+        acc.collect(new LevelEvent<>("c", 3, LEVEL, null));
         assertThat(acc.shouldEmit(999)).as("exactly at threshold").isTrue();
     }
 
     @Test
     void shouldEmit_ageBoundary_exactlyAtMaxAge() {
         var acc = new EventAccumulator<String>(new WindowPolicy(100, 0));
-        acc.collect(new LevelEvent<>("a", 10, LEVEL));
+        acc.collect(new LevelEvent<>("a", 10, LEVEL, null));
         assertThat(acc.shouldEmit(109)).as("1ms below maxAge").isFalse();
         assertThat(acc.shouldEmit(110)).as("exactly at maxAge").isTrue();
     }
@@ -92,7 +92,7 @@ class EventAccumulatorTest {
     @Test
     void shouldEmit_singleEvent_countOfOne() {
         var acc = new EventAccumulator<String>(new WindowPolicy(0, 1));
-        acc.collect(new LevelEvent<>("a", 1, LEVEL));
+        acc.collect(new LevelEvent<>("a", 1, LEVEL, null));
         assertThat(acc.shouldEmit(1)).isTrue();
     }
 
@@ -101,16 +101,16 @@ class EventAccumulatorTest {
     @Test
     void shouldEmit_dualPolicy_neitherTriggers() {
         var acc = new EventAccumulator<String>(new WindowPolicy(100, 5));
-        acc.collect(new LevelEvent<>("a", 10, LEVEL));
-        acc.collect(new LevelEvent<>("b", 11, LEVEL));
+        acc.collect(new LevelEvent<>("a", 10, LEVEL, null));
+        acc.collect(new LevelEvent<>("b", 11, LEVEL, null));
         assertThat(acc.shouldEmit(50)).as("2 events < maxCount=5, age 40 < maxAge=100").isFalse();
     }
 
     @Test
     void shouldEmit_countOnlyPolicy_belowThreshold() {
         var acc = new EventAccumulator<String>(new WindowPolicy(0, 3));
-        acc.collect(new LevelEvent<>("a", 1, LEVEL));
-        acc.collect(new LevelEvent<>("b", 2, LEVEL));
+        acc.collect(new LevelEvent<>("a", 1, LEVEL, null));
+        acc.collect(new LevelEvent<>("b", 2, LEVEL, null));
         assertThat(acc.shouldEmit(999_999)).as("maxAge=0 disabled, 2 < maxCount=3").isFalse();
     }
 
@@ -119,10 +119,10 @@ class EventAccumulatorTest {
     @Test
     void drain_returnsImmutableCopy() {
         var acc = new EventAccumulator<String>(new WindowPolicy(0, 1));
-        acc.collect(new LevelEvent<>("a", 1, LEVEL));
+        acc.collect(new LevelEvent<>("a", 1, LEVEL, null));
         var drained = acc.drain();
         assertThat(drained).hasSize(1);
-        acc.collect(new LevelEvent<>("b", 2, LEVEL));
+        acc.collect(new LevelEvent<>("b", 2, LEVEL, null));
         assertThat(drained).as("drained list unaffected by subsequent collect").hasSize(1);
     }
 
@@ -137,8 +137,8 @@ class EventAccumulatorTest {
     void size_tracksCollectsAndDrains() {
         var acc = new EventAccumulator<String>(new WindowPolicy(0, 10));
         assertThat(acc.size()).isZero();
-        acc.collect(new LevelEvent<>("a", 1, LEVEL));
-        acc.collect(new LevelEvent<>("b", 2, LEVEL));
+        acc.collect(new LevelEvent<>("a", 1, LEVEL, null));
+        acc.collect(new LevelEvent<>("b", 2, LEVEL, null));
         assertThat(acc.size()).isEqualTo(2);
         acc.drain();
         assertThat(acc.size()).isZero();
@@ -147,12 +147,12 @@ class EventAccumulatorTest {
     @Test
     void shouldEmit_afterDrain_requiresNewEvents() {
         var acc = new EventAccumulator<String>(new WindowPolicy(0, 2));
-        acc.collect(new LevelEvent<>("a", 1, LEVEL));
-        acc.collect(new LevelEvent<>("b", 2, LEVEL));
+        acc.collect(new LevelEvent<>("a", 1, LEVEL, null));
+        acc.collect(new LevelEvent<>("b", 2, LEVEL, null));
         assertThat(acc.shouldEmit(999)).isTrue();
         acc.drain();
         assertThat(acc.shouldEmit(999)).as("empty after drain").isFalse();
-        acc.collect(new LevelEvent<>("c", 3, LEVEL));
+        acc.collect(new LevelEvent<>("c", 3, LEVEL, null));
         assertThat(acc.shouldEmit(999)).as("one event, need two").isFalse();
     }
 
@@ -172,7 +172,7 @@ class EventAccumulatorTest {
                 final int val = i;
                 executor.submit(() -> {
                     try { latch.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
-                    acc.collect(new LevelEvent<>(val, val, LEVEL));
+                    acc.collect(new LevelEvent<>(val, val, LEVEL, null));
                 });
             }
 
@@ -198,7 +198,7 @@ class EventAccumulatorTest {
                 final int val = i;
                 executor.submit(() -> {
                     try { latch.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
-                    acc.collect(new LevelEvent<>(val, val, LEVEL));
+                    acc.collect(new LevelEvent<>(val, val, LEVEL, null));
                     acc.shouldEmit(val);
                 });
             }
@@ -214,8 +214,8 @@ class EventAccumulatorTest {
     @Test
     void drainIfReady_returnsEventsWhenReady() {
         var acc = new EventAccumulator<String>(new WindowPolicy(0, 2));
-        acc.collect(new LevelEvent<>("a", 1, new EventLevel("L1", 0)));
-        acc.collect(new LevelEvent<>("b", 2, new EventLevel("L1", 0)));
+        acc.collect(new LevelEvent<>("a", 1, new EventLevel("L1", 0), null));
+        acc.collect(new LevelEvent<>("b", 2, new EventLevel("L1", 0), null));
 
         var result = acc.drainIfReady(5);
         assertThat(result).hasSize(2);
@@ -225,7 +225,7 @@ class EventAccumulatorTest {
     @Test
     void drainIfReady_returnsEmptyWhenNotReady() {
         var acc = new EventAccumulator<String>(new WindowPolicy(0, 5));
-        acc.collect(new LevelEvent<>("a", 1, new EventLevel("L1", 0)));
+        acc.collect(new LevelEvent<>("a", 1, new EventLevel("L1", 0), null));
 
         var result = acc.drainIfReady(2);
         assertThat(result).isEmpty();

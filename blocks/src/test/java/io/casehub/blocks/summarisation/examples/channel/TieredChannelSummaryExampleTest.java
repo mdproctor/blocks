@@ -7,8 +7,8 @@ import io.casehub.blocks.summarisation.llm.LlmContentSummariser;
 import io.casehub.platform.agent.AgentEvent;
 import io.casehub.platform.agent.AgentProvider;
 import io.casehub.qhorus.api.message.Message;
-import io.casehub.qhorus.api.message.MessageType;
 import io.casehub.qhorus.api.spi.SummaryResult;
+import io.casehub.qhorus.api.message.MessageType;
 import io.casehub.qhorus.api.spi.SummaryUpdateContext;
 import io.smallrye.mutiny.Multi;
 import org.junit.jupiter.api.Test;
@@ -17,7 +17,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -40,9 +39,16 @@ class TieredChannelSummaryExampleTest {
 
     private final AgentProvider agentProvider = mock(AgentProvider.class);
 
-    private ContentSummariser<Message> buildTieredSummariser() {
-        var verbatim = new VerbatimContentSummariser<Message>(
-                msg -> "[" + msg.sender() + "] " + msg.content());
+    private ContentSummariser<Message, SummaryResult> buildTieredSummariser() {
+        ContentSummariser<Message, SummaryResult> verbatim = (items, prev) -> {
+            var sb = new StringBuilder();
+            if (prev != null && !prev.text().isBlank()) sb.append(prev.text()).append("\n\n");
+            for (var msg : items) sb.append("- [").append(msg.sender()).append("] ").append(msg.content()).append('\n');
+            var annotations = new java.util.HashMap<>(prev != null ? prev.annotations() : java.util.Map.<String, String>of());
+            annotations.put("tier", "verbatim");
+            annotations.put("itemCount", String.valueOf(items.size()));
+            return java.util.concurrent.CompletableFuture.completedFuture(new SummaryResult(sb.toString().stripTrailing(), annotations));
+        };
         var heuristic = new HeuristicMessageSummariser();
         var llm = new LlmContentSummariser<Message>(agentProvider,
                 msg -> "[" + msg.sender() + "] " + msg.content(),
@@ -155,19 +161,18 @@ class TieredChannelSummaryExampleTest {
     @Test
     void pipelineIntegration_sameAlgorithmInSummarisationRunner() {
         var heuristic = new HeuristicMessageSummariser();
-        Summariser<Message, String> pipelineSummariser =
-                new ContentSummariserToSummariser<>(heuristic);
+        var pipelineSummariser = heuristic.asSummariser();
 
         var events = List.of(
-                new LevelEvent<>(message("alice", "Point A", "design"), 1000L, new EventLevel("raw", 0)),
-                new LevelEvent<>(message("bob", "Point B", "design"), 2000L, new EventLevel("raw", 0)),
-                new LevelEvent<>(message("carol", "Point C", "testing"), 3000L, new EventLevel("raw", 0)),
-                new LevelEvent<>(message("alice", "Point D", "design"), 4000L, new EventLevel("raw", 0)));
+                new LevelEvent<>(message("alice", "Point A", "design"), 1000L, new EventLevel("raw", 0), null),
+                new LevelEvent<>(message("bob", "Point B", "design"), 2000L, new EventLevel("raw", 0), null),
+                new LevelEvent<>(message("carol", "Point C", "testing"), 3000L, new EventLevel("raw", 0), null),
+                new LevelEvent<>(message("alice", "Point D", "design"), 4000L, new EventLevel("raw", 0), null));
 
         var result = pipelineSummariser.summarise(events).toCompletableFuture().join();
 
         assertThat(result).hasSize(1);
-        assertThat(result.getFirst())
+        assertThat(result.getFirst().text())
                 .contains("alice", "bob", "carol")
                 .contains("design", "testing")
                 .contains("4 messages");

@@ -44,7 +44,7 @@ public class PartitionedObservationService<E, K> {
     public void publishEvent(E event) {
         Map<String, Set<K>> routing = visibilityPolicy.resolve(event);
         long timestamp = timestampExtractor.apply(event);
-        var levelEvent = new LevelEvent<>(event, timestamp, levelResolver.apply(event));
+        var levelEvent = new LevelEvent<>(event, timestamp, levelResolver.apply(event), null);
 
         for (var entry : routing.entrySet()) {
             String observerId = entry.getKey();

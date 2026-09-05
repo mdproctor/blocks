@@ -145,7 +145,7 @@ public void tick(long now) {
     var batch = accumulator.drain();
     summariser.summarise(batch).thenAccept(results -> {
         for (var payload : results) {
-            outputBus.publish(new LevelEvent<>(payload, now, outputLevel));
+            outputBus.publish(new LevelEvent<>(payload, now, outputLevel, null));
         }
     });
 }
@@ -157,7 +157,7 @@ public CompletionStage<Void> tick(long now) {
     var batch = accumulator.drain();
     return summariser.summarise(batch).thenAccept(results -> {
         for (var payload : results) {
-            outputBus.publish(new LevelEvent<>(payload, now, outputLevel));
+            outputBus.publish(new LevelEvent<>(payload, now, outputLevel, null));
         }
     });
 }

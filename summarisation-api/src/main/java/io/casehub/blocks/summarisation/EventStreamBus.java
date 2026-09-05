@@ -44,9 +44,4 @@ public class EventStreamBus<E> {
     public void clearSubscriptions() {
         subscriptions.clear();
     }
-
-    @Deprecated(forRemoval = true)
-    public void clear() {
-        clearSubscriptions();
-    }
 }

@@ -110,13 +110,15 @@ No Quarkus runtime — plain JUnit 5 tests with Mockito. No CDI container in tes
 
 | Path | Contents |
 |------|----------|
+| `summarisation-api/src/main/java/io/casehub/blocks/summarisation/` | Unified summarisation SPI — `Summariser<IN,OUT>`, `StatefulSummariser<IN,OUT,S>` (framework-managed state per partition), `ContentSummariser<T,R>` (with `asSummariser()` bridge to `StatefulSummariser`), `LevelEvent<E>` (with `@Nullable String tenancyId`), `EventStreamBus<E>`, `EventAccumulator<E>`, `WindowPolicy`, `SummarisationRunner<IN,OUT>` (state-aware), `KeyedAccumulator<K,E>` (key extractor: `Function<LevelEvent<E>, K>`), `KeyedSummarisationRunner<K,IN,OUT>`, `Compactor<E>`, `VerbatimContentSummariser<T>` |
+| `summarisation-api/src/test/java/io/casehub/blocks/summarisation/` | Tests for summarisation SPI |
 | `src/main/java/io/casehub/blocks/attestation/` | Attestation write-path types — `AttestationIntent`, `AttestationIntentWriter` (+ `NoOpAttestationIntentWriter` `@DefaultBean`), `LifecycleAttestationObserver<E>` SPI, `AttestationContext` |
 | `src/test/java/io/casehub/blocks/attestation/` | Tests for attestation types |
 | `src/main/java/io/casehub/blocks/trust/` | Trust-lifecycle SPIs — `IntakeClassifier<S>`, `VouchService` with pluggable `VouchConstraint` chain |
 | `src/test/java/io/casehub/blocks/trust/` | Tests for trust SPIs |
 | `src/main/java/io/casehub/blocks/channel/` | Channel utility blocks — message meta, context tracking, bounded projection |
 | `src/test/java/io/casehub/blocks/channel/` | Tests for channel blocks |
-| `src/main/java/io/casehub/blocks/channel/summary/` | Channel summary integration — `ContentSummariser<Message>` implementations, `SummaryUpdateHook` adapter, `NoOpThreadSummaryStore` `@DefaultBean` |
+| `src/main/java/io/casehub/blocks/channel/summary/` | Channel summary integration — `ContentSummariser<Message, SummaryResult>` implementations, `SummaryUpdateHook` adapter, `NoOpThreadSummaryStore` `@DefaultBean` |
 | `src/test/java/io/casehub/blocks/channel/summary/` | Tests for channel summary integration |
 | `src/main/java/io/casehub/blocks/agentic/` | Compositional agentic orchestration — six SPIs (routing, decomposition, activation, aggregation, judgment, termination), execution drivers, pattern builders |
 | `src/test/java/io/casehub/blocks/agentic/` | Tests for agentic orchestration blocks |
@@ -164,9 +166,9 @@ No Quarkus runtime — plain JUnit 5 tests with Mockito. No CDI container in tes
 | `src/test/java/io/casehub/blocks/prompt/optimiser/` | Tests for prompt optimisers |
 | `src/main/java/io/casehub/blocks/prompt/runtime/` | CDI runtime beans — `OptimisedFewShotSection`, `VariantAwareSystemPromptCustomiser`, `WeightedOutcomeMetric`, `InMemoryPromptVariantStore` |
 | `src/test/java/io/casehub/blocks/prompt/runtime/` | Tests for prompt runtime beans |
-| `src/main/java/io/casehub/blocks/summarisation/` | Temporal abstraction framework + reusable content summarisation SPI — event levels, windowed accumulation, pluggable summarisation, `ContentSummariser<T>` with tiered dispatch |
-| `src/test/java/io/casehub/blocks/summarisation/` | Tests for summarisation framework |
-| `src/main/java/io/casehub/blocks/summarisation/llm/` | LLM-backed `ContentSummariser<T>` — generic synthesis via `AgentProvider` |
+| `src/main/java/io/casehub/blocks/summarisation/` | Summarisation extensions (depends on summarisation-api) — `TieredContentSummariser<T>`, `SummaryMode`, observation package. Core types live in `summarisation-api/`. |
+| `src/test/java/io/casehub/blocks/summarisation/` | Tests for summarisation extensions |
+| `src/main/java/io/casehub/blocks/summarisation/llm/` | LLM-backed `ContentSummariser<T, SummaryResult>` — generic synthesis via `AgentProvider` |
 | `src/test/java/io/casehub/blocks/summarisation/llm/` | Tests for LLM content summariser |
 | `src/main/java/io/casehub/blocks/summarisation/observation/` | Observation accumulator — tiered, demand-driven rendering for LLM agent prompts with RAG-able chunks |
 | `src/test/java/io/casehub/blocks/summarisation/observation/` | Tests for observation accumulator |
@@ -227,14 +229,14 @@ Trust-lifecycle SPIs with no compile-time attestation dependency. Intake classif
 
 ## Package: `io.casehub.blocks.channel.summary`
 
-Channel and thread summary integration — Message-specific `ContentSummariser<Message>` implementations, the `SummaryUpdateHook` adapter for channel summaries, and the push-based `ThreadSummaryObserver` for per-thread summaries.
+Channel and thread summary integration — Message-specific `ContentSummariser<Message, SummaryResult>` implementations, the `SummaryUpdateHook` adapter for channel summaries, and the push-based `ThreadSummaryObserver` for per-thread summaries. `ContentSummariser` is now in `casehub-blocks-summarisation-api` with generified `<T, R>` — consumers bind `SummaryResult` as `R`.
 
 | Class | What it does |
 |-------|-------------|
-| `HeuristicMessageSummariser` | `@DefaultBean` `ContentSummariser<Message>` — append-only structural summary from message metadata (participants, topics, time span). Merges annotations across invocations. Zero LLM cost. |
-| `ChannelSummariser` | `@ApplicationScoped` `SummaryUpdateHook` adapter — delegates to injected `ContentSummariser<Message>`. Mutiny-aware blocking, channel-context error logging. |
+| `HeuristicMessageSummariser` | `@DefaultBean` `ContentSummariser<Message, SummaryResult>` — append-only structural summary from message metadata (participants, topics, time span). Merges annotations across invocations. Zero LLM cost. |
+| `ChannelSummariser` | `@ApplicationScoped` `SummaryUpdateHook` adapter — delegates to injected `ContentSummariser<Message, SummaryResult>`. Mutiny-aware blocking, channel-context error logging. |
 | `NoOpThreadSummaryStore` | `@DefaultBean` `@ApplicationScoped` no-op `ThreadSummaryStore` — `save()` returns input, queries return empty. Consumers override with qhorus persistence. |
-| `ThreadSummaryObserver` | `@ApplicationScoped` push-based observer — detects DONE/FAILURE messages with correlationId, fetches thread messages via `CrossTenantMessageStore`, delegates to `ContentSummariser<Message>`, writes to `ThreadSummaryStore`. Per-correlationId concurrency guard. Async via `ManagedExecutor`. |
+| `ThreadSummaryObserver` | `@ApplicationScoped` push-based observer — detects DONE/FAILURE messages with correlationId, fetches thread messages via `CrossTenantMessageStore`, delegates to `ContentSummariser<Message, SummaryResult>`, writes to `ThreadSummaryStore`. Per-correlationId concurrency guard. Async via `ManagedExecutor`. |
 
 ## Package: `io.casehub.blocks.conversation`
 
@@ -492,25 +494,32 @@ DSPy-inspired prompt optimisation framework — offline batch cycle that auto-im
 
 ## Package: `io.casehub.blocks.summarisation`
 
-Temporal abstraction framework for summarising high-frequency event streams into progressively higher-level abstractions. Pure Java, zero CDI/Quarkus dependencies. Extracted from quarkmind via #27.
+Unified summarisation framework. Core types live in `casehub-blocks-summarisation-api` (zero external deps). Extensions in `casehub-blocks` depend on qhorus-api/platform-agent-api.
+
+**Core types (in `casehub-blocks-summarisation-api`):**
 
 | Class | What it does |
 |-------|-------------|
 | `EventLevel` | Record: `(String name, int ordinal)` — identifies a level in the hierarchy |
-| `LevelEvent<E>` | Record: `(E payload, long timestamp, EventLevel level)` — typed event at a specific level |
+| `LevelEvent<E>` | Record: `(E payload, long timestamp, EventLevel level, @Nullable String tenancyId)` — typed event at a specific level with multi-tenant support |
 | `WindowPolicy` | Record: `(long maxAge, int maxCount)` — dual-trigger windowing. Validates: both >= 0, at least one positive. Factory methods: `ofCount(int)`, `ofAge(long)`, `of(long, int)`. |
 | `EventAccumulator<E>` | Thread-safe event buffer. `collect()`, `shouldEmit(now)`, `drain()`, `drainIfReady(now)` (atomic check+drain), `clear()`, `size()`. Synchronized on all public methods. |
-| `EventStreamBus<E>` | Predicate-based pub/sub. `subscribe(Predicate, Consumer)`, `publish(LevelEvent)` (synchronous dispatch on caller's thread), `clearSubscriptions()`. CopyOnWriteArrayList-backed — concurrent publish+subscribe safe. `clear()` deprecated. |
+| `EventStreamBus<E>` | Predicate-based pub/sub. `subscribe(Predicate, Consumer)`, `publish(LevelEvent)` (synchronous dispatch on caller's thread), `clearSubscriptions()`. CopyOnWriteArrayList-backed — concurrent publish+subscribe safe. |
 | `Summariser<IN, OUT>` | `@FunctionalInterface`. `CompletionStage<List<OUT>> summarise(List<LevelEvent<IN>>)`. `ofSync()` factory for deterministic implementations. |
+| `StatefulSummariser<IN, OUT, S>` | Extends `Summariser`. `CompletionStage<SummariseResult<OUT, S>> summarise(List<LevelEvent<IN>>, @Nullable S previousState)`. Framework-managed state per partition (keyed by tenancyId). `SummariseResult<OUT, S>` record carries outputs + new state. |
+| `ContentSummariser<T, R>` | `@FunctionalInterface` SPI: `CompletionStage<R> summarise(List<T>, @Nullable R previous)`. Generified result type — no qhorus dependency. `asSummariser()` default method bridges to `StatefulSummariser<T, R, R>` for pipeline use with state. |
 | `Compactor<E>` | `@FunctionalInterface`. `List<LevelEvent<E>> compact(List<LevelEvent<E>>)`. Optional pre-summarisation compaction (dedup, filtering, supersession). |
-| `SummarisationRunner<IN, OUT>` | Wires accumulator → optional compactor → summariser → output bus. `collect()`, `tick()` (synchronized, returns `CompletionStage<Void>`), `clear()`, `size()`. Optional `Compactor<IN>` for pre-summarisation compaction. Optional `Consumer<List<LevelEvent<IN>>> onFailure` for failure recovery (default: log and drop). |
-| `KeyedAccumulator<K, E>` | Groups events by key (via `Function<E, K>`), emits each group independently on completion predicate or stale timeout. Thread-safe. `collect()`, `drain(long now)`, `clear()`, `groupCount()`, `eventCount()`. Clock-from-last-event staleness semantics. |
-| `KeyedSummarisationRunner<K, IN, OUT>` | Wires `KeyedAccumulator` → optional compactor → `Summariser` → output bus. Per-group failure recovery. `collect()`, `tick(long now)` (synchronized), `clear()`, `groupCount()`, `eventCount()`. Optional `Compactor<IN>` and `Consumer<List<LevelEvent<IN>>> onFailure`. |
+| `SummarisationRunner<IN, OUT>` | Wires accumulator → optional compactor → summariser → output bus. Detects `StatefulSummariser` and manages state per partition automatically. `collect()`, `tick()` (synchronized, returns `CompletionStage<Void>`), `clear()`, `size()`. Propagates tenancyId from input batch to output events. |
+| `KeyedAccumulator<K, E>` | Groups events by key (via `Function<LevelEvent<E>, K>`), emits each group independently on completion predicate or stale timeout. Thread-safe. Key extractor receives full `LevelEvent` (enables tenancyId-based partitioning). |
+| `KeyedSummarisationRunner<K, IN, OUT>` | Wires `KeyedAccumulator` → optional compactor → `Summariser` → output bus. Same key extractor signature as `KeyedAccumulator`. Per-group failure recovery. |
+| `VerbatimContentSummariser<T>` | Renders each item as a bullet list via `Function<T, String>`. Implements `ContentSummariser<T, String>`. Pure Java. |
+
+**Extension types (in `casehub-blocks`):**
+
+| Class | What it does |
+|-------|-------------|
 | `SummaryMode` | Enum: `APPEND` (delta only) or `EDIT` (rewrite entire summary). Used by `LlmContentSummariser`. |
-| `ContentSummariser<T>` | `@FunctionalInterface` SPI: `CompletionStage<SummaryResult> summarise(List<T>, @Nullable SummaryResult)`. Reusable batch summarisation — decoupled from pipeline event model. Returns `SummaryResult` (text + annotations). |
-| `VerbatimContentSummariser<T>` | Renders each item as a bullet list via `Function<T, String>`. Preserves previous text and propagates annotations. |
-| `TieredContentSummariser<T>` | Dispatches to delegates based on batch size thresholds. 2-tier `(small, large, threshold)` and 3-tier `(small, medium, large, t1, t2)` constructors. |
-| `ContentSummariserToSummariser<T>` | Pipeline adapter: bridges `ContentSummariser<T>` → `Summariser<T, String>` for use in `SummarisationRunner`. Passes null previous (pipeline batches are independent). |
+| `TieredContentSummariser<T>` | Dispatches to `ContentSummariser<T, SummaryResult>` delegates based on batch size thresholds. 2-tier and 3-tier constructors. |
 
 Two integration patterns: **Pattern A** (SummarisationRunner pipeline — sync heuristics, microsecond latency) and **Pattern B** (direct EventAccumulator — async LLM dispatch, caller manages). `KeyedSummarisationRunner` is the grouped counterpart to `SummarisationRunner` — same compositional role, groups by key instead of flat windowing. See spec for details.
 
@@ -553,7 +562,7 @@ LLM-backed content summarisation. Separated from the pure-Java `blocks.summarisa
 
 | Class | What it does |
 |-------|-------------|
-| `LlmContentSummariser<T>` | Generic `ContentSummariser<T>` backed by `AgentProvider`. EDIT/APPEND modes via `SummaryMode`. Optional `preamble` for static context (e.g., channel name). Propagates previous annotations. |
+| `LlmContentSummariser<T>` | Generic `ContentSummariser<T, R>` backed by `AgentProvider`. EDIT/APPEND modes via `SummaryMode`. Optional `preamble` for static context (e.g., channel name). Propagates previous annotations. |
 
 ## Package: `io.casehub.blocks.speech.sherpa`
 

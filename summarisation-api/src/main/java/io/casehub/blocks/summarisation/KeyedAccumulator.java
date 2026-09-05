@@ -10,13 +10,13 @@ import java.util.function.Predicate;
 
 public class KeyedAccumulator<K, E> {
 
-    private final Function<E, K> keyExtractor;
+    private final Function<LevelEvent<E>, K> keyExtractor;
     private final Predicate<List<LevelEvent<E>>> completionTest;
     private final long staleTimeout;
     private final Map<K, List<LevelEvent<E>>> groups = new LinkedHashMap<>();
     private final Map<K, Long> lastEventTime = new LinkedHashMap<>();
 
-    public KeyedAccumulator(Function<E, K> keyExtractor,
+    public KeyedAccumulator(Function<LevelEvent<E>, K> keyExtractor,
                             Predicate<List<LevelEvent<E>>> completionTest,
                             long staleTimeout) {
         this.keyExtractor = keyExtractor;
@@ -25,7 +25,7 @@ public class KeyedAccumulator<K, E> {
     }
 
     public synchronized void collect(LevelEvent<E> event) {
-        K key = Objects.requireNonNull(keyExtractor.apply(event.payload()),
+        K key = Objects.requireNonNull(keyExtractor.apply(event),
             "keyExtractor returned null");
         groups.computeIfAbsent(key, k -> new ArrayList<>()).add(event);
         lastEventTime.put(key, event.timestamp());

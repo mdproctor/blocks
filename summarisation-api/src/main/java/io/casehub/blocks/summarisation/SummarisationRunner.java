@@ -3,11 +3,13 @@ package io.casehub.blocks.summarisation;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 public class SummarisationRunner<IN, OUT> {
 
     private static final System.Logger LOG = System.getLogger(SummarisationRunner.class.getName());
+    private static final String DEFAULT_PARTITION = "__default__";
 
     private final EventAccumulator<IN>           accumulator;
     private final Compactor<IN>                  compactor;
@@ -15,6 +17,7 @@ public class SummarisationRunner<IN, OUT> {
     private final EventStreamBus<OUT>            outputBus;
     private final EventLevel                     outputLevel;
     private final Consumer<List<LevelEvent<IN>>> onFailure;
+    private final ConcurrentHashMap<String, Object> partitionState = new ConcurrentHashMap<>();
 
     public SummarisationRunner(WindowPolicy policy,
                                Summariser<IN, OUT> summariser,
@@ -69,11 +72,7 @@ public class SummarisationRunner<IN, OUT> {
             batch = compactor.compact(batch);
         }
         var finalBatch = batch;
-        return summariser.summarise(batch).thenAccept(results -> {
-            for (var payload : results) {
-                outputBus.publish(new LevelEvent<>(payload, now, outputLevel));
-            }
-        }).handle((v, ex) -> {
+        return invokeSummariser(finalBatch, now).handle((v, ex) -> {
             if (ex != null) {
                 LOG.log(System.Logger.Level.WARNING,
                         "Summarisation failed, batch size=" + finalBatch.size(), ex);
@@ -84,7 +83,6 @@ public class SummarisationRunner<IN, OUT> {
             return null;
         });
     }
-
 
     /**
      * Unconditional drain — bypasses WindowPolicy. Use at shutdown to
@@ -98,11 +96,7 @@ public class SummarisationRunner<IN, OUT> {
         }
         var  finalBatch = batch;
         long now        = System.currentTimeMillis();
-        return summariser.summarise(batch).thenAccept(results -> {
-            for (var payload : results) {
-                outputBus.publish(new LevelEvent<>(payload, now, outputLevel));
-            }
-        }).handle((v, ex) -> {
+        return invokeSummariser(finalBatch, now).handle((v, ex) -> {
             if (ex != null) {
                 LOG.log(System.Logger.Level.WARNING,
                         "Flush failed, batch size=" + finalBatch.size(), ex);
@@ -111,6 +105,29 @@ public class SummarisationRunner<IN, OUT> {
                 }
             }
             return null;
+        });
+    }
+
+    @SuppressWarnings("unchecked")
+    private CompletionStage<Void> invokeSummariser(List<LevelEvent<IN>> batch, long now) {
+        String tenancyId = batch.isEmpty() ? null : batch.get(0).tenancyId();
+        if (summariser instanceof StatefulSummariser<IN, OUT, ?> stateful) {
+            String partitionKey = tenancyId != null ? tenancyId : DEFAULT_PARTITION;
+            var typedStateful = (StatefulSummariser<IN, OUT, Object>) stateful;
+            Object prevState = partitionState.get(partitionKey);
+            return typedStateful.summarise(batch, prevState).thenAccept(result -> {
+                if (result.newState() != null) {
+                    partitionState.put(partitionKey, result.newState());
+                }
+                for (var payload : result.outputs()) {
+                    outputBus.publish(new LevelEvent<>(payload, now, outputLevel, tenancyId));
+                }
+            });
+        }
+        return summariser.summarise(batch).thenAccept(results -> {
+            for (var payload : results) {
+                outputBus.publish(new LevelEvent<>(payload, now, outputLevel, tenancyId));
+            }
         });
     }
 

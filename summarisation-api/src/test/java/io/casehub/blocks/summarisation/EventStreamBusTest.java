@@ -20,9 +20,9 @@ class EventStreamBusTest {
         var bus = new EventStreamBus<String>();
         List<String> received = new ArrayList<>();
         bus.subscribe(s -> s.startsWith("A"), e -> received.add(e.payload()));
-        bus.publish(new LevelEvent<>("Alpha", 1, LEVEL));
-        bus.publish(new LevelEvent<>("Beta", 2, LEVEL));
-        bus.publish(new LevelEvent<>("Apex", 3, LEVEL));
+        bus.publish(new LevelEvent<>("Alpha", 1, LEVEL, null));
+        bus.publish(new LevelEvent<>("Beta", 2, LEVEL, null));
+        bus.publish(new LevelEvent<>("Apex", 3, LEVEL, null));
         assertThat(received).containsExactly("Alpha", "Apex");
     }
 
@@ -33,7 +33,7 @@ class EventStreamBusTest {
         List<String> sub2 = new ArrayList<>();
         bus.subscribe(s -> true, e -> sub1.add(e.payload()));
         bus.subscribe(s -> true, e -> sub2.add(e.payload()));
-        bus.publish(new LevelEvent<>("X", 1, LEVEL));
+        bus.publish(new LevelEvent<>("X", 1, LEVEL, null));
         assertThat(sub1).containsExactly("X");
         assertThat(sub2).containsExactly("X");
     }
@@ -44,14 +44,14 @@ class EventStreamBusTest {
         List<String> received = new ArrayList<>();
         bus.subscribe(s -> true, e -> received.add(e.payload()));
         bus.clearSubscriptions();
-        bus.publish(new LevelEvent<>("X", 1, LEVEL));
+        bus.publish(new LevelEvent<>("X", 1, LEVEL, null));
         assertThat(received).isEmpty();
     }
 
     @Test
     void publish_noSubscribers_noError() {
         var bus = new EventStreamBus<String>();
-        bus.publish(new LevelEvent<>("X", 1, LEVEL));
+        bus.publish(new LevelEvent<>("X", 1, LEVEL, null));
     }
 
     // --- Edge cases ---
@@ -61,7 +61,7 @@ class EventStreamBusTest {
         var bus = new EventStreamBus<String>();
         bus.subscribe(s -> { throw new RuntimeException("predicate failed"); }, e -> {});
 
-        assertThatThrownBy(() -> bus.publish(new LevelEvent<>("X", 1, LEVEL)))
+        assertThatThrownBy(() -> bus.publish(new LevelEvent<>("X", 1, LEVEL, null)))
             .isInstanceOf(RuntimeException.class)
             .hasMessage("predicate failed");
     }
@@ -71,7 +71,7 @@ class EventStreamBusTest {
         var bus = new EventStreamBus<String>();
         bus.subscribe(s -> true, e -> { throw new RuntimeException("callback failed"); });
 
-        assertThatThrownBy(() -> bus.publish(new LevelEvent<>("X", 1, LEVEL)))
+        assertThatThrownBy(() -> bus.publish(new LevelEvent<>("X", 1, LEVEL, null)))
             .isInstanceOf(RuntimeException.class)
             .hasMessage("callback failed");
     }
@@ -83,7 +83,7 @@ class EventStreamBusTest {
         bus.subscribe(s -> true, e -> { throw new RuntimeException("first fails"); });
         bus.subscribe(s -> true, e -> received.add(e.payload()));
 
-        try { bus.publish(new LevelEvent<>("X", 1, LEVEL)); } catch (RuntimeException ignored) {}
+        try { bus.publish(new LevelEvent<>("X", 1, LEVEL, null)); } catch (RuntimeException ignored) {}
 
         assertThat(received).as("second subscriber never called").isEmpty();
     }
@@ -97,10 +97,10 @@ class EventStreamBusTest {
             bus.subscribe(s2 -> true, e2 -> lateReceived.add(e2.payload()));
         });
 
-        bus.publish(new LevelEvent<>("first", 1, LEVEL));
+        bus.publish(new LevelEvent<>("first", 1, LEVEL, null));
         assertThat(lateReceived).as("late subscriber not called during current publish").isEmpty();
 
-        bus.publish(new LevelEvent<>("second", 2, LEVEL));
+        bus.publish(new LevelEvent<>("second", 2, LEVEL, null));
         assertThat(lateReceived).as("late subscriber called on subsequent publish").containsExactly("second");
     }
 
@@ -110,7 +110,7 @@ class EventStreamBusTest {
         List<String> predicateArgs = new ArrayList<>();
         bus.subscribe(s -> { predicateArgs.add(s); return true; }, e -> {});
 
-        bus.publish(new LevelEvent<>("hello", 1, LEVEL));
+        bus.publish(new LevelEvent<>("hello", 1, LEVEL, null));
 
         assertThat(predicateArgs).containsExactly("hello");
     }
@@ -122,7 +122,7 @@ class EventStreamBusTest {
         List<LevelEvent<String>> received = new ArrayList<>();
         bus.subscribe(s -> true, received::add);
 
-        bus.publish(new LevelEvent<>("payload", 42, level));
+        bus.publish(new LevelEvent<>("payload", 42, level, null));
 
         assertThat(received).hasSize(1);
         assertThat(received.get(0).payload()).isEqualTo("payload");
@@ -146,7 +146,7 @@ class EventStreamBusTest {
                 final int val = i;
                 executor.submit(() -> {
                     try { latch.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
-                    bus.publish(new LevelEvent<>(val, val, LEVEL));
+                    bus.publish(new LevelEvent<>(val, val, LEVEL, null));
                 });
                 executor.submit(() -> {
                     try { latch.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }

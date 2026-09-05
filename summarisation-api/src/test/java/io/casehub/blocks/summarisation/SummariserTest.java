@@ -17,7 +17,7 @@ class SummariserTest {
     void ofSync_wrapsResultInCompletedFuture() {
         Summariser<String, Integer> summariser = Summariser.ofSync(batch -> List.of(batch.size()));
 
-        var batch = List.of(new LevelEvent<>("a", 1, LEVEL), new LevelEvent<>("b", 2, LEVEL));
+        var batch = List.of(new LevelEvent<>("a", 1, LEVEL, null), new LevelEvent<>("b", 2, LEVEL, null));
         CompletionStage<List<Integer>> result = summariser.summarise(batch);
 
         assertThat(result.toCompletableFuture().isDone()).isTrue();
@@ -39,7 +39,7 @@ class SummariserTest {
             throw new IllegalStateException("sync failure");
         });
 
-        assertThatThrownBy(() -> summariser.summarise(List.of(new LevelEvent<>("a", 1, LEVEL))))
+        assertThatThrownBy(() -> summariser.summarise(List.of(new LevelEvent<>("a", 1, LEVEL, null))))
             .isInstanceOf(IllegalStateException.class)
             .hasMessage("sync failure");
     }
@@ -52,7 +52,7 @@ class SummariserTest {
         Summariser<String, Integer> summariser = batch -> future;
 
         CompletionStage<List<Integer>> result = summariser.summarise(
-            List.of(new LevelEvent<>("a", 1, LEVEL)));
+            List.of(new LevelEvent<>("a", 1, LEVEL, null)));
 
         assertThat(result.toCompletableFuture().isDone()).as("not yet completed").isFalse();
 
@@ -68,7 +68,7 @@ class SummariserTest {
             CompletableFuture.failedFuture(new RuntimeException("async failure"));
 
         CompletionStage<List<String>> result = summariser.summarise(
-            List.of(new LevelEvent<>("a", 1, LEVEL)));
+            List.of(new LevelEvent<>("a", 1, LEVEL, null)));
 
         assertThatThrownBy(() -> result.toCompletableFuture().join())
             .hasCauseInstanceOf(RuntimeException.class)
@@ -85,8 +85,8 @@ class SummariserTest {
         Summariser<String, String> wrapped = Summariser.ofSync(sync);
 
         var result = wrapped.summarise(List.of(
-            new LevelEvent<>("hello", 1, LEVEL),
-            new LevelEvent<>("world", 2, LEVEL)
+            new LevelEvent<>("hello", 1, LEVEL, null),
+            new LevelEvent<>("world", 2, LEVEL, null)
         )).toCompletableFuture().join();
 
         assertThat(result).containsExactly("HELLO", "WORLD");

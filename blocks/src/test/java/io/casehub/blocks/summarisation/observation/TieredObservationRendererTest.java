@@ -21,7 +21,7 @@ class TieredObservationRendererTest {
             CompletableFuture.completedFuture(List.of("Summary of " + batch.size() + " events"));
 
     private LevelEvent<String> event(String payload, long timestamp) {
-        return new LevelEvent<>(payload, timestamp, LEVEL);
+        return new LevelEvent<>(payload, timestamp, LEVEL, null);
     }
 
     private ObservationContext ctx(long now, long sinceLast) {

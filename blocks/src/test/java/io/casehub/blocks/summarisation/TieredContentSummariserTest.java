@@ -16,7 +16,7 @@ class TieredContentSummariserTest {
 
     private final AtomicReference<String> lastTier = new AtomicReference<>();
 
-    private ContentSummariser<String> tierRecorder(String tierName) {
+    private ContentSummariser<String, SummaryResult> tierRecorder(String tierName) {
         return (items, prev) -> {
             lastTier.set(tierName);
             return CompletableFuture.completedFuture(
@@ -72,7 +72,7 @@ class TieredContentSummariserTest {
     @Test
     void passesPreviousToDelegates() {
         var captured = new AtomicReference<SummaryResult>();
-        ContentSummariser<String> capturingDelegate = (items, prev) -> {
+        ContentSummariser<String, SummaryResult> capturingDelegate = (items, prev) -> {
             captured.set(prev);
             return CompletableFuture.completedFuture(SummaryResult.ofText("ok"));
         };

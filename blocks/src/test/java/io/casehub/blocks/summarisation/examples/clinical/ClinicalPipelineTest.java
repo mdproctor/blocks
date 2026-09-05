@@ -163,8 +163,7 @@ class ClinicalPipelineTest {
         var failingRunner = new SummarisationRunner<>(
                 new WindowPolicy(0, 1), failingSummariser, narrativeBus, L4_NARRATIVE);
 
-        failingRunner.collect(new LevelEvent<>(
-                new CarePhase("STABLE", 1000, "test"), 1, L3_PHASES));
+        failingRunner.collect(new LevelEvent<>(new CarePhase("STABLE", 1000, "test"), 1, L3_PHASES, null));
 
         CompletionStage<Void> result = failingRunner.tick(2);
 
@@ -294,7 +293,6 @@ class ClinicalPipelineTest {
     }
 
     private void feedVital(VitalType type, double value, String unit, long timestamp) {
-        vitalsBus.publish(new LevelEvent<>(
-            new VitalReading(type, value, unit), timestamp, L1_VITALS));
+        vitalsBus.publish(new LevelEvent<>(new VitalReading(type, value, unit), timestamp, L1_VITALS, null));
     }
 }

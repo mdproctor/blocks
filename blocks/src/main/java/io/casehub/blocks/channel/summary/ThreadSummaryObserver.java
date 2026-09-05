@@ -33,7 +33,7 @@ public class ThreadSummaryObserver {
 
     private final Set<String> inFlight = ConcurrentHashMap.newKeySet();
 
-    private final ContentSummariser<Message> contentSummariser;
+    private final ContentSummariser<Message, SummaryResult> contentSummariser;
     private final CrossTenantMessageStore messageStore;
     private final ThreadSummaryStore threadSummaryStore;
     private final Event<ThreadSummaryUpdatedEvent> summaryEvents;
@@ -41,7 +41,7 @@ public class ThreadSummaryObserver {
     @Inject ManagedExecutor executor;
 
     @Inject
-    public ThreadSummaryObserver(ContentSummariser<Message> contentSummariser,
+    public ThreadSummaryObserver(ContentSummariser<Message, SummaryResult> contentSummariser,
                                  CrossTenantMessageStore messageStore,
                                  ThreadSummaryStore threadSummaryStore,
                                  Event<ThreadSummaryUpdatedEvent> summaryEvents) {

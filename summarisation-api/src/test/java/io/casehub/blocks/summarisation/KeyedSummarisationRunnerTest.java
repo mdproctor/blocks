@@ -20,14 +20,14 @@ class KeyedSummarisationRunnerTest {
         Summariser<String, Integer> summariser = Summariser.ofSync(batch -> List.of(batch.size()));
         var outputBus = new EventStreamBus<Integer>();
         var runner = new KeyedSummarisationRunner<>(
-            s -> s.substring(0, 1), group -> group.size() >= 2, 0,
+            e -> e.payload().substring(0, 1), group -> group.size() >= 2, 0,
             summariser, outputBus, OUTPUT_LEVEL);
 
         List<LevelEvent<Integer>> received = new ArrayList<>();
         outputBus.subscribe(i -> true, received::add);
 
-        runner.collect(new LevelEvent<>("a1", 1, INPUT_LEVEL));
-        runner.collect(new LevelEvent<>("a2", 2, INPUT_LEVEL));
+        runner.collect(new LevelEvent<>("a1", 1, INPUT_LEVEL, null));
+        runner.collect(new LevelEvent<>("a2", 2, INPUT_LEVEL, null));
         runner.tick(10);
 
         assertThat(received).hasSize(1);
@@ -41,13 +41,13 @@ class KeyedSummarisationRunnerTest {
         Summariser<String, Integer> summariser = Summariser.ofSync(batch -> List.of(batch.size()));
         var outputBus = new EventStreamBus<Integer>();
         var runner = new KeyedSummarisationRunner<>(
-            s -> s, group -> group.size() >= 5, 0,
+            e -> e.payload(), group -> group.size() >= 5, 0,
             summariser, outputBus, OUTPUT_LEVEL);
 
         List<Integer> received = new ArrayList<>();
         outputBus.subscribe(i -> true, e -> received.add(e.payload()));
 
-        runner.collect(new LevelEvent<>("k1", 1, INPUT_LEVEL));
+        runner.collect(new LevelEvent<>("k1", 1, INPUT_LEVEL, null));
         runner.tick(10);
 
         assertThat(received).isEmpty();
@@ -58,13 +58,13 @@ class KeyedSummarisationRunnerTest {
         Summariser<String, Integer> summariser = Summariser.ofSync(batch -> List.of(batch.size()));
         var outputBus = new EventStreamBus<Integer>();
         var runner = new KeyedSummarisationRunner<>(
-            s -> s, group -> false, 100,
+            e -> e.payload(), group -> false, 100,
             summariser, outputBus, OUTPUT_LEVEL);
 
         List<Integer> received = new ArrayList<>();
         outputBus.subscribe(i -> true, e -> received.add(e.payload()));
 
-        runner.collect(new LevelEvent<>("k1", 10, INPUT_LEVEL));
+        runner.collect(new LevelEvent<>("k1", 10, INPUT_LEVEL, null));
         runner.tick(50);
         assertThat(received).as("not stale yet").isEmpty();
 
@@ -79,16 +79,16 @@ class KeyedSummarisationRunnerTest {
                 + "-size-" + batch.size()));
         var outputBus = new EventStreamBus<String>();
         var runner = new KeyedSummarisationRunner<>(
-            s -> s.substring(0, 1), group -> group.size() >= 2, 0,
+            e -> e.payload().substring(0, 1), group -> group.size() >= 2, 0,
             summariser, outputBus, OUTPUT_LEVEL);
 
         List<String> received = new ArrayList<>();
         outputBus.subscribe(s -> true, e -> received.add(e.payload()));
 
-        runner.collect(new LevelEvent<>("a1", 1, INPUT_LEVEL));
-        runner.collect(new LevelEvent<>("b1", 2, INPUT_LEVEL));
-        runner.collect(new LevelEvent<>("a2", 3, INPUT_LEVEL));
-        runner.collect(new LevelEvent<>("b2", 4, INPUT_LEVEL));
+        runner.collect(new LevelEvent<>("a1", 1, INPUT_LEVEL, null));
+        runner.collect(new LevelEvent<>("b1", 2, INPUT_LEVEL, null));
+        runner.collect(new LevelEvent<>("a2", 3, INPUT_LEVEL, null));
+        runner.collect(new LevelEvent<>("b2", 4, INPUT_LEVEL, null));
         runner.tick(10);
 
         assertThat(received).containsExactlyInAnyOrder("group-a-size-2", "group-b-size-2");
@@ -103,10 +103,10 @@ class KeyedSummarisationRunnerTest {
         };
         var outputBus = new EventStreamBus<Integer>();
         var runner = new KeyedSummarisationRunner<>(
-                s -> s, group -> group.size() >= 1, 0,
+                e -> e.payload(), group -> group.size() >= 1, 0,
                 failingSummariser, outputBus, OUTPUT_LEVEL);
 
-        runner.collect(new LevelEvent<>("k1", 1, INPUT_LEVEL));
+        runner.collect(new LevelEvent<>("k1", 1, INPUT_LEVEL, null));
         CompletionStage<Void> result = runner.tick(10);
 
         assertThat(result.toCompletableFuture().isCompletedExceptionally())
@@ -125,14 +125,14 @@ class KeyedSummarisationRunnerTest {
         };
         var outputBus = new EventStreamBus<Integer>();
         var runner = new KeyedSummarisationRunner<>(
-            s -> s.substring(0, 4), group -> group.size() >= 1, 0,
+            e -> e.payload().substring(0, 4), group -> group.size() >= 1, 0,
             summariser, outputBus, OUTPUT_LEVEL);
 
         List<Integer> received = new ArrayList<>();
         outputBus.subscribe(i -> true, e -> received.add(e.payload()));
 
-        runner.collect(new LevelEvent<>("good", 1, INPUT_LEVEL));
-        runner.collect(new LevelEvent<>("fail", 2, INPUT_LEVEL));
+        runner.collect(new LevelEvent<>("good", 1, INPUT_LEVEL, null));
+        runner.collect(new LevelEvent<>("fail", 2, INPUT_LEVEL, null));
         runner.tick(10);
 
         assertThat(received).as("successful group published despite sibling failure").containsExactly(1);
@@ -143,7 +143,7 @@ class KeyedSummarisationRunnerTest {
         Summariser<String, Integer> summariser = Summariser.ofSync(batch -> List.of(batch.size()));
         var outputBus = new EventStreamBus<Integer>();
         var runner = new KeyedSummarisationRunner<>(
-            s -> s, group -> true, 0,
+            e -> e.payload(), group -> true, 0,
             summariser, outputBus, OUTPUT_LEVEL);
 
         CompletionStage<Void> result = runner.tick(100);
@@ -154,11 +154,11 @@ class KeyedSummarisationRunnerTest {
     @Test
     void clear_delegatesToAccumulator() {
         var runner = new KeyedSummarisationRunner<>(
-            s -> s, group -> false, 0,
+            e -> e.payload(), group -> false, 0,
             Summariser.ofSync(batch -> List.of()), new EventStreamBus<>(),
             OUTPUT_LEVEL);
-        runner.collect(new LevelEvent<>("a", 1, INPUT_LEVEL));
-        runner.collect(new LevelEvent<>("b", 2, INPUT_LEVEL));
+        runner.collect(new LevelEvent<>("a", 1, INPUT_LEVEL, null));
+        runner.collect(new LevelEvent<>("b", 2, INPUT_LEVEL, null));
         runner.clear();
         assertThat(runner.groupCount()).isZero();
         assertThat(runner.eventCount()).isZero();
@@ -167,12 +167,12 @@ class KeyedSummarisationRunnerTest {
     @Test
     void groupCountAndEventCount_delegateToAccumulator() {
         var runner = new KeyedSummarisationRunner<String, String, Object>(
-            s -> s.substring(0, 1), group -> false, 0,
+            e -> e.payload().substring(0, 1), group -> false, 0,
             Summariser.ofSync(batch -> List.of()), new EventStreamBus<>(),
             OUTPUT_LEVEL);
-        runner.collect(new LevelEvent<>("a1", 1, INPUT_LEVEL));
-        runner.collect(new LevelEvent<>("a2", 2, INPUT_LEVEL));
-        runner.collect(new LevelEvent<>("b1", 3, INPUT_LEVEL));
+        runner.collect(new LevelEvent<>("a1", 1, INPUT_LEVEL, null));
+        runner.collect(new LevelEvent<>("a2", 2, INPUT_LEVEL, null));
+        runner.collect(new LevelEvent<>("b1", 3, INPUT_LEVEL, null));
         assertThat(runner.groupCount()).isEqualTo(2);
         assertThat(runner.eventCount()).isEqualTo(3);
     }
@@ -184,13 +184,13 @@ class KeyedSummarisationRunnerTest {
         Summariser<String, Integer> summariser = Summariser.ofSync(batch -> List.of(batch.size()));
         var                         outputBus  = new EventStreamBus<Integer>();
         var runner = new KeyedSummarisationRunner<>(
-                s -> s.substring(0, 1), group -> group.size() >= 2, 0,
+                e -> e.payload().substring(0, 1), group -> group.size() >= 2, 0,
                 dedup, summariser, outputBus, OUTPUT_LEVEL);
 
         List<Integer> received = new ArrayList<>();
         outputBus.subscribe(i -> true, e -> received.add(e.payload()));
 
-        var event = new LevelEvent<>("a1", 1, INPUT_LEVEL);
+        var event = new LevelEvent<>("a1", 1, INPUT_LEVEL, null);
         runner.collect(event);
         runner.collect(event);
         runner.tick(10);
@@ -205,16 +205,16 @@ class KeyedSummarisationRunnerTest {
         Summariser<String, Integer> summariser = Summariser.ofSync(batch -> List.of(batch.size()));
         var                         outputBus  = new EventStreamBus<Integer>();
         var runner = new KeyedSummarisationRunner<>(
-                s -> s.substring(0, 1), group -> group.size() >= 2, 0,
+                e -> e.payload().substring(0, 1), group -> group.size() >= 2, 0,
                 filterShort, summariser, outputBus, OUTPUT_LEVEL);
 
         List<Integer> received = new ArrayList<>();
         outputBus.subscribe(i -> true, e -> received.add(e.payload()));
 
-        runner.collect(new LevelEvent<>("a1", 1, INPUT_LEVEL));
-        runner.collect(new LevelEvent<>("abc", 2, INPUT_LEVEL));
-        runner.collect(new LevelEvent<>("b1", 3, INPUT_LEVEL));
-        runner.collect(new LevelEvent<>("bcd", 4, INPUT_LEVEL));
+        runner.collect(new LevelEvent<>("a1", 1, INPUT_LEVEL, null));
+        runner.collect(new LevelEvent<>("abc", 2, INPUT_LEVEL, null));
+        runner.collect(new LevelEvent<>("b1", 3, INPUT_LEVEL, null));
+        runner.collect(new LevelEvent<>("bcd", 4, INPUT_LEVEL, null));
         runner.tick(10);
 
         assertThat(received).as("each group compacted: 1 long item per group").containsExactlyInAnyOrder(1, 1);
@@ -230,11 +230,11 @@ class KeyedSummarisationRunnerTest {
         var                            outputBus = new EventStreamBus<Integer>();
         List<List<LevelEvent<String>>> recovered = new ArrayList<>();
         var runner = new KeyedSummarisationRunner<>(
-                s -> s, group -> group.size() >= 1, 0,
+                e -> e.payload(), group -> group.size() >= 1, 0,
                 failingSummariser, outputBus, OUTPUT_LEVEL, recovered::add);
 
-        runner.collect(new LevelEvent<>("k1", 1, INPUT_LEVEL));
-        runner.collect(new LevelEvent<>("k2", 2, INPUT_LEVEL));
+        runner.collect(new LevelEvent<>("k1", 1, INPUT_LEVEL, null));
+        runner.collect(new LevelEvent<>("k2", 2, INPUT_LEVEL, null));
         runner.tick(10).toCompletableFuture().join();
 
         assertThat(recovered).as("handler called for each failed group").hasSize(2);
@@ -253,11 +253,11 @@ class KeyedSummarisationRunnerTest {
         outputBus.subscribe(i -> true, e -> published.add(e.payload()));
         List<List<LevelEvent<String>>> recovered = new ArrayList<>();
         var runner = new KeyedSummarisationRunner<>(
-                s -> s.substring(0, 4), group -> group.size() >= 1, 0,
+                e -> e.payload().substring(0, 4), group -> group.size() >= 1, 0,
                 summariser, outputBus, OUTPUT_LEVEL, recovered::add);
 
-        runner.collect(new LevelEvent<>("good", 1, INPUT_LEVEL));
-        runner.collect(new LevelEvent<>("fail", 2, INPUT_LEVEL));
+        runner.collect(new LevelEvent<>("good", 1, INPUT_LEVEL, null));
+        runner.collect(new LevelEvent<>("fail", 2, INPUT_LEVEL, null));
         runner.tick(10).toCompletableFuture().join();
 
         assertThat(published).as("successful group still published").containsExactly(1);

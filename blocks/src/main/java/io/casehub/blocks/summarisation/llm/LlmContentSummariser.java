@@ -15,7 +15,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-public class LlmContentSummariser<T> implements ContentSummariser<T> {
+public class LlmContentSummariser<T> implements ContentSummariser<T, SummaryResult> {
 
     private static final String EDIT_PROMPT = """
             You are a content summariser. Given the current summary and a batch of \

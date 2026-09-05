@@ -1,6 +1,7 @@
 package io.casehub.blocks.memory;
 
 import io.casehub.blocks.summarisation.ContentSummariser;
+import io.casehub.qhorus.api.spi.SummaryResult;
 import io.casehub.neocortex.memory.EraseRequest;
 import io.casehub.neocortex.memory.MemoryDomain;
 import io.casehub.neocortex.memory.cbr.CbrCase;
@@ -34,7 +35,7 @@ public class MemoryHygieneOrchestrator {
     private final ConfidenceScorer   confidenceScorer;
     private final TemporalDecay      temporalDecay;
     private final ScopeDecay scopeDecay;
-    private final ContentSummariser<ScoredCbrCase<? extends CbrCase>> summariser;
+    private final ContentSummariser<ScoredCbrCase<? extends CbrCase>, SummaryResult> summariser;
     private final MemoryDomain domain;
     private final List<String>    caseTypes;
     private final RetentionConfig RetentionConfig;
@@ -51,7 +52,7 @@ public class MemoryHygieneOrchestrator {
             ConfidenceScorer confidenceScorer,
             TemporalDecay temporalDecay,
             ScopeDecay scopeDecay,
-            ContentSummariser<ScoredCbrCase<? extends CbrCase>> summariser,
+            ContentSummariser<ScoredCbrCase<? extends CbrCase>, SummaryResult> summariser,
             MemoryDomain domain,
             List<String> caseTypes,
             RetentionConfig RetentionConfig,

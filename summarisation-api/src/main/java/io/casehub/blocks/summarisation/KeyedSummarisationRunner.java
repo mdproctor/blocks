@@ -18,7 +18,7 @@ public class KeyedSummarisationRunner<K, IN, OUT> {
     private final EventLevel                     outputLevel;
     private final Consumer<List<LevelEvent<IN>>> onFailure;
 
-    public KeyedSummarisationRunner(Function<IN, K> keyExtractor,
+    public KeyedSummarisationRunner(Function<LevelEvent<IN>, K> keyExtractor,
                                     Predicate<List<LevelEvent<IN>>> completionTest,
                                     long staleTimeout,
                                     Summariser<IN, OUT> summariser,
@@ -27,7 +27,7 @@ public class KeyedSummarisationRunner<K, IN, OUT> {
         this(keyExtractor, completionTest, staleTimeout, null, summariser, outputBus, outputLevel, null);
     }
 
-    public KeyedSummarisationRunner(Function<IN, K> keyExtractor,
+    public KeyedSummarisationRunner(Function<LevelEvent<IN>, K> keyExtractor,
                                     Predicate<List<LevelEvent<IN>>> completionTest,
                                     long staleTimeout,
                                     Compactor<IN> compactor,
@@ -37,7 +37,7 @@ public class KeyedSummarisationRunner<K, IN, OUT> {
         this(keyExtractor, completionTest, staleTimeout, compactor, summariser, outputBus, outputLevel, null);
     }
 
-    public KeyedSummarisationRunner(Function<IN, K> keyExtractor,
+    public KeyedSummarisationRunner(Function<LevelEvent<IN>, K> keyExtractor,
                                     Predicate<List<LevelEvent<IN>>> completionTest,
                                     long staleTimeout,
                                     Summariser<IN, OUT> summariser,
@@ -47,7 +47,7 @@ public class KeyedSummarisationRunner<K, IN, OUT> {
         this(keyExtractor, completionTest, staleTimeout, null, summariser, outputBus, outputLevel, onFailure);
     }
 
-    public KeyedSummarisationRunner(Function<IN, K> keyExtractor,
+    public KeyedSummarisationRunner(Function<LevelEvent<IN>, K> keyExtractor,
                                     Predicate<List<LevelEvent<IN>>> completionTest,
                                     long staleTimeout,
                                     Compactor<IN> compactor,
@@ -81,7 +81,7 @@ public class KeyedSummarisationRunner<K, IN, OUT> {
                                                       var batch = compactor != null ? compactor.compact(group) : group;
                                                       return summariser.summarise(batch).thenAccept(results -> {
                                                           for (var payload : results) {
-                                                              outputBus.publish(new LevelEvent<>(payload, now, outputLevel));
+                                                              outputBus.publish(new LevelEvent<>(payload, now, outputLevel, batch.isEmpty() ? null : batch.get(0).tenancyId()));
                                                           }
                                                       }).handle((v, ex) -> {
                                                           if (ex != null) {
@@ -113,7 +113,7 @@ public class KeyedSummarisationRunner<K, IN, OUT> {
                                                       var batch = compactor != null ? compactor.compact(group) : group;
                                                       return summariser.summarise(batch).thenAccept(results -> {
                                                           for (var payload : results) {
-                                                              outputBus.publish(new LevelEvent<>(payload, now, outputLevel));
+                                                              outputBus.publish(new LevelEvent<>(payload, now, outputLevel, batch.isEmpty() ? null : batch.get(0).tenancyId()));
                                                           }
                                                       }).handle((v, ex) -> {
                                                           if (ex != null) {

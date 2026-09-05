@@ -132,7 +132,6 @@ class ObservationExampleTest {
     }
 
     private void publish(String actor, String action, String category, long timestamp) {
-        eventBus.publish(new LevelEvent<>(
-                new GameEvent(actor, action, category), timestamp, L1_EVENTS));
+        eventBus.publish(new LevelEvent<>(new GameEvent(actor, action, category), timestamp, L1_EVENTS, null));
     }
 }

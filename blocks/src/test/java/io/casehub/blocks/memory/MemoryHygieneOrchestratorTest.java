@@ -9,6 +9,7 @@ import io.casehub.neocortex.memory.cbr.ScoredCbrCase;
 import io.casehub.neocortex.memory.cbr.TemporalDecay;
 import io.casehub.neocortex.memory.cbr.ScopeDecay;
 import io.casehub.blocks.summarisation.ContentSummariser;
+import io.casehub.qhorus.api.spi.SummaryResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -29,7 +30,7 @@ class MemoryHygieneOrchestratorTest {
     private TemporalDecay      decay;
     private ScopeDecay scopeDecay;
     @SuppressWarnings("unchecked")
-    private ContentSummariser<ScoredCbrCase<? extends CbrCase>> summariser =
+    private ContentSummariser<ScoredCbrCase<? extends CbrCase>, SummaryResult> summariser =
             mock(ContentSummariser.class);
     @SuppressWarnings("unchecked")
     private Consumer<HygieneEvent> eventSink = mock(Consumer.class);

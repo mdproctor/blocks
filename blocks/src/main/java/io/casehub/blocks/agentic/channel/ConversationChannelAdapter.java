@@ -1,13 +1,11 @@
 package io.casehub.blocks.agentic.channel;
 
-import io.casehub.blocks.agentic.AgentRef;
 import io.casehub.blocks.agentic.model.AgentInvoker;
 import io.casehub.blocks.agentic.model.ExecutionModel;
 import io.casehub.blocks.agentic.model.ExecutionResult;
 import io.casehub.blocks.agentic.model.PatternType;
 import io.casehub.blocks.agentic.termination.TerminationDecision;
 import io.casehub.blocks.conversation.ConversationProjection;
-import io.casehub.blocks.conversation.orchestration.AgentParticipant;
 import io.casehub.blocks.conversation.orchestration.ConversationOrchestrator;
 import io.casehub.blocks.conversation.orchestration.FreeTurnPolicy;
 import io.casehub.blocks.conversation.orchestration.PointAddressedTurnPolicy;

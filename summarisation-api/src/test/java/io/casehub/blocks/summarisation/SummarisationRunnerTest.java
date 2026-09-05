@@ -23,11 +23,11 @@ class SummarisationRunnerTest {
         List<Integer> received = new ArrayList<>();
         outputBus.subscribe(i -> true, e -> received.add(e.payload()));
 
-        runner.collect(new LevelEvent<>("a", 1, INPUT_LEVEL));
+        runner.collect(new LevelEvent<>("a", 1, INPUT_LEVEL, null));
         runner.tick(5);
         assertThat(received).as("not enough events yet").isEmpty();
 
-        runner.collect(new LevelEvent<>("b", 2, INPUT_LEVEL));
+        runner.collect(new LevelEvent<>("b", 2, INPUT_LEVEL, null));
         runner.tick(5);
         assertThat(received).as("count threshold met").containsExactly(2);
     }
@@ -41,7 +41,7 @@ class SummarisationRunnerTest {
         List<Integer> received = new ArrayList<>();
         outputBus.subscribe(i -> true, e -> received.add(e.payload()));
 
-        runner.collect(new LevelEvent<>("a", 50, INPUT_LEVEL));
+        runner.collect(new LevelEvent<>("a", 50, INPUT_LEVEL, null));
         runner.tick(60);
         assertThat(received).isEmpty();
     }
@@ -55,7 +55,7 @@ class SummarisationRunnerTest {
         List<LevelEvent<String>> received = new ArrayList<>();
         outputBus.subscribe(s -> true, received::add);
 
-        runner.collect(new LevelEvent<>("a", 10, INPUT_LEVEL));
+        runner.collect(new LevelEvent<>("a", 10, INPUT_LEVEL, null));
         runner.tick(42);
         assertThat(received).hasSize(1);
         assertThat(received.get(0).level()).isEqualTo(OUTPUT_LEVEL);
@@ -69,7 +69,7 @@ class SummarisationRunnerTest {
         var outputBus = new EventStreamBus<Integer>();
         var runner = new SummarisationRunner<>(new WindowPolicy(0, 2), summariser, outputBus, OUTPUT_LEVEL);
 
-        runner.collect(new LevelEvent<>("a", 1, INPUT_LEVEL));
+        runner.collect(new LevelEvent<>("a", 1, INPUT_LEVEL, null));
         runner.clear();
         assertThat(runner.size()).isZero();
     }
@@ -84,7 +84,7 @@ class SummarisationRunnerTest {
         List<Integer> received = new ArrayList<>();
         outputBus.subscribe(i -> true, e -> received.add(e.payload()));
 
-        runner.collect(new LevelEvent<>("a", 1, INPUT_LEVEL));
+        runner.collect(new LevelEvent<>("a", 1, INPUT_LEVEL, null));
         CompletionStage<Void> result = runner.tick(5);
 
         assertThat(result).isNotNull();
@@ -117,7 +117,7 @@ class SummarisationRunnerTest {
         List<String> received = new ArrayList<>();
         outputBus.subscribe(s -> true, e -> received.add(e.payload()));
 
-        runner.collect(new LevelEvent<>("a", 1, INPUT_LEVEL));
+        runner.collect(new LevelEvent<>("a", 1, INPUT_LEVEL, null));
         runner.tick(5);
 
         assertThat(received).isEmpty();
@@ -134,7 +134,7 @@ class SummarisationRunnerTest {
         List<String> received = new ArrayList<>();
         outputBus.subscribe(s -> true, e -> received.add(e.payload()));
 
-        runner.collect(new LevelEvent<>("a", 1, INPUT_LEVEL));
+        runner.collect(new LevelEvent<>("a", 1, INPUT_LEVEL, null));
         runner.tick(5);
 
         assertThat(received).containsExactly("first", "second", "third");
@@ -149,13 +149,13 @@ class SummarisationRunnerTest {
         List<Integer> received = new ArrayList<>();
         outputBus.subscribe(i -> true, e -> received.add(e.payload()));
 
-        runner.collect(new LevelEvent<>("a", 1, INPUT_LEVEL));
-        runner.collect(new LevelEvent<>("b", 2, INPUT_LEVEL));
+        runner.collect(new LevelEvent<>("a", 1, INPUT_LEVEL, null));
+        runner.collect(new LevelEvent<>("b", 2, INPUT_LEVEL, null));
         runner.tick(10);
         assertThat(received).containsExactly(2);
 
-        runner.collect(new LevelEvent<>("c", 3, INPUT_LEVEL));
-        runner.collect(new LevelEvent<>("d", 4, INPUT_LEVEL));
+        runner.collect(new LevelEvent<>("c", 3, INPUT_LEVEL, null));
+        runner.collect(new LevelEvent<>("d", 4, INPUT_LEVEL, null));
         runner.tick(20);
         assertThat(received).containsExactly(2, 2);
     }
@@ -166,12 +166,12 @@ class SummarisationRunnerTest {
         var outputBus = new EventStreamBus<Integer>();
         var runner = new SummarisationRunner<>(new WindowPolicy(0, 2), summariser, outputBus, OUTPUT_LEVEL);
 
-        runner.collect(new LevelEvent<>("a", 1, INPUT_LEVEL));
-        runner.collect(new LevelEvent<>("b", 2, INPUT_LEVEL));
+        runner.collect(new LevelEvent<>("a", 1, INPUT_LEVEL, null));
+        runner.collect(new LevelEvent<>("b", 2, INPUT_LEVEL, null));
         runner.tick(10);
 
         assertThat(runner.size()).as("drained after tick").isZero();
-        runner.collect(new LevelEvent<>("c", 3, INPUT_LEVEL));
+        runner.collect(new LevelEvent<>("c", 3, INPUT_LEVEL, null));
         assertThat(runner.size()).as("new event in fresh window").isEqualTo(1);
     }
 
@@ -186,7 +186,7 @@ class SummarisationRunnerTest {
         List<Integer> received = new ArrayList<>();
         outputBus.subscribe(i -> true, e -> received.add(e.payload()));
 
-        var event = new LevelEvent<>("a", 1, INPUT_LEVEL);
+        var event = new LevelEvent<>("a", 1, INPUT_LEVEL, null);
         runner.collect(event);
         runner.collect(event);
         runner.tick(5);
@@ -204,9 +204,9 @@ class SummarisationRunnerTest {
         List<Integer> received = new ArrayList<>();
         outputBus.subscribe(i -> true, e -> received.add(e.payload()));
 
-        runner.collect(new LevelEvent<>("a", 1, INPUT_LEVEL));
-        runner.collect(new LevelEvent<>("ab", 2, INPUT_LEVEL));
-        runner.collect(new LevelEvent<>("abc", 3, INPUT_LEVEL));
+        runner.collect(new LevelEvent<>("a", 1, INPUT_LEVEL, null));
+        runner.collect(new LevelEvent<>("ab", 2, INPUT_LEVEL, null));
+        runner.collect(new LevelEvent<>("abc", 3, INPUT_LEVEL, null));
         runner.tick(5);
         assertThat(received).as("compactor filtered single-char events").containsExactly(2);
     }
@@ -221,7 +221,7 @@ class SummarisationRunnerTest {
         List<Integer> received = new ArrayList<>();
         outputBus.subscribe(i -> true, e -> received.add(e.payload()));
 
-        runner.collect(new LevelEvent<>("a", 1, INPUT_LEVEL));
+        runner.collect(new LevelEvent<>("a", 1, INPUT_LEVEL, null));
         runner.tick(5);
         assertThat(received).as("summariser called with empty list, publishes 0").containsExactly(0);
     }
@@ -235,7 +235,7 @@ class SummarisationRunnerTest {
         var runner = new SummarisationRunner<>(new WindowPolicy(0, 1),
                                                failingSummariser, outputBus, OUTPUT_LEVEL, recovered::add);
 
-        runner.collect(new LevelEvent<>("a", 1, INPUT_LEVEL));
+        runner.collect(new LevelEvent<>("a", 1, INPUT_LEVEL, null));
         runner.tick(5).toCompletableFuture().join();
 
         assertThat(recovered).as("handler received the failed batch").hasSize(1);
@@ -251,7 +251,7 @@ class SummarisationRunnerTest {
         var runner = new SummarisationRunner<>(new WindowPolicy(0, 1),
                                                failingSummariser, outputBus, OUTPUT_LEVEL, batch -> {});
 
-        runner.collect(new LevelEvent<>("a", 1, INPUT_LEVEL));
+        runner.collect(new LevelEvent<>("a", 1, INPUT_LEVEL, null));
         CompletionStage<Void> result = runner.tick(5);
 
         assertThat(result.toCompletableFuture().isCompletedExceptionally())
@@ -266,7 +266,7 @@ class SummarisationRunnerTest {
         var runner = new SummarisationRunner<>(new WindowPolicy(0, 1),
                                                failingSummariser, outputBus, OUTPUT_LEVEL);
 
-        runner.collect(new LevelEvent<>("a", 1, INPUT_LEVEL));
+        runner.collect(new LevelEvent<>("a", 1, INPUT_LEVEL, null));
         CompletionStage<Void> result = runner.tick(5);
 
         assertThat(result.toCompletableFuture().isCompletedExceptionally())
@@ -283,7 +283,7 @@ class SummarisationRunnerTest {
         var runner = new SummarisationRunner<>(new WindowPolicy(0, 1), dedup,
                                                failingSummariser, outputBus, OUTPUT_LEVEL, recovered::add);
 
-        var event = new LevelEvent<>("a", 1, INPUT_LEVEL);
+        var event = new LevelEvent<>("a", 1, INPUT_LEVEL, null);
         runner.collect(event);
         runner.collect(event);
         runner.tick(5).toCompletableFuture().join();
@@ -319,16 +319,16 @@ class SummarisationRunnerTest {
         List<Integer> received = new ArrayList<>();
         outputBus.subscribe(i -> true, e -> received.add(e.payload()));
 
-        runner.collect(new LevelEvent<>("a", 1, INPUT_LEVEL));
-        runner.collect(new LevelEvent<>("b", 2, INPUT_LEVEL));
+        runner.collect(new LevelEvent<>("a", 1, INPUT_LEVEL, null));
+        runner.collect(new LevelEvent<>("b", 2, INPUT_LEVEL, null));
         runner.tick(10);
         assertThat(received).containsExactly(2);
 
-        runner.collect(new LevelEvent<>("c", 11, INPUT_LEVEL));
+        runner.collect(new LevelEvent<>("c", 11, INPUT_LEVEL, null));
         runner.tick(15);
         assertThat(received).as("one event not enough for second window").containsExactly(2);
 
-        runner.collect(new LevelEvent<>("d", 16, INPUT_LEVEL));
+        runner.collect(new LevelEvent<>("d", 16, INPUT_LEVEL, null));
         runner.tick(20);
         assertThat(received).as("second window fires").containsExactly(2, 2);
     }

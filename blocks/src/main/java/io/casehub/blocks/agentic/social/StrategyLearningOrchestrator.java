@@ -1,6 +1,7 @@
 package io.casehub.blocks.agentic.social;
 
 import io.casehub.blocks.summarisation.ContentSummariser;
+import io.casehub.qhorus.api.spi.SummaryResult;
 import io.casehub.neocortex.memory.cbr.CbrCase;
 import io.casehub.neocortex.memory.cbr.CbrCaseMemoryStore;
 import io.casehub.neocortex.memory.cbr.CbrQuery;
@@ -62,7 +63,7 @@ public class StrategyLearningOrchestrator {
     private final CbrCaseMemoryStore cbrStore;
     private final ReflectionOrchestrator reflectionOrchestrator;
     private final AgentProvider agentProvider;
-    private final @Nullable ContentSummariser<EngagementSignal> summariser;
+    private final @Nullable ContentSummariser<EngagementSignal, SummaryResult> summariser;
     private final StrategyLearningConfig config;
     private final Clock clock;
 
@@ -83,7 +84,7 @@ public class StrategyLearningOrchestrator {
                                   CbrCaseMemoryStore cbrStore,
                                   ReflectionOrchestrator reflectionOrchestrator,
                                   AgentProvider agentProvider,
-                                  @Nullable ContentSummariser<EngagementSignal> summariser,
+                                  @Nullable ContentSummariser<EngagementSignal, SummaryResult> summariser,
                                   StrategyLearningConfig config,
                                   Clock clock) {
         this.strategyStore = strategyStore;

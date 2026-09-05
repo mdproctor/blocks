@@ -57,7 +57,7 @@ class InnerLifeOrchestratorTest {
     }
 
     private LevelEvent<String> event(String text) {
-        return new LevelEvent<>(text, System.currentTimeMillis(), new EventLevel("L1", 1));
+        return new LevelEvent<>(text, System.currentTimeMillis(), new EventLevel("L1", 1), null);
     }
 
     @Test

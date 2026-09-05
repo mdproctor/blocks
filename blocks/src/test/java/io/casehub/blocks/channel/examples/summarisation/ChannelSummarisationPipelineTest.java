@@ -1,8 +1,8 @@
 package io.casehub.blocks.channel.examples.summarisation;
 
+import io.casehub.blocks.summarisation.*;
 import io.casehub.blocks.channel.ChannelEventAdapter;
 import io.casehub.blocks.channel.ChannelEventPublisher;
-import io.casehub.blocks.summarisation.*;
 import io.casehub.platform.api.identity.ActorType;
 import io.casehub.qhorus.api.gateway.MessageReceivedEvent;
 import io.casehub.qhorus.api.message.DispatchResult;
@@ -57,7 +57,7 @@ class ChannelSummarisationPipelineTest {
                 "chain of " + batch.size() + " messages"));
         });
         var keyedRunner = new KeyedSummarisationRunner<>(
-            (ChannelEvent e) -> e.correlationId(),
+            (LevelEvent<ChannelEvent> e) -> e.payload().correlationId(),
             group -> group.stream().anyMatch(e -> e.payload().messageType().isTerminal()),
             0, episodeSummariser, episodeBus, L2);
 
@@ -98,7 +98,7 @@ class ChannelSummarisationPipelineTest {
             return List.of(new Episode(first.correlationId(), batch.size(), "stale"));
         });
         var keyedRunner = new KeyedSummarisationRunner<>(
-            (ChannelEvent e) -> e.correlationId(),
+            (LevelEvent<ChannelEvent> e) -> e.payload().correlationId(),
             group -> group.stream().anyMatch(e -> e.payload().messageType().isTerminal()),
             5000, episodeSummariser, episodeBus, L2);
 
@@ -139,7 +139,7 @@ class ChannelSummarisationPipelineTest {
                 batch.size(), "episode")));
 
         var keyedRunner = new KeyedSummarisationRunner<>(
-            (ChannelEvent e) -> e.correlationId(),
+            (LevelEvent<ChannelEvent> e) -> e.payload().correlationId(),
             group -> group.stream().anyMatch(e -> e.payload().messageType().isTerminal()),
             0, episodeSummariser, episodeBus, L2);
 
@@ -190,8 +190,7 @@ class ChannelSummarisationPipelineTest {
                 .content("Episode: " + event.payload().summary())
                 .build());
 
-        episodeBus.publish(new LevelEvent<>(
-            new Episode("c1", 3, "chain of 3"), 1000, L2));
+        episodeBus.publish(new LevelEvent<>(new Episode("c1", 3, "chain of 3"), 1000, L2, null));
 
         assertThat(dispatched).hasSize(1);
         assertThat(dispatched.get(0).content()).isEqualTo("Episode: chain of 3");

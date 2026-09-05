@@ -17,6 +17,13 @@
   <description>Reusable building blocks for CaseHub applications</description>
 
   <dependencies>
+    <!-- Compile — summarisation API (extracted types) -->
+    <dependency>
+      <groupId>io.casehub</groupId>
+      <artifactId>casehub-blocks-summarisation-api</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
     <!-- Compile — foundation SPIs -->
     <dependency>
       <groupId>io.casehub</groupId>

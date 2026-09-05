@@ -19,7 +19,7 @@ class ChannelSummariserTest {
 
     @Test
     void delegatesToContentSummariser() {
-        ContentSummariser<Message> delegate = (items, prev) ->
+        ContentSummariser<Message, SummaryResult> delegate = (items, prev) ->
                 CompletableFuture.completedFuture(
                         SummaryResult.ofText("delegated:" + items.size()));
         var hook = new ChannelSummariser(delegate);
@@ -35,7 +35,7 @@ class ChannelSummariserTest {
 
     @Test
     void emptyMessages_returnsPreviousResult() {
-        ContentSummariser<Message> delegate = (items, prev) -> {
+        ContentSummariser<Message, SummaryResult> delegate = (items, prev) -> {
             throw new AssertionError("should not be called");
         };
         var hook = new ChannelSummariser(delegate);
@@ -48,7 +48,7 @@ class ChannelSummariserTest {
 
     @Test
     void nullMessages_returnsEmptyResult() {
-        ContentSummariser<Message> delegate = (items, prev) -> {
+        ContentSummariser<Message, SummaryResult> delegate = (items, prev) -> {
             throw new AssertionError("should not be called");
         };
         var hook = new ChannelSummariser(delegate);
@@ -61,7 +61,7 @@ class ChannelSummariserTest {
     @Test
     void passesPreviousResultToDelegate() {
         var captured = new java.util.concurrent.atomic.AtomicReference<SummaryResult>();
-        ContentSummariser<Message> delegate = (items, prev) -> {
+        ContentSummariser<Message, SummaryResult> delegate = (items, prev) -> {
             captured.set(prev);
             return CompletableFuture.completedFuture(SummaryResult.ofText("ok"));
         };
