@@ -24,18 +24,19 @@ final class WavReader {
         }
 
         ByteBuffer buf = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
-        buf.position(4); // skip RIFF already checked
+        buf.position(4);
         buf.getInt(); // file size
 
         if (buf.get() != 'W' || buf.get() != 'A' || buf.get() != 'V' || buf.get() != 'E') {
             throw new IOException("Not a WAV file: missing WAVE marker");
         }
 
-        // Find and parse fmt chunk
         int audioFormat   = -1;
         int channels      = -1;
         int sampleRate    = -1;
         int bitsPerSample = -1;
+        int dataChunkPos  = -1;
+        int dataChunkSize = -1;
 
         while (buf.remaining() >= 8) {
             int chunkId   = buf.getInt();
@@ -46,24 +47,29 @@ final class WavReader {
                 audioFormat = Short.toUnsignedInt(buf.getShort());
                 channels    = Short.toUnsignedInt(buf.getShort());
                 sampleRate  = buf.getInt();
-                buf.getInt(); // byte rate
-                buf.getShort(); // block align
+                buf.getInt();
+                buf.getShort();
                 bitsPerSample = Short.toUnsignedInt(buf.getShort());
                 int extra = chunkSize - 16;
                 if (extra > 0) {buf.position(buf.position() + extra);}
             } else if (chunkId == chunkId("data")) {
-                if (audioFormat != 1) {
-                    throw new IOException("Unsupported audio format (expected PCM/1, got " + audioFormat + ")");
+                if (audioFormat != -1) {
+                    if (audioFormat != 1) {
+                        throw new IOException("Unsupported audio format (expected PCM/1, got " + audioFormat + ")");
+                    }
+                    if (bitsPerSample != 16) {
+                        throw new IOException("Unsupported bits per sample: " + bitsPerSample + " (expected 16)");
+                    }
+                    int     sampleCount = chunkSize / 2;
+                    float[] samples     = new float[sampleCount];
+                    for (int i = 0; i < sampleCount; i++) {
+                        samples[i] = buf.getShort() / 32768f;
+                    }
+                    return new WavData(samples, sampleRate, channels);
                 }
-                if (bitsPerSample != 16) {
-                    throw new IOException("Unsupported bits per sample: " + bitsPerSample + " (expected 16)");
-                }
-                int     sampleCount = chunkSize / 2;
-                float[] samples     = new float[sampleCount];
-                for (int i = 0; i < sampleCount; i++) {
-                    samples[i] = buf.getShort() / 32768f;
-                }
-                return new WavData(samples, sampleRate, channels);
+                dataChunkPos  = buf.position();
+                dataChunkSize = chunkSize;
+                buf.position(buf.position() + chunkSize);
             } else {
                 buf.position(buf.position() + chunkSize);
             }
@@ -73,8 +79,20 @@ final class WavReader {
         if (audioFormat != 1) {
             throw new IOException("Unsupported audio format (expected PCM/1, got " + audioFormat + ")");
         }
-        return new WavData(new float[0], sampleRate, channels);
-    }
+        if (bitsPerSample != 16) {
+            throw new IOException("Unsupported bits per sample: " + bitsPerSample + " (expected 16)");
+        }
+        if (dataChunkPos == -1) {
+            return new WavData(new float[0], sampleRate, channels);
+        }
+
+        buf.position(dataChunkPos);
+        int     sampleCount = dataChunkSize / 2;
+        float[] samples     = new float[sampleCount];
+        for (int i = 0; i < sampleCount; i++) {
+            samples[i] = buf.getShort() / 32768f;
+        }
+        return new WavData(samples, sampleRate, channels);}
 
     private static int chunkId(String id) {
         return ByteBuffer.wrap(id.getBytes()).order(ByteOrder.LITTLE_ENDIAN).getInt();
