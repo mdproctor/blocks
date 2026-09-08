@@ -1,0 +1,24 @@
+type: htn
+rootTask:
+  type: compound
+  name: main-task
+  subtasks:
+    - type: primitive
+      name: gather-data
+      executor: data-agent
+    - type: compound
+      name: process
+      subtasks:
+        - type: primitive
+          name: clean
+          executor: cleaner-agent
+        - type: primitive
+          name: analyse
+          executor: analyst-agent
+agents:
+  - type: worker
+    name: data-agent
+  - type: worker
+    name: cleaner-agent
+  - type: worker
+    name: analyst-agent

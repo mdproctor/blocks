@@ -1,0 +1,11 @@
+type: debate
+maxRounds: 7
+judge:
+  type: worker
+  name: arbiter
+  description: "Resolves disputed points"
+agents:
+  - type: worker
+    name: proponent
+  - type: worker
+    name: opponent

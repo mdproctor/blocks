@@ -1,0 +1,6 @@
+type: loop
+maxIterations: 15
+exitCondition: "qualityScore > 0.9"
+agents:
+  - type: worker
+    name: improver

@@ -1,0 +1,8 @@
+type: parallel
+agents:
+  - type: worker
+    name: researcher-1
+  - type: worker
+    name: researcher-2
+  - type: worker
+    name: researcher-3

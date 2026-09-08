@@ -1,0 +1,15 @@
+type: conditional
+branches:
+  - condition: "category == 'medical'"
+    agent:
+      type: worker
+      name: medical-expert
+  - condition: "category == 'legal'"
+    agent:
+      type: worker
+      name: legal-expert
+agents:
+  - type: worker
+    name: medical-expert
+  - type: worker
+    name: legal-expert

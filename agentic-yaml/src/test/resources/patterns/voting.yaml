@@ -1,0 +1,8 @@
+type: voting
+agents:
+  - type: worker
+    name: evaluator-1
+  - type: worker
+    name: evaluator-2
+  - type: worker
+    name: evaluator-3
