@@ -52,6 +52,9 @@ No Quarkus runtime — plain JUnit 5 tests with Mockito. No CDI container in tes
 | `summarisation-yaml/src/main/java/io/casehub/blocks/summarisation/yaml/builtin/` | Built-in summariser types — `ThresholdClassifySummariser` (per-event MVEL3 predicates), `PhaseDetectSummariser` (stateful state machine with structured predicates), `CountSummariser`, `FieldExtractSummariser`, `BatchContext`/`BatchContextView` |
 | `summarisation-yaml/src/test/java/io/casehub/blocks/summarisation/yaml/` | Tests for YAML surface |
 | `summarisation-yaml-deployment/src/main/java/io/casehub/blocks/summarisation/yaml/deployment/` | Quarkus deployment module — `SummarisationYamlProcessor` (YAML discovery, validation), `SummarisationRecorder` (runtime bean registration) |
+| `agentic-yaml/src/main/java/io/casehub/blocks/agentic/yaml/` | YAML surface for agentic orchestration — `PatternSpec` (8 topologies), `RoutingSpec`, `TerminationSpec`, `AggregationSpec`, `ActivationSpec`, `DecompositionSpec`, `AgentRefSpec` sealed record hierarchies, `PatternCompiler` (spec → `ExecutionModel`), strategy registries, `BlocksSchemaGenerator` (victools schema from spec records), `JudgmentSpec`, `NegotiationSpec`, `ConversationSpec`, `ConflictResolutionSpec` |
+| `agentic-yaml/src/test/java/io/casehub/blocks/agentic/yaml/` | Tests for YAML agentic surface |
+| `agentic-yaml-deployment/src/main/java/io/casehub/blocks/agentic/yaml/deployment/` | Quarkus deployment module — `AgenticYamlProcessor` (YAML discovery, validation), `AgenticRecorder` (runtime compiler registration) |
 | `docs/summarisation/CAPABILITY-MATRIX.md` | Summarisation capability matrix — maps 29 capabilities across 11 examples |
 | `src/main/java/io/casehub/blocks/attestation/` | Attestation write-path types — `AttestationIntent`, `AttestationIntentWriter` (+ `NoOpAttestationIntentWriter` `@DefaultBean`), `LifecycleAttestationObserver<E>` SPI, `AttestationContext` |
 | `src/test/java/io/casehub/blocks/attestation/` | Tests for attestation types |
@@ -565,6 +568,11 @@ Consumers that only use blocks' pure types (records, sealed interfaces, plain cl
 **summarisation-yaml module:**
 **Compile:** `casehub-blocks-summarisation-api`, `casehub-blocks-cloudevents`, `com.fasterxml.jackson.dataformat:jackson-dataformat-yaml`
 **Provided:** `casehub-platform-api` (ExpressionEngine SPI), `io.quarkus:quarkus-core` (recorder annotation)
+**Test:** JUnit 5, AssertJ, `casehub-platform-expression` (MvelExpressionEngine)
+
+**agentic-yaml module:**
+**Compile:** `casehub-blocks`, `jackson-dataformat-yaml`, `jackson-datatype-jsr310`, `casehub-platform-schema-generator`
+**Provided:** `casehub-platform-api` (ExpressionEngine SPI), `io.quarkus:quarkus-core`
 **Test:** JUnit 5, AssertJ, `casehub-platform-expression` (MvelExpressionEngine)
 
 **speech-sherpa module:**

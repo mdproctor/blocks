@@ -485,6 +485,43 @@ Affordance grounding -- per-entity observation rendering for LLM agents.
 | `ObservationPipeline` | class | Ordered `ObservationFilter` composition. `apply(sections, agentTags)` runs all stages, then unwraps `AnnotatedSection` to base `ObservationSection`. |
 | `PerceptionFilter` | class | Built-in `ObservationFilter`: visibility gating (drop sections whose `requiredTags` don't intersect `agentTags`) + resolution fallback (degrade to lower `ResolutionTier` on partial match). |
 
+### `io.casehub.blocks.agentic.yaml` (module: `blocks-agentic-yaml`)
+
+YAML surface for agentic orchestration patterns — makes all 8 pattern topologies YAML-expressible via typed spec records, strategy registries, and a pattern compiler.
+
+| Class | Type | What it does |
+|-------|------|-------------|
+| `PatternSpec` | sealed interface | 8 topology subtypes (Supervisor, Debate, Loop, Parallel, Voting, Conditional, Sequence, Htn) with shared concern fields (routing, termination, aggregation, activation, decomposition, failurePolicy, agents, judgment). Jackson `@JsonTypeInfo` discriminated. |
+| `RoutingSpec` | sealed interface | 5 subtypes: FirstMatch (with optional guard expression), RoundRobin, Sequential, LlmSelected, SelectAll |
+| `TerminationSpec` | sealed interface | 9 subtypes: MaxIterations, GoalReached, JudgeConvergence, AllAgreed, Supervisor, Contested, Convergence, SinglePass, AgentCount |
+| `AggregationSpec` | sealed interface | 4 subtypes: PassThrough, CollectAll, MajorityVote, Auction |
+| `AgentRefSpec` | sealed interface | 5 subtypes: Worker, Channel, Human, External, Composed (recursive — holds nested `PatternSpec`) |
+| `PatternCompiler` | class | `compile(PatternSpec) → ExecutionModel<T>`. Resolves spec records to live runtime objects via registries. Applies pattern-specific defaults. |
+| `BlocksSchemaGenerator` | class | `generate(Class<?>) → JsonNode`. Produces JSON Schema from spec record sealed hierarchies via victools with Jackson-aligned discriminator names. |
+
+**Quick start — declare a pattern in YAML:**
+```yaml
+type: supervisor
+routing:
+  type: round-robin
+termination:
+  - type: max-iterations
+    iterations: 10
+agents:
+  - type: worker
+    name: analyst
+  - type: worker
+    name: reviewer
+```
+
+**Compile to ExecutionModel:**
+```java
+var mapper = new ObjectMapper(new YAMLFactory());
+var spec = mapper.readValue(yaml, PatternSpec.class);
+var compiler = new PatternCompiler(expressionEngine);
+ExecutionModel<?> model = compiler.compile(spec);
+```
+
 ### `io.casehub.blocks.speech` (module: `blocks-speech-api`)
 
 Speech pipeline SPIs — provider-agnostic interfaces for audio, prompt assembly, and avatar cognition. Zero foundation dependencies.
