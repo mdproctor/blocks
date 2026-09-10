@@ -7,6 +7,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class StrategySpecSerializationTest {
@@ -297,6 +299,35 @@ class StrategySpecSerializationTest {
             var spec = mapper.readValue(yaml, AgentRefSpec.class);
             assertThat(spec).isInstanceOf(AgentRefSpec.Channel.class);
             assertThat(((AgentRefSpec.Channel) spec).channelId()).isEqualTo("ch-123");
+        }
+    }
+
+    @Nested
+    class NegotiationTerminationSpecs {
+        @Test
+        void acceptedTermination() throws Exception {
+            var yaml = "type: accepted";
+            var spec = mapper.readValue(yaml, TerminationSpec.class);
+            assertThat(spec).isInstanceOf(TerminationSpec.Accepted.class);
+        }
+
+        @Test
+        void terminalOutcome() throws Exception {
+            var yaml = "type: terminal-outcome";
+            var spec = mapper.readValue(yaml, TerminationSpec.class);
+            assertThat(spec).isInstanceOf(TerminationSpec.TerminalOutcome.class);
+        }
+
+        @Test
+        void deadlineWithTimeout() throws Exception {
+            var yaml = """
+                    type: deadline
+                    timeout: PT30M
+                    """;
+            var spec = mapper.readValue(yaml, TerminationSpec.class);
+            assertThat(spec).isInstanceOf(TerminationSpec.Deadline.class);
+            assertThat(((TerminationSpec.Deadline) spec).timeout())
+                    .isEqualTo(Duration.ofMinutes(30));
         }
     }
 }

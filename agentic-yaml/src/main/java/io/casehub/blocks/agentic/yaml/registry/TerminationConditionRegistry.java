@@ -7,6 +7,9 @@ import io.casehub.blocks.agentic.yaml.spec.TerminationSpec;
 import io.casehub.blocks.conversation.orchestration.AllAgreedTermination;
 import io.casehub.blocks.conversation.orchestration.ContestedEscalation;
 import io.casehub.blocks.conversation.orchestration.SupervisorTermination;
+import io.casehub.blocks.negotiation.AcceptedTermination;
+import io.casehub.blocks.negotiation.DeadlineTermination;
+import io.casehub.blocks.negotiation.TerminalOutcomeTermination;
 import io.casehub.platform.api.expression.ExpressionEngine;
 import org.jspecify.annotations.Nullable;
 
@@ -52,6 +55,13 @@ public class TerminationConditionRegistry {
             case TerminationSpec.AgentCount ac ->
                     throw new UnsupportedOperationException(
                             "agent-count resolved by PatternCompiler (needs agent list)");
+            case TerminationSpec.Accepted ignored ->
+                    (TerminationCondition<T>) new AcceptedTermination();
+            case TerminationSpec.TerminalOutcome ignored ->
+                    (TerminationCondition<T>) new TerminalOutcomeTermination();
+            case TerminationSpec.Deadline dl ->
+                    (TerminationCondition<T>) new DeadlineTermination(
+                            java.time.Instant.now().plus(dl.timeout()));
         };
     }
 }

@@ -6,6 +6,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;
 import org.jspecify.annotations.Nullable;
 
+import java.time.Duration;
 import java.util.Set;
 
 @JsonTypeInfo(use = Id.NAME, property = "type")
@@ -18,7 +19,10 @@ import java.util.Set;
         @Type(value = TerminationSpec.Contested.class, name = "contested"),
         @Type(value = TerminationSpec.Convergence.class, name = "convergence"),
         @Type(value = TerminationSpec.SinglePass.class, name = "single-pass"),
-        @Type(value = TerminationSpec.AgentCount.class, name = "agent-count")
+        @Type(value = TerminationSpec.AgentCount.class, name = "agent-count"),
+        @Type(value = TerminationSpec.Accepted.class, name = "accepted"),
+        @Type(value = TerminationSpec.TerminalOutcome.class, name = "terminal-outcome"),
+        @Type(value = TerminationSpec.Deadline.class, name = "deadline")
 })
 public sealed interface TerminationSpec {
 
@@ -39,4 +43,10 @@ public sealed interface TerminationSpec {
     record SinglePass() implements TerminationSpec {}
 
     record AgentCount() implements TerminationSpec {}
+
+    record Accepted() implements TerminationSpec {}
+
+    record TerminalOutcome() implements TerminationSpec {}
+
+    record Deadline(Duration timeout) implements TerminationSpec {}
 }

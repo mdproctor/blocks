@@ -64,21 +64,21 @@ and their implementation status. Update as gaps close.
 | Turn policies (RoundRobin, Addressed, PointAddressed, Free) | Done | |
 | Epistemic rules (ExplicitAcknowledgement, TacitAcceptance, CommitmentResolution) | Done | |
 | Convergence policies (Structural, CommonGroundRatio, Composite) | Done | |
-| Conversation compiler (ConversationOrchestrator wiring) | Gap | Needs AgentParticipant spec + default PromptAssembler |
-| Agent participants (name, role, systemPrompt) | Gap | Key type for conversation YAML |
-| Conversation protocol config (sentinel, entry types) | Gap | ConversationProjection config |
-| Progress renderer types (percentage, count, step) | Gap | DefaultProgressRenderer named types |
+| Conversation compiler (ConversationOrchestrator wiring) | Done | #249 — ConversationCompiler + CompiledConversation |
+| Agent participants (name, role, systemPrompt) | Done | #249 — AgentParticipantSpec |
+| Conversation protocol config (sentinel, entry types) | Done | #249 — ConversationProtocolSpec |
+| Progress renderer types (percentage, count, step) | Done | #249 — ProgressRendererSpec |
 
 ### 5. Negotiation
 
 | Capability | Status | Notes |
 |-----------|--------|-------|
 | Acceptance policies (Unanimous, Majority, Threshold) | Done | |
-| NegotiationSpec (parties, acceptance, termination) | Spec only | No compiler |
-| AcceptedTermination | Gap | Terminal on AGREED |
-| TerminalOutcomeTermination | Gap | Terminal on AGREED/DEADLOCKED/WITHDRAWN |
-| DeadlineTermination (timeout) | Gap | `timeout: PT30M` |
-| NegotiationProjection (parties + acceptance) | Gap | Fully declarative, no compiler |
+| NegotiationSpec (parties, acceptance, termination) | Done | #249 — NegotiationCompiler + CompiledNegotiation |
+| AcceptedTermination | Done | #249 — TerminationSpec.Accepted |
+| TerminalOutcomeTermination | Done | #249 — TerminationSpec.TerminalOutcome |
+| DeadlineTermination (timeout) | Done | #249 — TerminationSpec.Deadline (Duration) |
+| NegotiationProjection (parties + acceptance) | Done | #249 — compiled via NegotiationCompiler |
 
 ### 6. Normative Conflict Resolution
 
@@ -208,10 +208,10 @@ and their implementation status. Update as gaps close.
 
 | Capability | Status | Notes |
 |-----------|--------|-------|
-| ChannelBinding (channelId, semantic) | Gap | Channel identity |
-| ChannelExecutionStrategy (Conversation / FanIn / Barrier) | Gap | Sealed — pure config |
-| AgentParticipant (name, role, systemPrompt) | Gap | Participant declaration |
-| ConversationProtocol config (sentinel, entry types) | Gap | Message protocol |
+| ChannelBinding (channelId, semantic) | Done | #249 — ChannelBindingSpec |
+| ChannelExecutionStrategy (Conversation / FanIn / Barrier) | Partial | #249 — Conversation Done; FanIn/Barrier code-only (Function params) |
+| AgentParticipant (name, role, systemPrompt) | Done | #249 — AgentParticipantSpec |
+| ConversationProtocol config (sentinel, entry types) | Done | #249 — ConversationProtocolSpec |
 
 ### 17. Prompt Optimisation
 
@@ -329,8 +329,8 @@ and their implementation status. Update as gaps close.
 | Module | Section | Total capabilities | Done | Spec only | Gap | Partial | Code-only |
 |--------|---------|-------------------|------|-----------|-----|---------|-----------|
 | agentic-yaml | Patterns (1-3) | 41 | **41** | — | — | — | — |
-| agentic-yaml | Conversation (4) | 7 | 3 | — | **4** | — | — |
-| agentic-yaml | Negotiation (5) | 6 | 1 | 1 | **4** | — | — |
+| agentic-yaml | Conversation (4) | 7 | **7** | — | — | — | — |
+| agentic-yaml | Negotiation (5) | 6 | **6** | — | — | — | — |
 | agentic-yaml | Normative (6) | 5 | **5** | — | — | — | — |
 | agentic-yaml | Expression/infra (7-8) | 7 | **4** | — | **3** | — | — |
 | summarisation-yaml | Pipeline (9-10) | 13 | **10** | — | **3** | — | — |
@@ -339,7 +339,7 @@ and their implementation status. Update as gaps close.
 | summarisation-api | Core (13) | 9 | **3** | — | **1** | — | 5 |
 | blocks | Social configs (14) | 13 | **13** | — | — | — | — |
 | blocks | Affordance (15) | 8 | **7** | — | — | 1 | — |
-| blocks | Channel (16) | 4 | — | — | **4** | — | — |
+| blocks | Channel (16) | 4 | **3** | — | — | 1 | — |
 | blocks | Prompt optim (17) | 8 | — | — | **8** | — | — |
 | blocks | Execution (18) | 6 | — | — | **6** | — | — |
 | blocks | Trust/routing (19) | 6 | — | — | **6** | — | — |
@@ -349,8 +349,8 @@ and their implementation status. Update as gaps close.
 | speech-ws | Avatar (23) | 2 | — | — | **2** | — | — |
 | speech-sherpa | Models (24) | 4 | — | — | **4** | — | — |
 | annotations | Governance (25) | 3 | — | — | **3** | — | — |
-| **Total** | | **165** | **71** | **1** | **84** | **3** | **6** |
+| **Total** | | **165** | **83** | — | **72** | **4** | **6** |
 
-**Coverage: 71/165 (43%).** The pattern orchestration layer is complete.
-The application configuration layer — channels, prompt tuning, speech,
-summarisation extensions — is 84 capabilities wide open.
+**Coverage: 83/165 (50%).** Pattern orchestration, conversation, negotiation,
+and channel layers are complete. Remaining gaps: prompt tuning, execution
+infrastructure, trust/routing, oversight, engine adapter, speech.
