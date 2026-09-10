@@ -1,0 +1,14 @@
+type: supervisor
+routing:
+  type: first-match
+  guard: "ref.name() == \"specialist\""
+termination:
+  - type: goal-reached
+    when: "completed == true"
+  - type: max-iterations
+    iterations: 10
+agents:
+  - type: worker
+    name: specialist
+  - type: worker
+    name: generalist

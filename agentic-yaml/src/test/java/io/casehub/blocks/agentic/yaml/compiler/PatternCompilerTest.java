@@ -113,6 +113,16 @@ class PatternCompilerTest {
         assertThat(model.candidateSupplier().get()).hasSize(3);
     }
 
+
+    @Test
+    void compilesSupervisorWithExpressions() throws IOException {
+        var spec  = loadPattern("supervisor-with-expressions");
+        var model = compiler.compile(spec);
+        assertThat(model.patternType()).isEqualTo(PatternType.SUPERVISOR);
+        assertThat(model.routing()).isInstanceOf(FirstMatchRouting.class);
+        assertThat(model.candidateSupplier().get()).hasSize(2);
+    }
+
     @Test
     void compilesComposedAgent() throws IOException {
         var yaml = """

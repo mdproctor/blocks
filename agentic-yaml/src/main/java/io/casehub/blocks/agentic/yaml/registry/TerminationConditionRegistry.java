@@ -1,5 +1,6 @@
 package io.casehub.blocks.agentic.yaml.registry;
 
+import io.casehub.blocks.agentic.termination.GoalReached;
 import io.casehub.blocks.agentic.termination.MaxIterationsTermination;
 import io.casehub.blocks.agentic.termination.TerminationCondition;
 import io.casehub.blocks.agentic.yaml.spec.TerminationSpec;
@@ -9,6 +10,7 @@ import io.casehub.blocks.conversation.orchestration.SupervisorTermination;
 import io.casehub.platform.api.expression.ExpressionEngine;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Map;
 import java.util.Set;
 
 public class TerminationConditionRegistry {
@@ -19,10 +21,17 @@ public class TerminationConditionRegistry {
         return switch (spec) {
             case TerminationSpec.MaxIterations mi ->
                     new MaxIterationsTermination<>(mi.iterations());
-            case TerminationSpec.GoalReached gr ->
-                    throw new UnsupportedOperationException(
-                            "goal-reached requires runtime expression compilation — " +
-                            "use PatternCompiler with CDI-provided ExpressionEngine");
+            case TerminationSpec.GoalReached gr -> {
+                if (engine == null) {
+                    throw new IllegalStateException(
+                            "GoalReached requires ExpressionEngine for predicate compilation");
+                }
+                @SuppressWarnings("unchecked")
+                var compiled = engine.compile(gr.when(),
+                        (Class<Map<String, Object>>) (Class<?>) Map.class, Boolean.class);
+                yield (TerminationCondition<T>) new GoalReached<>(
+                        state -> Boolean.TRUE.equals(compiled.eval((Map<String, Object>) state)));
+            }
             case TerminationSpec.JudgeConvergence jc ->
                     throw new UnsupportedOperationException(
                             "judge-convergence resolved by PatternCompiler (needs agent ref)");

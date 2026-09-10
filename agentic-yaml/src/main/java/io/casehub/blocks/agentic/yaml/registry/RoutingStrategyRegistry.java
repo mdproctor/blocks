@@ -1,6 +1,9 @@
 package io.casehub.blocks.agentic.yaml.registry;
 
 import io.casehub.blocks.agentic.routing.FirstMatchRouting;
+
+import java.util.HashMap;
+import java.util.Map;
 import io.casehub.blocks.agentic.routing.RoundRobinRouting;
 import io.casehub.blocks.agentic.routing.RoutingStrategy;
 import io.casehub.blocks.agentic.routing.SelectAllRouting;
@@ -14,7 +17,19 @@ public class RoutingStrategyRegistry {
     @SuppressWarnings("unchecked")
     public <T> RoutingStrategy<T> resolve(RoutingSpec spec, @Nullable ExpressionEngine engine) {
         return switch (spec) {
-            case RoutingSpec.FirstMatch fm -> new FirstMatchRouting<>(c -> true);
+            case RoutingSpec.FirstMatch fm -> {
+                if (fm.guard() != null && engine != null) {
+                    var compiled = engine.compile(fm.guard(),
+                            (Class<Map<String, Object>>) (Class<?>) Map.class, Boolean.class);
+                    yield new FirstMatchRouting<>(c -> {
+                        var map = new HashMap<String, Object>();
+                        map.put("ref", c.ref());
+                        map.put("descriptor", c.descriptor());
+                        return Boolean.TRUE.equals(compiled.eval(map));
+                    });
+                }
+                yield new FirstMatchRouting<>(c -> true);
+            }
             case RoutingSpec.RoundRobin rr -> new RoundRobinRouting<>();
             case RoutingSpec.Sequential seq -> new SequentialRouting<>();
             case RoutingSpec.LlmSelected llm ->

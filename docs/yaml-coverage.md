@@ -90,10 +90,10 @@ and their implementation status. Update as gaps close.
 
 | Capability | Status | Issue |
 |-----------|--------|-------|
-| Type-safe MVEL per expression site | Gap | #242 |
-| Guard → RoutingCandidate context | Gap | #242 |
-| GoalReached → Map context | Gap | #242 |
-| ConfidenceThreshold → JudgmentContext | Gap | #242 |
+| Type-safe MVEL per expression site | Done | #242 |
+| Guard → RoutingCandidate context (Map projection) | Done | #242 |
+| GoalReached → Map context | Done | #242 |
+| ConfidenceThreshold → JudgmentContext (Map projection) | Done | #242 |
 
 ### 8. Schema & Infrastructure
 
@@ -332,7 +332,7 @@ and their implementation status. Update as gaps close.
 | agentic-yaml | Conversation (4) | 7 | 3 | — | **4** | — | — |
 | agentic-yaml | Negotiation (5) | 6 | 1 | 1 | **4** | — | — |
 | agentic-yaml | Normative (6) | 5 | **5** | — | — | — | — |
-| agentic-yaml | Expression/infra (7-8) | 7 | — | — | **7** | — | — |
+| agentic-yaml | Expression/infra (7-8) | 7 | **4** | — | **3** | — | — |
 | summarisation-yaml | Pipeline (9-10) | 13 | **10** | — | **3** | — | — |
 | summarisation-yaml | Extensions (11) | 4 | 1 | — | **2** | 1 | — |
 | cloudevents | Bridge (12) | 4 | — | — | **3** | — | 1 |
