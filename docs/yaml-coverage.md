@@ -195,14 +195,14 @@ and their implementation status. Update as gaps close.
 
 | Capability | Status | Notes |
 |-----------|--------|-------|
-| ObservableEntity (id, name, description, affordances) | Gap | Things an agent can see |
-| Affordance (actionType, label, requiredItem, acceptsItems) | Gap | Actions on entities |
-| ActionDescriptor (type, description, parameterFormat) | Gap | Action vocabulary |
-| ObservationSection (sealed: EntityGroup / TextBlock / ItemList) | Gap | World structure |
-| AnnotatedSection (requiredTags, resolution alternatives) | Gap | Capability-gated sections |
-| ObservationPipeline (ordered filter chain) | Gap | Perception pipeline |
-| PerceptionFilter (agentTags for visibility gating) | Gap | Named filter type |
-| TieredObservationRenderer (tier thresholds) | Partial | Thresholds YAML; renderer + key extractor code |
+| ObservableEntity (id, name, description, affordances) | Done | #248 — EntitySpec + InlineEntitySpec |
+| Affordance (actionType, label, requiredItem, acceptsItems) | Done | #248 — AffordanceSpec |
+| ActionDescriptor (type, description, parameterFormat) | Done | #248 — ActionDescriptorSpec |
+| ObservationSection (sealed: EntityGroup / TextBlock / ItemList) | Done | #248 — ObservationSectionSpec polymorphic |
+| AnnotatedSection (requiredTags, resolution alternatives) | Done | #248 — inline annotation properties on section specs |
+| ObservationPipeline (ordered filter chain) | Done | #248 — ObservationFilterSpec + ObservationFilterRegistry |
+| PerceptionFilter (agentTags for visibility gating) | Done | #248 — PerceptionSpec named type |
+| TieredObservationRenderer (tier thresholds) | Partial | Thresholds Done (#248 RendererSpec); renderer + key extractor code-only |
 
 ### 16. Channel Infrastructure
 
@@ -338,7 +338,7 @@ and their implementation status. Update as gaps close.
 | cloudevents | Bridge (12) | 4 | — | — | **3** | — | 1 |
 | summarisation-api | Core (13) | 9 | **3** | — | **1** | — | 5 |
 | blocks | Social configs (14) | 13 | **13** | — | — | — | — |
-| blocks | Affordance (15) | 8 | — | — | **7** | 1 | — |
+| blocks | Affordance (15) | 8 | **7** | — | — | 1 | — |
 | blocks | Channel (16) | 4 | — | — | **4** | — | — |
 | blocks | Prompt optim (17) | 8 | — | — | **8** | — | — |
 | blocks | Execution (18) | 6 | — | — | **6** | — | — |
@@ -349,8 +349,8 @@ and their implementation status. Update as gaps close.
 | speech-ws | Avatar (23) | 2 | — | — | **2** | — | — |
 | speech-sherpa | Models (24) | 4 | — | — | **4** | — | — |
 | annotations | Governance (25) | 3 | — | — | **3** | — | — |
-| **Total** | | **165** | **64** | **1** | **91** | **3** | **6** |
+| **Total** | | **165** | **71** | **1** | **84** | **3** | **6** |
 
-**Coverage: 64/165 (39%).** The pattern orchestration layer is complete.
-The application configuration layer — social cognition, affordances, channels,
-prompt tuning, speech, summarisation extensions — is 91 capabilities wide open.
+**Coverage: 71/165 (43%).** The pattern orchestration layer is complete.
+The application configuration layer — channels, prompt tuning, speech,
+summarisation extensions — is 84 capabilities wide open.

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.casehub.blocks.agentic.yaml.spec.PatternSpec;
+import io.casehub.blocks.agentic.yaml.spec.world.WorldDefinition;
 import io.quarkus.deployment.annotations.BuildStep;
 import io.quarkus.deployment.builditem.HotDeploymentWatchedFileBuildItem;
 
@@ -63,6 +64,17 @@ public class AgenticYamlProcessor {
         }
 
         return new AgenticPatternsBuildItem(patterns);
+    }
+
+    @BuildStep
+    WorldConfigBuildItem discoverWorldConfig() throws IOException {
+        ClassLoader cl       = Thread.currentThread().getContextClassLoader();
+        URL         resource = cl.getResource("META-INF/world.yaml");
+        if (resource == null) {return new WorldConfigBuildItem(null);}
+        try (InputStream in = resource.openStream()) {
+            var definition = YAML.readValue(in, WorldDefinition.class);
+            return new WorldConfigBuildItem(definition);
+        }
     }
 
     @BuildStep
