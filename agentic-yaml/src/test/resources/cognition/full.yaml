@@ -1,0 +1,26 @@
+drive:
+  changeThreshold: 0.1
+mood:
+  maxDisplacement: 0.8
+personality:
+  decayFactor: 0.05
+userModel:
+  minSignalsForSynthesis: 10
+strategyLearning:
+  maxGuidelines: 20
+mentalModel:
+  confidenceFloor: 0.2
+narrative:
+  maxEpisodes: 100
+  synthesisGate:
+    minNewReflections: 3
+goalProposal:
+  proposalThreshold: 0.5
+goalEscalation:
+  escalationCycles: 3
+normDetection:
+  minObservationsForNorm: 20
+collectiveGoal:
+  alignmentThreshold: 0.7
+retention:
+  recencyWeight: 0.5

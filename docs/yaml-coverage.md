@@ -177,19 +177,19 @@ and their implementation status. Update as gaps close.
 
 | Config | What it controls | Status |
 |--------|-----------------|--------|
-| `DriveConfig` | Intrinsic motivation axis weights, thresholds, modulation | Gap |
-| `MoodConfig` | PAD emotional baseline, decay, influence | Gap |
-| `PersonalityEvolutionConfig` | Trait drift rate, dampening, L2 ceiling | Gap |
-| `UserModelConfig` | Per-user profile signals, cooldown, decay, stage tiers | Gap |
-| `StrategyLearningConfig` | Interaction strategy adaptation rates | Gap |
-| `MentalModelConfig` | Theory of Mind confidence, projection | Gap |
-| `NarrativeConfig` | Episode/theme capacity, salience, reflection cap | Gap |
-| `NarrativeSynthesisGate` | Synthesis trigger: count + novelty + quiet period | Gap |
-| `GoalProposalConfig` | Autonomous goal thresholds, capacity, cooldown | Gap |
-| `GoalEscalationConfig` | Priority escalation weights and cycles | Gap |
-| `NormDetectionConfig` | Social norm emergence thresholds, min agents | Gap |
-| `CollectiveGoalConfig` | Group goal alignment threshold, cooldown | Gap |
-| `RetentionConfig` | Memory eviction scoring weights | Gap |
+| `DriveConfig` | Intrinsic motivation axis weights, thresholds, modulation | Done | #247 |
+| `MoodConfig` | PAD emotional baseline, decay, influence | Done | #247 |
+| `PersonalityEvolutionConfig` | Trait drift rate, dampening, L2 ceiling | Done | #247 |
+| `UserModelConfig` | Per-user profile signals, cooldown, decay, stage tiers | Done | #247 |
+| `StrategyLearningConfig` | Interaction strategy adaptation rates | Done | #247 |
+| `MentalModelConfig` | Theory of Mind confidence, projection | Done | #247 |
+| `NarrativeConfig` | Episode/theme capacity, salience, reflection cap | Done | #247 |
+| `NarrativeSynthesisGate` | Synthesis trigger: count + novelty + quiet period | Done | #247 (nested in NarrativeConfig) |
+| `GoalProposalConfig` | Autonomous goal thresholds, capacity, cooldown | Done | #247 |
+| `GoalEscalationConfig` | Priority escalation weights and cycles | Done | #247 |
+| `NormDetectionConfig` | Social norm emergence thresholds, min agents | Done | #247 |
+| `CollectiveGoalConfig` | Group goal alignment threshold, cooldown | Done | #247 |
+| `RetentionConfig` | Memory eviction scoring weights | Done | #247 |
 
 ### 15. Affordance / World Model
 
@@ -337,7 +337,7 @@ and their implementation status. Update as gaps close.
 | summarisation-yaml | Extensions (11) | 4 | 1 | — | **2** | 1 | — |
 | cloudevents | Bridge (12) | 4 | — | — | **3** | — | 1 |
 | summarisation-api | Core (13) | 9 | **3** | — | **1** | — | 5 |
-| blocks | Social configs (14) | 13 | — | — | **13** | — | — |
+| blocks | Social configs (14) | 13 | **13** | — | — | — | — |
 | blocks | Affordance (15) | 8 | — | — | **7** | 1 | — |
 | blocks | Channel (16) | 4 | — | — | **4** | — | — |
 | blocks | Prompt optim (17) | 8 | — | — | **8** | — | — |

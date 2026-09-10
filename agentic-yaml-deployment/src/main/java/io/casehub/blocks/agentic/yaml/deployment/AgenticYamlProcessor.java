@@ -9,7 +9,6 @@ import io.quarkus.deployment.builditem.HotDeploymentWatchedFileBuildItem;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Files;
@@ -65,4 +64,16 @@ public class AgenticYamlProcessor {
 
         return new AgenticPatternsBuildItem(patterns);
     }
+
+    @BuildStep
+    CognitionConfigBuildItem discoverCognitionConfig() throws IOException {
+        ClassLoader cl       = Thread.currentThread().getContextClassLoader();
+        URL         resource = cl.getResource("META-INF/cognition.yaml");
+        if (resource == null) {return new CognitionConfigBuildItem(null);}
+        try (InputStream in = resource.openStream()) {
+            var definition = YAML.readValue(in, io.casehub.blocks.agentic.yaml.spec.cognition.CognitionDefinition.class);
+            return new CognitionConfigBuildItem(definition);
+        }
+    }
+
 }

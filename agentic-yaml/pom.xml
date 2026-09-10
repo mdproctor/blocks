@@ -42,6 +42,12 @@
     <!-- Provided -->
     <dependency>
       <groupId>io.casehub</groupId>
+      <artifactId>casehub-neocortex-memory-api</artifactId>
+      <version>${project.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.casehub</groupId>
       <artifactId>casehub-platform-api</artifactId>
       <version>${project.version}</version>
       <scope>provided</scope>
