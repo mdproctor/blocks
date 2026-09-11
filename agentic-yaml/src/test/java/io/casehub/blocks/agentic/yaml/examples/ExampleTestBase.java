@@ -75,6 +75,62 @@ abstract class ExampleTestBase {
         };
     }
 
+    @SuppressWarnings("unchecked")
+    protected static ExpressionEngine runtimeMvelEngine() {
+        return new ExpressionEngine() {
+            @Override public String type() { return "runtime-mvel"; }
+            @Override public <C, R> CompiledExpression<C, R> compile(String expr, Class<C> ct, Class<R> rt) {
+                return new CompiledExpression<>() {
+                    @Override public String type() { return "runtime-mvel"; }
+                    @Override public R eval(C context) {
+                        if (context instanceof Map<?, ?> m) return (R) evalMapExpr(expr, (Map<String, Object>) m);
+                        if (context instanceof List<?> l) return (R) Boolean.valueOf(l.size() >= 3);
+                        return (R) m(context, expr);
+                    }
+                    private <X> X m(Object ctx, String e) { return (X) ((Map<?,?>) ctx).get(e); }
+                };
+            }
+            @Override public <C, R> CompiledExpression<C, R> compile(String expr, Class<C> ct, Class<R> rt, Map<String, Object> vars) {
+                return compile(expr, ct, rt);
+            }
+            @Override public void validate(String expr) {}
+        };
+    }
+
+    private static Object evalMapExpr(String expr, Map<String, Object> ctx) {
+        if (expr.contains(" > ")) {
+            var parts = expr.split(" > ", 2);
+            var val = ctx.get(parts[0].trim());
+            if (val instanceof Number n) return n.doubleValue() > Double.parseDouble(parts[1].trim());
+            return false;
+        }
+        if (expr.contains(" >= ")) {
+            var parts = expr.split(" >= ", 2);
+            var val = ctx.get(parts[0].trim());
+            if (val instanceof Number n) return n.doubleValue() >= Double.parseDouble(parts[1].trim());
+            return false;
+        }
+        if (expr.contains(" == ")) {
+            var parts = expr.split(" == ", 2);
+            var val = ctx.get(parts[0].trim());
+            var expected = parts[1].trim();
+            if ("true".equals(expected)) return Boolean.TRUE.equals(val);
+            if ("false".equals(expected)) return Boolean.FALSE.equals(val);
+            if (val instanceof Number n) return n.doubleValue() == Double.parseDouble(expected);
+            return String.valueOf(val).equals(expected);
+        }
+        return ctx.get(expr);
+    }
+
+    protected SummariserRegistry executionRegistry() {
+        var engine = runtimeMvelEngine();
+        var registry = new SummariserRegistry();
+        registry.register("threshold-classify", (SummariserFactory) config -> ThresholdClassifySummariser.create(config, engine));
+        registry.register("phase-detect", (SummariserFactory) config -> PhaseDetectSummariser.create(config, List.of()));
+        registry.register("count", (SummariserFactory) config -> CountSummariser.create(config));
+        return registry;
+    }
+
     protected PatternSpec loadPattern(String scenario) throws IOException {
         return load(scenario, "pattern.yaml", PatternSpec.class);
     }

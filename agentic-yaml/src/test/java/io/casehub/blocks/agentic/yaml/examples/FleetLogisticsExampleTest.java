@@ -7,9 +7,13 @@ import io.casehub.blocks.agentic.model.PatternType;
 import io.casehub.blocks.agentic.routing.FirstMatchRouting;
 import io.casehub.blocks.agentic.social.drive.DriveAxis;
 import io.casehub.blocks.agentic.social.drive.DriveConfig;
+import io.casehub.blocks.summarisation.EventLevel;
+import io.casehub.blocks.summarisation.LevelEvent;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -52,6 +56,44 @@ class FleetLogisticsExampleTest extends ExampleTestBase {
 
         assertThat(model.judgment()).isNotNull();
         assertThat(model.judgment()).isInstanceOf(JudgmentPolicy.class);
+    }
+
+    @Test
+    void pipelineExecutesWithEvents() throws IOException {
+        var def = loadPipeline(SCENARIO);
+        var runtimeEngine = runtimeMvelEngine();
+        var pipeline = pipelineCompiler.<Map<String, Object>>compile(def, executionRegistry(), null, runtimeEngine);
+
+        var level0Out = new ArrayList<LevelEvent<?>>();
+        var level1Out = new ArrayList<LevelEvent<?>>();
+        var level2Out = new ArrayList<LevelEvent<?>>();
+        var level3Out = new ArrayList<LevelEvent<?>>();
+        pipeline.outputBus("per-vehicle").subscribe(e -> true, level0Out::add);
+        pipeline.outputBus("per-route").subscribe(e -> true, level1Out::add);
+        pipeline.outputBus("route-health").subscribe(e -> true, level2Out::add);
+        pipeline.outputBus("fleet-status").subscribe(e -> true, level3Out::add);
+
+        var input = new EventLevel("input", 0);
+
+        pipeline.inputBus().publish(new LevelEvent<>(Map.of("vehicleId", (Object) "truck-1", "routeId", "route-A", "delayMinutes", 5), 1000L, input, "tenant-1"));
+        pipeline.inputBus().publish(new LevelEvent<>(Map.of("vehicleId", (Object) "truck-1", "routeId", "route-A", "delayMinutes", 25), 2000L, input, "tenant-1"));
+        pipeline.inputBus().publish(new LevelEvent<>(Map.of("vehicleId", (Object) "truck-2", "routeId", "route-A", "delayMinutes", 70, "missedDelivery", true), 3000L, input, "tenant-1"));
+
+        pipeline.tick(4000L).toCompletableFuture().join();
+        pipeline.tick(5000L).toCompletableFuture().join();
+        pipeline.flush().toCompletableFuture().join();
+
+        System.out.println("=== Fleet Logistics Pipeline Execution ===");
+        System.out.println("L1 per-vehicle events: " + level0Out.size());
+        level0Out.forEach(e -> System.out.println("  → " + e.payload()));
+        System.out.println("L2 per-route events:   " + level1Out.size());
+        level1Out.forEach(e -> System.out.println("  → " + e.payload()));
+        System.out.println("L3 route-health events: " + level2Out.size());
+        level2Out.forEach(e -> System.out.println("  → " + e.payload()));
+        System.out.println("L4 fleet-status events: " + level3Out.size());
+        level3Out.forEach(e -> System.out.println("  → " + e.payload()));
+
+        assertThat(level0Out).as("L1 per-vehicle should produce output").isNotEmpty();
     }
 
     @Test

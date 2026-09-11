@@ -7,16 +7,17 @@ import io.casehub.blocks.agentic.social.drive.DriveAxis;
 import io.casehub.blocks.agentic.yaml.compiler.CompiledWorld;
 import io.casehub.blocks.agentic.yaml.spec.ConversationSpec;
 import io.casehub.blocks.agentic.yaml.spec.JointIntentionSpec;
-import io.casehub.blocks.conversation.EpistemicRules;
 import io.casehub.blocks.conversation.orchestration.RoundRobinTurnPolicy;
 import io.casehub.blocks.agentic.yaml.registry.ConvergencePolicyRegistry;
 import io.casehub.blocks.agentic.yaml.registry.EpistemicRuleRegistry;
 import io.casehub.blocks.agentic.yaml.registry.TurnPolicyRegistry;
+import io.casehub.blocks.summarisation.observation.affordance.AffordanceRenderer;
 import io.casehub.blocks.summarisation.observation.affordance.AnnotatedSection;
 import io.casehub.blocks.summarisation.observation.affordance.ObservationSection;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -125,6 +126,37 @@ class HistoricalEncounterExampleTest extends ExampleTestBase {
         CompiledWorld.RendererThresholds thresholds = compiled.rendererThresholds();
         assertThat(thresholds).isNotNull();
         assertThat(thresholds.verbatimThreshold()).isEqualTo(12);
+    }
+
+    @Test
+    void worldRendersWithVisibilityGating() throws IOException {
+        var def = loadWorld(SCENARIO);
+        var compiled = worldCompiler.compile(def);
+        var renderer = new AffordanceRenderer();
+
+        var allSections = compiled.sections();
+        var withTrust = compiled.pipeline().apply(allSections, Set.of("deep-trust"));
+        var withoutTrust = compiled.pipeline().apply(allSections, Set.of());
+
+        System.out.println("=== Historical Encounter — World Observation ===");
+        System.out.println();
+        System.out.println("--- What an agent sees (no deep-trust tag) ---");
+        String restrictedView = renderer.renderObservation(withoutTrust);
+        System.out.println(restrictedView);
+        System.out.println();
+        System.out.println("--- What an agent sees (with deep-trust tag) ---");
+        String fullView = renderer.renderObservation(withTrust);
+        System.out.println(fullView);
+        System.out.println();
+        System.out.println("--- Action vocabulary ---");
+        System.out.println(renderer.renderActionVocabulary("Available actions:", compiled.actions()));
+
+        assertThat(fullView).as("With trust: sees Tesla's Private Diary")
+                .contains("Tesla's Private Diary");
+        assertThat(restrictedView).as("Without trust: diary degraded to fallback text")
+                .doesNotContain("Tesla's Private Diary");
+        assertThat(restrictedView).as("Without trust: sees reduced-fidelity fallback")
+                .contains("deeper trust is needed");
     }
 
     @Test

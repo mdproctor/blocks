@@ -11,13 +11,22 @@ import io.casehub.blocks.agentic.yaml.registry.ConflictResolutionRegistry;
 import io.casehub.blocks.agentic.yaml.registry.TerminationConditionRegistry;
 import io.casehub.blocks.agentic.yaml.spec.ConflictResolutionSpec;
 import io.casehub.blocks.agentic.yaml.spec.NegotiationSpec;
-import io.casehub.blocks.negotiation.AcceptancePolicy;
+import io.casehub.blocks.negotiation.NegotiationOutcome;
 import io.casehub.blocks.normative.MostRestrictiveResolution;
+import io.casehub.blocks.summarisation.EventLevel;
+import io.casehub.blocks.summarisation.LevelEvent;
 import io.casehub.blocks.summarisation.Summariser;
+import io.casehub.platform.api.identity.ActorType;
+import io.casehub.qhorus.api.message.MessageType;
+import io.casehub.qhorus.api.message.MessageView;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -102,5 +111,85 @@ class SupplyChainOpsExampleTest extends ExampleTestBase {
         var strategy = registry.resolve(spec);
 
         assertThat(strategy).isInstanceOf(MostRestrictiveResolution.class);
+    }
+
+    @Test
+    void pipelineExecutesDetectionThroughResponse() throws IOException {
+        var execRegistry = executionRegistry();
+        execRegistry.register("field-extract", config ->
+                Summariser.ofSync(batch -> batch.stream()
+                        .map(e -> Map.of("extracted", e.payload()))
+                        .toList()));
+
+        var def = loadPipeline(SCENARIO);
+        var runtimeEngine = runtimeMvelEngine();
+        var pipeline = pipelineCompiler.<Map<String, Object>>compile(def, execRegistry, null, runtimeEngine);
+
+        var detectionOut = new ArrayList<LevelEvent<?>>();
+        var triageOut = new ArrayList<LevelEvent<?>>();
+        var responseOut = new ArrayList<LevelEvent<?>>();
+        var resolutionOut = new ArrayList<LevelEvent<?>>();
+        pipeline.outputBus("detection").subscribe(e -> true, detectionOut::add);
+        pipeline.outputBus("triage").subscribe(e -> true, triageOut::add);
+        pipeline.outputBus("response").subscribe(e -> true, responseOut::add);
+        pipeline.outputBus("resolution").subscribe(e -> true, resolutionOut::add);
+
+        var input = new EventLevel("input", 0);
+
+        pipeline.inputBus().publish(new LevelEvent<>(Map.of("warehouseId", (Object) "wh-1", "weightDelta", 2.0, "temperature", 22.0, "delayHours", 1, "missingScan", false), 1000L, input, "tenant-1"));
+        pipeline.inputBus().publish(new LevelEvent<>(Map.of("warehouseId", (Object) "wh-1", "weightDelta", 8.5, "temperature", 35.0, "delayHours", 6, "missingScan", false), 2000L, input, "tenant-1"));
+        pipeline.inputBus().publish(new LevelEvent<>(Map.of("warehouseId", (Object) "wh-1", "weightDelta", 1.0, "temperature", 28.0, "delayHours", 0, "missingScan", true), 3000L, input, "tenant-1"));
+
+        for (int i = 0; i < 10; i++) {
+            pipeline.inputBus().publish(new LevelEvent<>(Map.of("warehouseId", (Object) "wh-1", "weightDelta", 8.0 + i, "temperature", 32.0, "delayHours", 5, "missingScan", false), (4000L + i * 100), input, "tenant-1"));
+        }
+
+        pipeline.tick(6000L).toCompletableFuture().join();
+        pipeline.tick(7000L).toCompletableFuture().join();
+        pipeline.flush().toCompletableFuture().join();
+
+        System.out.println("=== Supply Chain Pipeline Execution ===");
+        System.out.println("L1 detection events:   " + detectionOut.size());
+        detectionOut.forEach(e -> System.out.println("  → " + e.payload()));
+        System.out.println("L2 triage events:      " + triageOut.size());
+        triageOut.forEach(e -> System.out.println("  → " + e.payload()));
+        System.out.println("L3 response events:    " + responseOut.size());
+        responseOut.forEach(e -> System.out.println("  → " + e.payload()));
+        System.out.println("L4 resolution events:  " + resolutionOut.size());
+        resolutionOut.forEach(e -> System.out.println("  → " + e.payload()));
+
+        assertThat(detectionOut).as("L1 detection should classify anomalies").isNotEmpty();
+    }
+
+    @Test
+    void negotiationExecutesProposalToAgreement() throws IOException {
+        var spec = load(SCENARIO, "negotiation.yaml", NegotiationSpec.class);
+        var compiler = new NegotiationCompiler(new TerminationConditionRegistry(), null);
+        var compiled = compiler.compile(spec);
+
+        var projection = compiled.projection();
+        var state = projection.identity();
+
+        var channelId = UUID.randomUUID();
+        var t = Instant.parse("2026-01-15T10:00:00Z");
+
+        state = projection.apply(state, new MessageView(1L, channelId, "response-planner", MessageType.PROPOSE, "Reroute via warehouse-3, ETA 4h", null, "p1", null, null, null, List.of(), ActorType.AGENT, t, null, 0));
+
+        System.out.println("=== Supply Chain Negotiation ===");
+        System.out.println("After proposal: " + state.outcome() + " — round " + state.round());
+        System.out.println("  Proposal: " + state.activeProposal().content());
+
+        state = projection.apply(state, new MessageView(2L, channelId, "triage-coordinator", MessageType.DONE, null, null, "p1", null, null, null, List.of(), ActorType.AGENT, t.plusSeconds(30), null, 0));
+
+        System.out.println("After triage-coordinator accepts: " + state.outcome());
+        System.out.println("  Responses so far: " + state.responses().size());
+
+        state = projection.apply(state, new MessageView(3L, channelId, "resolution-tracker", MessageType.DONE, null, null, "p1", null, null, null, List.of(), ActorType.AGENT, t.plusSeconds(60), null, 0));
+
+        System.out.println("After resolution-tracker accepts: " + state.outcome());
+
+        assertThat(state.outcome()).as("All non-proposer parties accepted")
+                .isEqualTo(NegotiationOutcome.AGREED);
+        System.out.println("  → Negotiation resolved: " + state.outcome());
     }
 }

@@ -80,6 +80,8 @@ sections:
       - "The relationship between art and engineering — beauty in function."
       - "Water — Leonardo's obsession with fluid dynamics; Tesla's hydroelectric vision at Niagara."
       - "The cost of obsession — unfinished works, unpaid debts, solitary lives."
+pipeline:
+  - type: perception
 renderer:
   verbatimThreshold: 12
   groupedThreshold: 30
