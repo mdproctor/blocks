@@ -17,6 +17,8 @@ public class KeyedSummarisationRunner<K, IN, OUT> {
     private final EventStreamBus<OUT>            outputBus;
     private final EventLevel                     outputLevel;
     private final Consumer<List<LevelEvent<IN>>> onFailure;
+    private final java.util.concurrent.ConcurrentHashMap<K, Object> keyState = new java.util.concurrent.ConcurrentHashMap<>();
+
 
     public KeyedSummarisationRunner(Function<LevelEvent<IN>, K> keyExtractor,
                                     Predicate<List<LevelEvent<IN>>> completionTest,
@@ -79,20 +81,18 @@ public class KeyedSummarisationRunner<K, IN, OUT> {
         CompletableFuture<Void>[] futures = groups.stream()
                                                   .map(group -> {
                                                       var batch = compactor != null ? compactor.compact(group) : group;
-                                                      return summariser.summarise(batch).thenAccept(results -> {
-                                                          for (var payload : results) {
-                                                              outputBus.publish(new LevelEvent<>(payload, now, outputLevel, batch.isEmpty() ? null : batch.get(0).tenancyId()));
-                                                          }
-                                                      }).handle((v, ex) -> {
-                                                          if (ex != null) {
-                                                              LOG.log(System.Logger.Level.WARNING,
-                                                                      "Summarisation failed, batch size=" + batch.size(), ex);
-                                                              if (onFailure != null) {
-                                                                  onFailure.accept(batch);
-                                                              }
-                                                          }
-                                                          return (Void) null;
-                                                      }).toCompletableFuture();
+                                                      K   key   = batch.isEmpty() ? null : accumulator.keyExtractor().apply(batch.get(0));
+                                                      return invokeSummariser(batch, key, now)
+                                                                     .handle((v, ex) -> {
+                                                                         if (ex != null) {
+                                                                             LOG.log(System.Logger.Level.WARNING,
+                                                                                     "Summarisation failed, batch size=" + batch.size(), ex);
+                                                                             if (onFailure != null) {
+                                                                                 onFailure.accept(batch);
+                                                                             }
+                                                                         }
+                                                                         return (Void) null;
+                                                                     }).toCompletableFuture();
                                                   })
                                                   .toArray(CompletableFuture[]::new);
         return CompletableFuture.allOf(futures);
@@ -111,23 +111,44 @@ public class KeyedSummarisationRunner<K, IN, OUT> {
         CompletableFuture<Void>[] futures = groups.stream()
                                                   .map(group -> {
                                                       var batch = compactor != null ? compactor.compact(group) : group;
-                                                      return summariser.summarise(batch).thenAccept(results -> {
-                                                          for (var payload : results) {
-                                                              outputBus.publish(new LevelEvent<>(payload, now, outputLevel, batch.isEmpty() ? null : batch.get(0).tenancyId()));
-                                                          }
-                                                      }).handle((v, ex) -> {
-                                                          if (ex != null) {
-                                                              LOG.log(System.Logger.Level.WARNING,
-                                                                      "Flush failed, batch size=" + batch.size(), ex);
-                                                              if (onFailure != null) {
-                                                                  onFailure.accept(batch);
-                                                              }
-                                                          }
-                                                          return (Void) null;
-                                                      }).toCompletableFuture();
+                                                      K   key   = batch.isEmpty() ? null : accumulator.keyExtractor().apply(batch.get(0));
+                                                      return invokeSummariser(batch, key, now)
+                                                                     .handle((v, ex) -> {
+                                                                         if (ex != null) {
+                                                                             LOG.log(System.Logger.Level.WARNING,
+                                                                                     "Flush failed, batch size=" + batch.size(), ex);
+                                                                             if (onFailure != null) {
+                                                                                 onFailure.accept(batch);
+                                                                             }
+                                                                         }
+                                                                         return (Void) null;
+                                                                     }).toCompletableFuture();
                                                   })
                                                   .toArray(CompletableFuture[]::new);
         return CompletableFuture.allOf(futures);
+    }
+
+
+    @SuppressWarnings("unchecked")
+    private CompletionStage<Void> invokeSummariser(List<LevelEvent<IN>> batch, K key, long now) {
+        String tenancyId = batch.isEmpty() ? null : batch.get(0).tenancyId();
+        if (summariser instanceof StatefulSummariser<IN, OUT, ?> stateful) {
+            var    typedStateful = (StatefulSummariser<IN, OUT, Object>) stateful;
+            Object prevState     = key != null ? keyState.get(key) : null;
+            return typedStateful.summarise(batch, prevState).thenAccept(result -> {
+                if (result.newState() != null && key != null) {
+                    keyState.put(key, result.newState());
+                }
+                for (var payload : result.outputs()) {
+                    outputBus.publish(new LevelEvent<>(payload, now, outputLevel, tenancyId));
+                }
+            });
+        }
+        return summariser.summarise(batch).thenAccept(results -> {
+            for (var payload : results) {
+                outputBus.publish(new LevelEvent<>(payload, now, outputLevel, tenancyId));
+            }
+        });
     }
 
     public void clear() {
@@ -141,4 +162,9 @@ public class KeyedSummarisationRunner<K, IN, OUT> {
     public int eventCount() {
         return accumulator.eventCount();
     }
+
+    public void evictState(K key) {
+        keyState.remove(key);
+    }
+
 }

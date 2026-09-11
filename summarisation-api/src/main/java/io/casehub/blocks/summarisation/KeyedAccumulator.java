@@ -24,6 +24,11 @@ public class KeyedAccumulator<K, E> {
         this.staleTimeout = staleTimeout;
     }
 
+
+    public Function<LevelEvent<E>, K> keyExtractor() {
+        return keyExtractor;
+    }
+
     public synchronized void collect(LevelEvent<E> event) {
         K key = Objects.requireNonNull(keyExtractor.apply(event),
             "keyExtractor returned null");
