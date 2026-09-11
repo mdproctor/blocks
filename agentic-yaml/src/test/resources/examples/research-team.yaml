@@ -1,0 +1,58 @@
+type: supervisor
+routing:
+  type: first-match
+  guard: "descriptor != null && descriptor.briefing() != null"
+termination:
+  - type: max-iterations
+    iterations: 15
+  - type: goal-reached
+    when: "state != null && state.containsKey('complete')"
+aggregation:
+  type: collect-all
+failurePolicy:
+  onRoutingFailure: RETRY_BROADER
+  onDeadlock: ESCALATE
+  agentRetry:
+    maxRetries: 3
+    backoff: PT1S
+    backoffStrategy: EXPONENTIAL
+    onExhausted: SKIP
+judgment:
+  trigger:
+    type: iteration-based
+    every: 5
+  caller:
+    type: single
+    callerName: quality-reviewer
+agents:
+  - type: composed
+    name: research-team
+    description: "Parallel research across web and database sources"
+    pattern:
+      type: parallel
+      aggregation:
+        type: collect-all
+      agents:
+        - type: worker
+          name: web-researcher
+          description: "Searches web sources for relevant information"
+          capabilities:
+            - web-search
+            - summarisation
+        - type: worker
+          name: db-researcher
+          description: "Queries internal knowledge bases"
+          capabilities:
+            - database-query
+            - data-analysis
+  - type: worker
+    name: synthesiser
+    description: "Combines research findings into a coherent report"
+    capabilities:
+      - synthesis
+      - report-generation
+  - type: external
+    name: fact-checker
+    description: "Validates claims against authoritative sources"
+    capabilities:
+      - verification

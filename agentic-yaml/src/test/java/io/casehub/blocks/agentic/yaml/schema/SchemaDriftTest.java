@@ -33,11 +33,12 @@ class SchemaDriftTest {
             return;
         }
 
-        var stream = getClass().getResourceAsStream(BASELINE_RESOURCE);
-        assertThat(stream)
-                .as("Baseline not found — run with -Dschema.update to generate")
-                .isNotNull();
-        var baseline = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
-        assertThat(actual).isEqualTo(baseline);
+        try (var stream = getClass().getResourceAsStream(BASELINE_RESOURCE)) {
+            assertThat(stream)
+                    .as("Baseline not found — run with -Dschema.update to generate")
+                    .isNotNull();
+            var baseline = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+            assertThat(actual).isEqualTo(baseline);
+        }
     }
 }

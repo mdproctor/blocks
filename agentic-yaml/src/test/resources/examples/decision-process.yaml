@@ -1,0 +1,36 @@
+type: voting
+aggregation:
+  type: majority-vote
+termination:
+  - type: single-pass
+judgment:
+  trigger:
+    type: always-yield
+  caller:
+    type: escalation-chain
+    callerNames:
+      - junior-reviewer
+      - senior-reviewer
+      - principal-reviewer
+agents:
+  - type: worker
+    name: risk-analyst
+    description: "Evaluates financial risk exposure"
+    capabilities:
+      - risk-assessment
+      - quantitative-analysis
+  - type: worker
+    name: compliance-officer
+    description: "Checks regulatory compliance"
+    capabilities:
+      - regulatory-compliance
+  - type: worker
+    name: strategy-advisor
+    description: "Assesses strategic alignment"
+    capabilities:
+      - strategic-analysis
+  - type: human
+    name: domain-expert
+    description: "Provides domain-specific judgment"
+    capabilities:
+      - domain-expertise

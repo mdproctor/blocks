@@ -1,0 +1,86 @@
+cognition:
+  drive:
+    changeThreshold: 0.15
+    axisWeights:
+      CURIOSITY: 1.5
+      AFFILIATION: 1.2
+  mood:
+    maxDisplacement: 0.6
+    baseline:
+      pleasure: 0.5
+      arousal: 0.4
+      dominance: 0.3
+  personality:
+    decayFactor: 0.03
+    l2Ceiling: 0.4
+  narrative:
+    maxEpisodes: 50
+    synthesisGate:
+      minNewReflections: 5
+      noveltyThreshold: 0.3
+  goalProposal:
+    proposalThreshold: 0.6
+    maxDriveGoals: 3
+  retention:
+    recencyWeight: 0.6
+
+world:
+  actions:
+    - type: MOVE
+      description: Move to a location
+      parameterFormat: <location-id>
+    - type: EXAMINE
+      description: Look closely at something
+      parameterFormat: <entity-id>
+    - type: TALK
+      description: Speak to a character
+      parameterFormat: <character-id> <message>
+    - type: USE
+      description: Use an item
+      parameterFormat: <item-id>
+  entities:
+    door:
+      displayName: Wooden Door
+      description: An old wooden door with iron hinges
+      affordances:
+        - actionType: EXAMINE
+          label: to inspect
+        - actionType: USE
+          label: to open
+          requiredItem: key
+    key:
+      displayName: Rusty Key
+      affordances:
+        - actionType: TAKE
+          label: to pick up
+    merchant:
+      displayName: Travelling Merchant
+      description: A weathered figure with a large pack
+      affordances:
+        - actionType: TALK
+          label: to converse
+  sections:
+    - type: text
+      header: Location
+      content: A crossroads in the forest, with paths leading in four directions.
+    - type: entity-group
+      header: Objects
+      entityRefs:
+        - door
+        - key
+    - type: entity-group
+      header: Characters
+      requiredTags:
+        - social-awareness
+      entityRefs:
+        - merchant
+    - type: item-list
+      header: Available Exits
+      items:
+        - North — deeper into the forest
+        - South — back to the village
+        - East — toward the mountains
+        - West — along the river
+  renderer:
+    verbatimThreshold: 10
+    groupedThreshold: 25

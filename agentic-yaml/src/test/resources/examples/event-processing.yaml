@@ -1,0 +1,44 @@
+type: sequence
+termination:
+  - type: agent-count
+failurePolicy:
+  onRoutingFailure: FAIL
+  agentRetry:
+    maxRetries: 2
+    backoff: PT0.5S
+    backoffStrategy: FIXED
+    onExhausted: FAIL
+decomposition:
+  type: identity
+agents:
+  - type: worker
+    name: event-classifier
+    description: "Classifies incoming events by severity and category"
+    capabilities:
+      - event-classification
+      - pattern-detection
+  - type: composed
+    name: analysis-tier
+    description: "Parallel analysis across multiple dimensions"
+    pattern:
+      type: parallel
+      aggregation:
+        type: collect-all
+      agents:
+        - type: worker
+          name: anomaly-detector
+          description: "Detects statistical anomalies in event streams"
+          capabilities:
+            - anomaly-detection
+        - type: worker
+          name: trend-analyser
+          description: "Identifies trends and correlations"
+          capabilities:
+            - trend-analysis
+            - time-series
+  - type: worker
+    name: action-recommender
+    description: "Recommends actions based on analysis results"
+    capabilities:
+      - recommendation
+      - prioritisation

@@ -1,0 +1,38 @@
+type: debate
+maxRounds: 5
+judge:
+  type: worker
+  name: editor
+  description: "Final editorial authority"
+  capabilities:
+    - editorial-judgment
+termination:
+  - type: all-agreed
+    resolvedStatuses:
+      - RESOLVED
+      - ACCEPTED
+      - ACKNOWLEDGED
+  - type: contested
+    maxDisputeRounds: 3
+  - type: max-iterations
+    iterations: 10
+failurePolicy:
+  onRoutingFailure: FAIL
+  onDeadlock: FAIL
+agents:
+  - type: worker
+    name: structural-reviewer
+    description: "Reviews document structure and logical flow"
+    capabilities:
+      - structural-analysis
+  - type: worker
+    name: content-reviewer
+    description: "Challenges claims and checks evidence"
+    capabilities:
+      - fact-checking
+      - content-analysis
+  - type: worker
+    name: readability-reviewer
+    description: "Flags dense prose and unclear phrasing"
+    capabilities:
+      - readability-analysis
