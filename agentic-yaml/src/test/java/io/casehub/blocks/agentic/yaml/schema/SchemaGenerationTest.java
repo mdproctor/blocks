@@ -1,9 +1,14 @@
 package io.casehub.blocks.agentic.yaml.schema;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import io.casehub.blocks.agentic.yaml.spec.CbrOutcomeWeightsSpec;
+import io.casehub.blocks.agentic.yaml.spec.CoordinationOutcomeWeightsSpec;
 import io.casehub.blocks.agentic.yaml.spec.PatternSpec;
+import io.casehub.blocks.agentic.yaml.spec.RiskDecisionSpec;
 import io.casehub.blocks.agentic.yaml.spec.RoutingSpec;
 import io.casehub.blocks.agentic.yaml.spec.TerminationSpec;
+import io.casehub.blocks.agentic.yaml.spec.TrustRoutingPolicyKeysSpec;
+import io.casehub.blocks.routing.agent.DispositionProfile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -84,6 +89,43 @@ class SchemaGenerationTest {
         assertThat(schema).isNotNull();
         var schemaText = schema.toString();
         assertThat(schemaText).contains("pipelines");
+    }
+
+    @Test
+    void riskDecisionSpecSchemaHasTypes() {
+        JsonNode schema = generator.generate(RiskDecisionSpec.class);
+        assertThat(schema).isNotNull();
+        var schemaText = schema.toString();
+        assertThat(schemaText).contains("autonomous");
+        assertThat(schemaText).contains("gate-required");
+    }
+
+    @Test
+    void cbrOutcomeWeightsSpecSchemaGenerates() {
+        JsonNode schema = generator.generate(CbrOutcomeWeightsSpec.class);
+        assertThat(schema).isNotNull();
+        assertThat(schema.toString()).contains("weights");
+    }
+
+    @Test
+    void coordinationOutcomeWeightsSpecSchemaGenerates() {
+        JsonNode schema = generator.generate(CoordinationOutcomeWeightsSpec.class);
+        assertThat(schema).isNotNull();
+        assertThat(schema.toString()).contains("weights");
+    }
+
+    @Test
+    void trustRoutingPolicyKeysSpecSchemaGenerates() {
+        JsonNode schema = generator.generate(TrustRoutingPolicyKeysSpec.class);
+        assertThat(schema).isNotNull();
+        assertThat(schema.toString()).contains("scopePrefix");
+    }
+
+    @Test
+    void dispositionProfileSchemaGenerates() {
+        JsonNode schema = generator.generate(DispositionProfile.class);
+        assertThat(schema).isNotNull();
+        assertThat(schema.toString()).contains("desired");
     }
 
 }

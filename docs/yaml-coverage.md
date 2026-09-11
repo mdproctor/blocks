@@ -241,20 +241,20 @@ and their implementation status. Update as gaps close.
 
 | Capability | Status | Notes |
 |-----------|--------|-------|
-| TrustRoutingPolicyKeys (threshold, minObservations, blendFactor) | Gap | |
-| CbrOutcomeWeights (outcome → weight map) | Gap | |
-| CoordinationOutcomeWeights (outcome → weight map) | Gap | |
-| DispositionProfile (desired traits + axis weights) | Gap | Personality matching for routing |
-| AttestationContext (tenancyId, caseId, capabilityTag) | Gap | |
-| AttestationIntent (full attestation payload) | Gap | |
+| TrustRoutingPolicyKeys (threshold, minObservations, blendFactor) | Done | #252 — adapted record spec |
+| CbrOutcomeWeights (outcome → weight map) | Done | #252 — weight map spec |
+| CoordinationOutcomeWeights (outcome → weight map) | Done | #252 — weight map spec |
+| DispositionProfile (desired traits + axis weights) | Done | #252 — direct reuse |
+| AttestationContext (tenancyId, caseId, capabilityTag) | N/A | Runtime data — not config |
+| AttestationIntent (full attestation payload) | N/A | Runtime data — not config |
 
 ### 20. Oversight
 
 | Capability | Status | Notes |
 |-----------|--------|-------|
-| RiskDecision (Autonomous / GateRequired) | Gap | Sealed — pure config |
-| ClassificationContext (workerId, caseId, tenancyId) | Gap | Pure data |
-| GateOutcome (Autonomous / GatePending) | Gap | Sealed — pure data |
+| RiskDecision (Autonomous / GateRequired) | Done | #252 — sealed interface spec |
+| ClassificationContext (workerId, caseId, tenancyId) | N/A | Runtime data — not config |
+| GateOutcome (Autonomous / GatePending) | N/A | Response type — not config |
 
 ---
 
@@ -353,4 +353,4 @@ and their implementation status. Update as gaps close.
 
 **Coverage: 97/165 (59%).** Pattern orchestration, conversation, negotiation,
 channel, prompt optimisation, and execution infrastructure layers are complete.
-Remaining gaps: trust/routing, oversight, engine adapter, speech.
+Remaining gaps: engine adapter, speech.
