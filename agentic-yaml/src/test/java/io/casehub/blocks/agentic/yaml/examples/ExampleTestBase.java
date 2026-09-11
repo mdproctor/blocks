@@ -98,16 +98,16 @@ abstract class ExampleTestBase {
     }
 
     private static Object evalMapExpr(String expr, Map<String, Object> ctx) {
-        if (expr.contains(" > ")) {
-            var parts = expr.split(" > ", 2);
-            var val = ctx.get(parts[0].trim());
-            if (val instanceof Number n) return n.doubleValue() > Double.parseDouble(parts[1].trim());
-            return false;
-        }
         if (expr.contains(" >= ")) {
             var parts = expr.split(" >= ", 2);
             var val = ctx.get(parts[0].trim());
             if (val instanceof Number n) return n.doubleValue() >= Double.parseDouble(parts[1].trim());
+            return false;
+        }
+        if (expr.contains(" > ")) {
+            var parts = expr.split(" > ", 2);
+            var val = ctx.get(parts[0].trim());
+            if (val instanceof Number n) return n.doubleValue() > Double.parseDouble(parts[1].trim());
             return false;
         }
         if (expr.contains(" == ")) {
