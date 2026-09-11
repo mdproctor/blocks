@@ -1,0 +1,67 @@
+actions:
+  - type: ACKNOWLEDGE
+    description: Acknowledge an incident and take ownership
+    parameterFormat: <incident-id>
+  - type: INVESTIGATE
+    description: Begin investigation of an incident component
+    parameterFormat: <component-id>
+  - type: MITIGATE
+    description: Apply a mitigation action to a component
+    parameterFormat: <component-id> <action>
+  - type: ESCALATE
+    description: Escalate to next tier of on-call responders
+    parameterFormat: <incident-id> <reason>
+  - type: RESOLVE
+    description: Mark an incident as resolved with resolution summary
+    parameterFormat: <incident-id> <summary>
+entities:
+  api-gateway:
+    displayName: API Gateway
+    description: Edge service handling all inbound traffic
+    affordances:
+      - actionType: INVESTIGATE
+        label: to check gateway logs
+      - actionType: MITIGATE
+        label: to apply rate limiting
+  payment-service:
+    displayName: Payment Service
+    description: Processes payment transactions
+    affordances:
+      - actionType: INVESTIGATE
+        label: to check transaction logs
+      - actionType: MITIGATE
+        label: to enable fallback processor
+  database-primary:
+    displayName: Primary Database
+    description: Main transactional database cluster
+    affordances:
+      - actionType: INVESTIGATE
+        label: to check replication lag
+      - actionType: MITIGATE
+        label: to failover to replica
+sections:
+  - type: entity-group
+    header: Affected Systems
+    entityRefs:
+      - api-gateway
+      - payment-service
+  - type: entity-group
+    header: Infrastructure (Restricted)
+    requiredTags:
+      - clearance
+    entityRefs:
+      - database-primary
+  - type: item-list
+    header: Incident Timeline
+    items:
+      - "14:32 — Alert triggered: payment latency > 5s"
+      - "14:35 — Triage acknowledged by on-call"
+      - "14:41 — Root cause identified: database connection pool exhausted"
+  - type: text
+    header: Runbook Reference
+    content: "See runbook DB-POOL-001 for connection pool exhaustion procedures."
+pipeline:
+  - type: perception
+renderer:
+  verbatimThreshold: 10
+  groupedThreshold: 30

@@ -1,0 +1,47 @@
+type: supervisor
+routing:
+  type: first-match
+  guard: "descriptor != null && descriptor.briefing() != null"
+termination:
+  - type: max-iterations
+    iterations: 25
+  - type: goal-reached
+    when: "state != null && state.containsKey('resolved')"
+aggregation:
+  type: collect-all
+failurePolicy:
+  onRoutingFailure: RETRY_BROADER
+  onDeadlock: ESCALATE
+  agentRetry:
+    maxRetries: 5
+    backoff: PT10S
+    backoffStrategy: EXPONENTIAL
+    onExhausted: ESCALATE
+judgment:
+  trigger:
+    type: always-yield
+  caller:
+    type: escalation-chain
+    callerNames:
+      - on-call-engineer
+      - incident-commander
+      - vp-engineering
+agents:
+  - type: worker
+    name: triage-responder
+    description: "Initial incident triage — classifies severity, identifies affected systems, assigns priority"
+    capabilities:
+      - incident-triage
+      - severity-classification
+  - type: worker
+    name: investigation-lead
+    description: "Deep investigation — root cause analysis, timeline reconstruction, blast radius assessment"
+    capabilities:
+      - root-cause-analysis
+      - forensic-investigation
+  - type: worker
+    name: mitigation-engineer
+    description: "Applies mitigations — rollbacks, feature flags, traffic shifting, capacity scaling"
+    capabilities:
+      - incident-mitigation
+      - system-recovery

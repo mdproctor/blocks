@@ -1,0 +1,22 @@
+drive:
+  changeThreshold: 0.08
+  axisWeights:
+    AUTONOMY: 1.7
+    COMPETENCE: 1.4
+    CURIOSITY: 0.8
+    AFFILIATION: 0.6
+mood:
+  maxDisplacement: 0.7
+  baseline:
+    pleasure: 0.3
+    arousal: 0.7
+    dominance: 0.8
+personality:
+  decayFactor: 0.01
+narrative:
+  maxEpisodes: 100
+  synthesisGate:
+    minNewReflections: 2
+    noveltyThreshold: 0.20
+retention:
+  recencyWeight: 0.8

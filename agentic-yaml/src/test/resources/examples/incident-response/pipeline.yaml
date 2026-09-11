@@ -1,0 +1,34 @@
+pipeline:
+  name: incident-monitoring
+  source:
+    cloud-event-type: io.casehub.ops.incident.v1
+    type-prefix: io.casehub.ops
+  tick-interval: 10000
+  levels:
+    - name: per-service
+      grouping:
+        type: keyed
+        key: serviceId
+        completion: size
+        stale-timeout: 30000
+      summariser:
+        type: pass-through
+
+    - name: severity-timeline
+      grouping:
+        type: windowed
+        count: 15
+      summariser:
+        type: severity-classify
+        escalation-threshold: 3
+        window-minutes: 5
+
+    - name: impact-assessment
+      grouping:
+        type: windowed
+        age: 120000
+      summariser:
+        type: count
+        category-field: impactLevel
+      emit:
+        cloud-event-type: io.casehub.ops.impact.v1
