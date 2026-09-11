@@ -34,6 +34,7 @@ Read `docs/guides/consumer-guide.md` for app-level work. Only read `docs/guides/
 ```bash
 mvn --batch-mode install
 mvn --batch-mode test
+mvn --batch-mode test -pl agentic-yaml -Dschema.update    # regenerate PatternSpec schema baseline
 ```
 
 ## Testing
