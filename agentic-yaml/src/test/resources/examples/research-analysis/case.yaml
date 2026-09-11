@@ -1,0 +1,17 @@
+dsl: "1.0.0"
+name: research-analysis
+description: "Research analysis pipeline with peer review — extends engine LLM example"
+capabilities:
+  - name: gather
+    description: "Collect and organise source material"
+    type: LLM
+  - name: analyse
+    description: "Analyse gathered material for patterns and insights"
+    type: LLM
+    depends-on:
+      - gather
+  - name: synthesise
+    description: "Synthesise analysis into final report"
+    type: LLM
+    depends-on:
+      - analyse

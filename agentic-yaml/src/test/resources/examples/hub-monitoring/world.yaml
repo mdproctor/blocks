@@ -1,0 +1,67 @@
+actions:
+  - type: INSPECT
+    description: Examine a sensor or equipment unit for diagnostics
+    parameterFormat: <entity-id>
+  - type: ISOLATE
+    description: Isolate a zone from the distribution network
+    parameterFormat: <zone-id>
+  - type: RESET
+    description: Reset a sensor or equipment unit to factory defaults
+    parameterFormat: <entity-id>
+entities:
+  zone-a:
+    displayName: Loading Bay A
+    description: Primary inbound loading zone with temperature-controlled storage
+    affordances:
+      - actionType: INSPECT
+        label: to check zone status
+      - actionType: ISOLATE
+        label: to isolate from network
+  zone-b:
+    displayName: Sorting Area B
+    description: Automated sorting line with throughput sensors
+    affordances:
+      - actionType: INSPECT
+        label: to check zone status
+      - actionType: ISOLATE
+        label: to isolate from network
+  temp-sensor-1:
+    displayName: Temperature Sensor T-1
+    affordances:
+      - actionType: INSPECT
+        label: to read diagnostics
+      - actionType: RESET
+        label: to reset calibration
+  conveyor-c1:
+    displayName: Conveyor Belt C-1
+    description: Main belt connecting loading bay to sorting area
+    affordances:
+      - actionType: INSPECT
+        label: to check belt status
+      - actionType: RESET
+        label: to restart motor
+sections:
+  - type: entity-group
+    header: Zones
+    entityRefs:
+      - zone-a
+      - zone-b
+  - type: entity-group
+    header: Equipment Internals
+    requiredTags:
+      - maintenance
+    entityRefs:
+      - temp-sensor-1
+      - conveyor-c1
+  - type: item-list
+    header: Active Alerts
+    emptyMessage: No active alerts
+    items:
+      - "DEGRADED — Zone A temperature out of range (38.2°C)"
+      - "NORMAL — Zone B throughput nominal"
+  - type: text
+    header: Shift Summary
+    content: "Current shift: Day 2 of 3. 14 trucks processed, 2 pending. No safety incidents."
+renderer:
+  verbatimThreshold: 8
+  groupedThreshold: 20

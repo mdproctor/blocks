@@ -1,0 +1,35 @@
+type: conditional
+branches:
+  - condition: "severity == 'CRITICAL'"
+    agent:
+      type: worker
+      name: safety-officer
+  - condition: "severity == 'DEGRADED'"
+    agent:
+      type: worker
+      name: maintenance-coordinator
+  - condition: "anomalyCount > 0"
+    agent:
+      type: worker
+      name: logistics-planner
+termination:
+  - type: single-pass
+agents:
+  - type: worker
+    name: safety-officer
+    description: "Immediate response to critical zone conditions — isolates affected areas and triggers emergency protocols"
+    capabilities:
+      - emergency-response
+      - zone-isolation
+  - type: worker
+    name: maintenance-coordinator
+    description: "Schedules repair and maintenance for degraded zones — prioritises by impact and availability"
+    capabilities:
+      - maintenance-scheduling
+      - resource-allocation
+  - type: worker
+    name: logistics-planner
+    description: "Preventive action planning for zones showing early anomalies — adjusts throughput and reroutes"
+    capabilities:
+      - preventive-planning
+      - throughput-optimisation

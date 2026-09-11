@@ -94,7 +94,7 @@ abstract class ExampleTestBase {
 
     record PipelineWrapper(PipelineDefinition pipeline) {}
 
-    private <T> T load(String scenario, String file, Class<T> type) throws IOException {
+    protected <T> T load(String scenario, String file, Class<T> type) throws IOException {
         String path = "/examples/" + scenario + "/" + file;
         try (InputStream is = getClass().getResourceAsStream(path)) {
             if (is == null) throw new IOException("Resource not found: " + path);

@@ -1,0 +1,28 @@
+drive:
+  changeThreshold: 0.10
+  axisWeights:
+    CURIOSITY: 1.6
+    COMPETENCE: 1.2
+    AFFILIATION: 0.5
+    AUTONOMY: 1.4
+mood:
+  maxDisplacement: 0.4
+  baseline:
+    pleasure: 0.3
+    arousal: 0.6
+    dominance: 0.7
+personality:
+  decayFactor: 0.01
+strategyLearning:
+  maxGuidelines: 15
+  minCasesForReflection: 5
+mentalModel:
+  confidenceFloor: 0.3
+  minSignalsForInference: 3
+narrative:
+  maxEpisodes: 60
+  synthesisGate:
+    minNewReflections: 3
+    noveltyThreshold: 0.35
+retention:
+  recencyWeight: 0.55

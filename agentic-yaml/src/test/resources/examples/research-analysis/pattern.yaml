@@ -1,0 +1,35 @@
+type: debate
+maxRounds: 3
+judge:
+  type: worker
+  name: senior-reviewer
+  description: "Resolves methodological and evidential disputes — weighs both critics' arguments"
+  capabilities:
+    - dispute-resolution
+    - quality-assessment
+termination:
+  - type: all-agreed
+    resolvedStatuses:
+      - RESOLVED
+      - ACCEPTED
+  - type: max-iterations
+    iterations: 6
+judgment:
+  trigger:
+    type: always-yield
+  caller:
+    type: single
+    callerName: senior-reviewer
+agents:
+  - type: worker
+    name: methodology-critic
+    description: "Challenges research methodology — sample sizes, control groups, statistical validity"
+    capabilities:
+      - methodology-review
+      - statistical-analysis
+  - type: worker
+    name: evidence-critic
+    description: "Challenges evidence quality and sourcing — citation validity, data provenance, replication"
+    capabilities:
+      - evidence-review
+      - source-verification

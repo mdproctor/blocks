@@ -1,0 +1,67 @@
+pipeline:
+  name: hub-monitoring
+  source:
+    cloud-event-type: io.casehub.hub.sensor.v1
+    type-prefix: io.casehub.hub
+  tick-interval: 15000
+  levels:
+    - name: per-sensor
+      grouping:
+        type: keyed
+        key: sensorId
+        completion: size
+        stale-timeout: 15000
+      summariser:
+        type: pass-through
+
+    - name: per-zone
+      grouping:
+        type: keyed
+        key: zoneId
+        completion: size
+        stale-timeout: 30000
+      summariser:
+        type: pass-through
+
+    - name: zone-health
+      grouping:
+        type: keyed
+        key: zoneId
+        completion: size
+        stale-timeout: 60000
+      summariser:
+        type: phase-detect
+        initial: NORMAL
+        states:
+          - NORMAL
+          - DEGRADED
+          - CRITICAL
+        transitions:
+          - from: NORMAL
+            to: DEGRADED
+            count-field: sensorStatus
+            count-value: ALARM
+            op: ">="
+            threshold: 2
+          - from: DEGRADED
+            to: CRITICAL
+            count-field: equipmentStatus
+            count-value: OFFLINE
+            op: ">="
+            threshold: 1
+          - from: CRITICAL
+            to: NORMAL
+            count-field: sensorStatus
+            count-value: ALARM
+            op: "=="
+            threshold: 0
+
+    - name: alert-tally
+      grouping:
+        type: windowed
+        count: 20
+      summariser:
+        type: count
+        category-field: severity
+      emit:
+        cloud-event-type: io.casehub.hub.alerts.v1
