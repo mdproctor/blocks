@@ -1,0 +1,72 @@
+type: supervisor
+routing:
+  type: first-match
+  guard: "descriptor != null && descriptor.briefing() != null"
+termination:
+  - type: max-iterations
+    iterations: 15
+  - type: goal-reached
+    when: "state != null && state.containsKey('briefing-complete')"
+aggregation:
+  type: collect-all
+failurePolicy:
+  onRoutingFailure: RETRY_BROADER
+  onDeadlock: ESCALATE
+  agentRetry:
+    maxRetries: 2
+    backoff: PT5S
+    backoffStrategy: EXPONENTIAL
+    onExhausted: ESCALATE
+agents:
+  - type: composed
+    name: primary-research
+    description: "Parallel primary research across web, database, and social sources"
+    pattern:
+      type: parallel
+      aggregation:
+        type: collect-all
+      agents:
+        - type: worker
+          name: web-analyst
+          description: "Public source intelligence — news, reports, filings"
+          capabilities:
+            - web-search
+            - document-analysis
+        - type: worker
+          name: database-analyst
+          description: "Proprietary data analysis — internal databases and purchased datasets"
+          capabilities:
+            - database-query
+            - statistical-analysis
+        - type: worker
+          name: social-analyst
+          description: "Social media sentiment and trend analysis"
+          capabilities:
+            - social-monitoring
+            - sentiment-analysis
+  - type: composed
+    name: competitive-intel
+    description: "Parallel competitive intelligence across IP and financial dimensions"
+    pattern:
+      type: parallel
+      aggregation:
+        type: collect-all
+      agents:
+        - type: worker
+          name: patent-analyst
+          description: "IP landscape analysis — patent filings, technology trends"
+          capabilities:
+            - patent-search
+            - technology-analysis
+        - type: worker
+          name: financial-analyst
+          description: "Competitor financial analysis — revenue, margins, investment"
+          capabilities:
+            - financial-analysis
+            - benchmarking
+  - type: worker
+    name: chief-analyst
+    description: "Synthesises all research streams into an executive briefing"
+    capabilities:
+      - synthesis
+      - executive-reporting

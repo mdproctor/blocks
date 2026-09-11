@@ -1,0 +1,16 @@
+dsl: "1.0.0"
+name: market-intelligence
+description: "Market intelligence pipeline with remote agent invocation (A2A)"
+capabilities:
+  - name: primary-research
+    description: "Gather intelligence from public and proprietary sources"
+    type: A2A
+  - name: competitive-analysis
+    description: "Analyse competitor landscape"
+    type: A2A
+  - name: synthesis
+    description: "Synthesise all research into executive briefing"
+    type: LLM
+    depends-on:
+      - primary-research
+      - competitive-analysis

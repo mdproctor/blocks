@@ -1,0 +1,33 @@
+type: voting
+aggregation:
+  type: majority-vote
+termination:
+  - type: single-pass
+judgment:
+  trigger:
+    type: always-yield
+  caller:
+    type: escalation-chain
+    callerNames:
+      - junior-reviewer
+      - senior-reviewer
+      - principal-reviewer
+agents:
+  - type: worker
+    name: legal-analyst
+    description: "Checks regulatory compliance — licence terms, data protection, jurisdiction clauses"
+    capabilities:
+      - regulatory-compliance
+      - legal-analysis
+  - type: worker
+    name: financial-analyst
+    description: "Assesses financial terms — payment schedules, penalties, liability caps"
+    capabilities:
+      - financial-analysis
+      - risk-quantification
+  - type: worker
+    name: risk-analyst
+    description: "Evaluates overall risk exposure — termination triggers, indemnity, force majeure"
+    capabilities:
+      - risk-assessment
+      - scenario-analysis

@@ -1,0 +1,23 @@
+dsl: "1.0.0"
+name: contract-review
+description: "Contract review with GOAP-style precondition/effect planning"
+capabilities:
+  - name: clause-extraction
+    description: "Extract and classify contract clauses"
+    type: LLM
+  - name: compliance-check
+    description: "Check clauses against regulatory requirements"
+    type: LLM
+    depends-on:
+      - clause-extraction
+  - name: risk-assessment
+    description: "Assess risk exposure from contract terms"
+    type: LLM
+    depends-on:
+      - clause-extraction
+  - name: final-review
+    description: "Produce final review recommendation"
+    type: LLM
+    depends-on:
+      - compliance-check
+      - risk-assessment

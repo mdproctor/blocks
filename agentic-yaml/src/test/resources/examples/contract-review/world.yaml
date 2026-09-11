@@ -1,0 +1,83 @@
+actions:
+  - type: EXAMINE
+    description: Read and analyse a contract section in detail
+    parameterFormat: <section-id>
+  - type: ANNOTATE
+    description: Add a review annotation to a contract section
+    parameterFormat: <section-id> <annotation>
+  - type: FLAG
+    description: Flag a section for escalation or further review
+    parameterFormat: <section-id> <reason>
+  - type: APPROVE
+    description: Mark a contract section as approved
+    parameterFormat: <section-id>
+  - type: REJECT
+    description: Mark a contract section as rejected with rationale
+    parameterFormat: <section-id> <rationale>
+entities:
+  terms-and-conditions:
+    displayName: Terms and Conditions
+    description: Standard terms governing the agreement
+    affordances:
+      - actionType: EXAMINE
+        label: to review terms
+      - actionType: ANNOTATE
+        label: to add notes
+      - actionType: APPROVE
+        label: to approve section
+  payment-schedule:
+    displayName: Payment Schedule
+    description: Payment milestones, amounts, and penalties
+    affordances:
+      - actionType: EXAMINE
+        label: to review payments
+      - actionType: FLAG
+        label: to flag for finance review
+  confidentiality-clause:
+    displayName: Confidentiality Clause
+    description: Non-disclosure and data handling provisions
+    affordances:
+      - actionType: EXAMINE
+        label: to review confidentiality terms
+      - actionType: FLAG
+        label: to flag for legal review
+  liability-cap:
+    displayName: Liability Cap
+    description: Limits on liability and indemnification
+    affordances:
+      - actionType: EXAMINE
+        label: to review liability
+      - actionType: REJECT
+        label: to reject terms
+sections:
+  - type: entity-group
+    header: Contract Sections
+    entityRefs:
+      - terms-and-conditions
+      - payment-schedule
+  - type: entity-group
+    header: Confidential Clauses
+    requiredTags:
+      - senior-review
+    entityRefs:
+      - confidentiality-clause
+  - type: entity-group
+    header: Financial Terms
+    requiredTags:
+      - financial-clearance
+    entityRefs:
+      - liability-cap
+      - payment-schedule
+  - type: item-list
+    header: Review Actions
+    items:
+      - "EXAMINE — read and analyse a section"
+      - "ANNOTATE — add review notes"
+      - "FLAG — escalate for specialist review"
+      - "APPROVE — mark section as accepted"
+      - "REJECT — mark section as rejected"
+pipeline:
+  - type: perception
+renderer:
+  verbatimThreshold: 6
+  groupedThreshold: 15
