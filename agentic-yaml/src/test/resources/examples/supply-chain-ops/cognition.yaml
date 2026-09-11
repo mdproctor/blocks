@@ -1,0 +1,43 @@
+drive:
+  changeThreshold: 0.08
+  axisWeights:
+    COMPETENCE: 1.8
+    AUTONOMY: 1.5
+    CURIOSITY: 0.7
+    AFFILIATION: 0.5
+mood:
+  maxDisplacement: 0.6
+  baseline:
+    pleasure: 0.4
+    arousal: 0.6
+    dominance: 0.8
+personality:
+  decayFactor: 0.02
+userModel:
+  minSignalsForSynthesis: 5
+  decayRate: 0.03
+strategyLearning:
+  maxGuidelines: 25
+  minCasesForReflection: 3
+mentalModel:
+  confidenceFloor: 0.35
+  minSignalsForInference: 2
+goalProposal:
+  proposalThreshold: 0.5
+  maxDriveGoals: 3
+goalEscalation:
+  escalationCycles: 3
+  maxPrimaryDriveGoals: 2
+normDetection:
+  minObservationsForNorm: 10
+  establishedThreshold: 0.8
+collectiveGoal:
+  alignmentThreshold: 0.7
+  minAlignedAgents: 2
+narrative:
+  maxEpisodes: 80
+  synthesisGate:
+    minNewReflections: 3
+    noveltyThreshold: 0.25
+retention:
+  recencyWeight: 0.75

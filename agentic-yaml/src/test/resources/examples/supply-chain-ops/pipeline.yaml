@@ -1,0 +1,94 @@
+pipeline:
+  name: supply-chain-monitoring
+  source:
+    cloud-event-type: io.casehub.supply.shipment.v1
+    type-prefix: io.casehub.supply
+  tick-interval: 20000
+  levels:
+    - name: detection
+      grouping:
+        type: windowed
+        count: 10
+      summariser:
+        type: threshold-classify
+        rules:
+          - name: weight-discrepancy
+            when: "weightDelta > 5.0"
+            category: WEIGHT_ANOMALY
+            severity: MEDIUM
+          - name: temperature-breach
+            when: "temperature > 30.0"
+            category: TEMP_BREACH
+            severity: HIGH
+          - name: late-arrival
+            when: "delayHours > 4"
+            category: LATE
+            severity: MEDIUM
+          - name: missing-scan
+            when: "missingScan == true"
+            category: TRACKING_GAP
+            severity: LOW
+      emit:
+        cloud-event-type: io.casehub.supply.anomaly.v1
+
+    - name: triage
+      grouping:
+        type: keyed
+        key: warehouseId
+        completion: size
+        stale-timeout: 60000
+      summariser:
+        type: phase-detect
+        initial: NORMAL
+        states:
+          - NORMAL
+          - ELEVATED
+          - DISRUPTED
+          - RECOVERING
+        transitions:
+          - from: NORMAL
+            to: ELEVATED
+            count-field: severity
+            count-value: MEDIUM
+            op: ">="
+            threshold: 3
+          - from: ELEVATED
+            to: DISRUPTED
+            count-field: severity
+            count-value: HIGH
+            op: ">="
+            threshold: 2
+          - from: DISRUPTED
+            to: RECOVERING
+            count-field: severity
+            count-value: HIGH
+            op: "=="
+            threshold: 0
+          - from: RECOVERING
+            to: NORMAL
+            count-field: severity
+            count-value: MEDIUM
+            op: "=="
+            threshold: 0
+      emit:
+        cloud-event-type: io.casehub.supply.triage.v1
+
+    - name: response
+      grouping:
+        type: windowed
+        age: 180000
+      summariser:
+        type: count
+        category-field: category
+      emit:
+        cloud-event-type: io.casehub.supply.response.v1
+
+    - name: resolution
+      grouping:
+        type: windowed
+        count: 50
+      summariser:
+        type: field-extract
+        expression: ".resolution"
+      emit:
+        cloud-event-type: io.casehub.supply.resolution.v1

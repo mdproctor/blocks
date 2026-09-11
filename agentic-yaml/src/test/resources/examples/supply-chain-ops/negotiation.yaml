@@ -1,0 +1,12 @@
+parties:
+  - response-planner
+  - triage-coordinator
+  - resolution-tracker
+acceptance:
+  type: majority
+termination:
+  - type: accepted
+  - type: max-iterations
+    iterations: 5
+  - type: deadline
+    timeout: PT30M

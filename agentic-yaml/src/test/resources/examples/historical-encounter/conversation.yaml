@@ -1,0 +1,14 @@
+turnPolicy:
+  type: round-robin
+epistemicRule:
+  type: explicit-acknowledgement
+  minParticipants: 2
+convergencePolicy:
+  type: composite
+  policies:
+    - type: structural
+      similarityThreshold: 0.75
+      staleRounds: 4
+    - type: common-ground-ratio
+      consensusThreshold: 0.8
+      deadlockDisputeRatio: 0.3

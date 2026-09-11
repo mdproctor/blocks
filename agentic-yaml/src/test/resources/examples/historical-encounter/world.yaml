@@ -1,0 +1,85 @@
+actions:
+  - type: RESEARCH
+    description: Look up information about a topic, person, or era
+    parameterFormat: <topic>
+  - type: REFLECT
+    description: Process and consolidate recent observations into memory
+  - type: SHARE
+    description: Tell the other person about an experience or insight
+    parameterFormat: <topic> <detail>
+  - type: ASK
+    description: Ask the other person a question
+    parameterFormat: <person-id> <question>
+entities:
+  leonardo:
+    displayName: Leonardo da Vinci
+    description: A Florentine polymath in his mid-fifties, dressed in a rose-coloured cloak. His notebooks are tucked under one arm.
+    affordances:
+      - actionType: ASK
+        label: to ask Leonardo a question
+      - actionType: SHARE
+        label: to share an insight with Leonardo
+  nikola:
+    displayName: Nikola Tesla
+    description: A tall, slender Serbian-American in a dark suit, mid-thirties. His eyes carry an intensity that suggests a mind perpetually at work.
+    affordances:
+      - actionType: ASK
+        label: to ask Tesla a question
+      - actionType: SHARE
+        label: to share an insight with Tesla
+  codex:
+    displayName: Leonardo's Codex
+    description: A leather-bound volume of mirror-written observations — anatomy, mechanics, water flow, flight
+    affordances:
+      - actionType: RESEARCH
+        label: to study the drawings and notes
+  tesla-patents:
+    displayName: Tesla's Patent Portfolio
+    description: A collection of patent documents — AC motors, transformers, oscillators, wireless power
+    affordances:
+      - actionType: RESEARCH
+        label: to study the designs and specifications
+sections:
+  - type: text
+    header: The Setting
+    content: "A reading room outside of time. Two inventors sit across from each other at a broad oak table, each with their life's work spread before them. Neither speaks the other's language, yet they understand perfectly — ideas translate themselves here."
+    interpretiveFrame: "Narrate the physical setting when the agent first observes."
+  - type: entity-group
+    header: The Inventors
+    entityRefs:
+      - leonardo
+      - nikola
+  - type: entity-group
+    header: Works and Writings
+    entityRefs:
+      - codex
+      - tesla-patents
+  - type: entity-group
+    header: Personal Journals
+    requiredTags:
+      - deep-trust
+    entityRefs:
+      - codex
+    entities:
+      - id: private-diary
+        displayName: Tesla's Private Diary
+        description: Unpublished personal reflections — childhood memories, the pigeon, visions of the rotating magnetic field
+        affordances:
+          - actionType: RESEARCH
+            label: to read private entries
+    resolutions:
+      REDUCED:
+        type: text
+        header: Personal Journals
+        content: "[The journals are present but their contents feel private — deeper trust is needed.]"
+  - type: item-list
+    header: Conversation Seeds
+    items:
+      - "The nature of light — waves or particles? Both spent decades observing it."
+      - "Flight — Leonardo sketched ornithopters; Tesla imagined electromagnetic propulsion."
+      - "The relationship between art and engineering — beauty in function."
+      - "Water — Leonardo's obsession with fluid dynamics; Tesla's hydroelectric vision at Niagara."
+      - "The cost of obsession — unfinished works, unpaid debts, solitary lives."
+renderer:
+  verbatimThreshold: 12
+  groupedThreshold: 30

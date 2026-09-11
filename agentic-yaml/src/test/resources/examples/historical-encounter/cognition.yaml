@@ -1,0 +1,80 @@
+drive:
+  changeThreshold: 0.08
+  axisWeights:
+    CURIOSITY: 2.0
+    COMPETENCE: 1.4
+    AUTONOMY: 1.6
+    AFFILIATION: 1.0
+  narrativeModulationStrength: 0.3
+mood:
+  maxDisplacement: 0.7
+  baseline:
+    pleasure: 0.6
+    arousal: 0.5
+    dominance: 0.5
+  moodInfluence: 0.4
+personality:
+  decayFactor: 0.01
+  l2Ceiling: 0.3
+  dampeningFactor: 0.15
+userModel:
+  minSignalsForSynthesis: 3
+  synthesisCooldown: PT2M
+  decayRate: 0.02
+  positiveWeight: 1.5
+  negativeWeight: 0.5
+  maxObservationsInPrompt: 15
+strategyLearning:
+  minSignalsForConversationCase: 2
+  minCasesForReflection: 3
+  maxReflectionSources: 10
+  maxGuidelines: 20
+  maxBufferSize: 50
+mentalModel:
+  beliefHalfLife: PT30M
+  desireHalfLife: PT1H
+  intentionHalfLife: PT15M
+  confidenceFloor: 0.2
+  projectionFloor: 0.15
+  minSignalsForInference: 2
+  maxSignalsInPrompt: 12
+  maxBufferSize: 40
+goalProposal:
+  proposalThreshold: 0.4
+  relevanceThreshold: 0.3
+  maxDriveGoals: 5
+  staleAfter: PT20M
+  cooldown: PT5M
+  failureAbandonmentThreshold: 2
+goalEscalation:
+  escalationSalienceThreshold: 0.5
+  minAxisAlignmentWeight: 0.3
+  crossAxisMinWeight: 0.2
+  minCrossAxisCount: 2
+  escalationCycles: 3
+  demotionCycles: 5
+  maxPrimaryDriveGoals: 3
+normDetection:
+  minObservationsForNorm: 8
+  establishedThreshold: 0.7
+  decliningThreshold: 0.25
+  minAgentsForNorm: 2
+collectiveGoal:
+  alignmentThreshold: 0.6
+  minAlignedAgents: 2
+  cooldown: PT10M
+narrative:
+  maxEpisodes: 120
+  maxThemes: 8
+  themeSalienceFloor: 0.2
+  maxReflectionsPerSynthesis: 10
+  synthesisGate:
+    minNewReflections: 2
+    noveltyThreshold: 0.2
+    quietPeriodBypass: PT15M
+retention:
+  retentionThreshold: 0.3
+  confidenceWeight: 0.25
+  recencyWeight: 0.35
+  scopeWeight: 0.2
+  trustWeight: 0.2

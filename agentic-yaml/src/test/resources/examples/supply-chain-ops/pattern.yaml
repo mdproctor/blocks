@@ -1,0 +1,56 @@
+type: supervisor
+routing:
+  type: first-match
+  guard: "descriptor != null && descriptor.briefing() != null"
+termination:
+  - type: max-iterations
+    iterations: 30
+  - type: goal-reached
+    when: "state != null && state.containsKey('all-resolved')"
+aggregation:
+  type: collect-all
+failurePolicy:
+  onRoutingFailure: RETRY_BROADER
+  onDeadlock: ESCALATE
+  agentRetry:
+    maxRetries: 4
+    backoff: PT5S
+    backoffStrategy: EXPONENTIAL
+    onExhausted: ESCALATE
+judgment:
+  trigger:
+    type: confidence-threshold
+    threshold: 0.7
+    extractor: "confidence"
+  caller:
+    type: fan-out
+    callerNames:
+      - ops-lead
+      - logistics-director
+    agreement:
+      type: unanimous
+agents:
+  - type: worker
+    name: anomaly-detector
+    description: "Detects supply chain anomalies from sensor and tracking data — weight discrepancies, temperature breaches, tracking gaps"
+    capabilities:
+      - anomaly-detection
+      - sensor-analysis
+  - type: worker
+    name: triage-coordinator
+    description: "Classifies and prioritises disruptions by warehouse and severity — escalates critical events"
+    capabilities:
+      - triage-classification
+      - priority-assessment
+  - type: worker
+    name: response-planner
+    description: "Plans response actions — rerouting, substitute sourcing, capacity reallocation"
+    capabilities:
+      - response-planning
+      - resource-optimisation
+  - type: worker
+    name: resolution-tracker
+    description: "Tracks resolution outcomes and confirms restoration to normal operations"
+    capabilities:
+      - resolution-tracking
+      - outcome-verification

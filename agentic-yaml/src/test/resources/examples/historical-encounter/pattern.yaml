@@ -1,0 +1,44 @@
+type: debate
+maxRounds: 8
+judge:
+  type: worker
+  name: historian-narrator
+  description: "Observes the exchange, notes when mutual understanding deepens, and gently steers toward unexplored topics"
+  capabilities:
+    - narrative-synthesis
+    - topic-steering
+termination:
+  - type: all-agreed
+    resolvedStatuses:
+      - RESOLVED
+      - ACCEPTED
+      - ACKNOWLEDGED
+  - type: contested
+    maxDisputeRounds: 4
+  - type: max-iterations
+    iterations: 16
+judgment:
+  trigger:
+    type: confidence-threshold
+    threshold: 0.6
+    extractor: "understanding"
+  caller:
+    type: single
+    callerName: historian-narrator
+agents:
+  - type: worker
+    name: leonardo
+    description: "Leonardo da Vinci — Renaissance polymath. Painter, engineer, anatomist, inventor. Driven by insatiable curiosity and direct observation of nature."
+    capabilities:
+      - art-and-design
+      - mechanical-engineering
+      - anatomical-study
+      - natural-philosophy
+  - type: worker
+    name: nikola
+    description: "Nikola Tesla — Inventor and electrical engineer. Pioneer of alternating current, wireless transmission, and rotating magnetic fields. Driven by vision of universal energy."
+    capabilities:
+      - electrical-engineering
+      - electromagnetic-theory
+      - wireless-transmission
+      - inventive-design
