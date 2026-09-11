@@ -1,0 +1,79 @@
+pipeline:
+  name: fleet-monitoring
+  source:
+    cloud-event-type: io.casehub.logistics.vehicle.v1
+    type-prefix: io.casehub.logistics
+  tick-interval: 30000
+  levels:
+    - name: per-vehicle
+      grouping:
+        type: keyed
+        key: vehicleId
+        completion: size
+        stale-timeout: 60000
+      summariser:
+        type: pass-through
+
+    - name: per-route
+      grouping:
+        type: keyed
+        key: routeId
+        completion: size
+        stale-timeout: 120000
+      summariser:
+        type: pass-through
+
+    - name: route-health
+      grouping:
+        type: windowed
+        count: 10
+      summariser:
+        type: threshold-classify
+        rules:
+          - name: critical-delay
+            when: "delayMinutes > 60"
+            category: CRITICAL
+            severity: HIGH
+          - name: degraded-delay
+            when: "delayMinutes > 15"
+            category: DEGRADED
+            severity: MEDIUM
+          - name: missed-delivery
+            when: "missedDelivery == true"
+            category: CRITICAL
+            severity: HIGH
+      emit:
+        cloud-event-type: io.casehub.logistics.route-health.v1
+
+    - name: fleet-status
+      grouping:
+        type: windowed
+        age: 300000
+      summariser:
+        type: phase-detect
+        initial: NORMAL
+        states:
+          - NORMAL
+          - DEGRADED
+          - CRITICAL
+        transitions:
+          - from: NORMAL
+            to: DEGRADED
+            count-field: severity
+            count-value: MEDIUM
+            op: ">="
+            threshold: 3
+          - from: DEGRADED
+            to: CRITICAL
+            count-field: severity
+            count-value: HIGH
+            op: ">="
+            threshold: 2
+          - from: CRITICAL
+            to: NORMAL
+            count-field: severity
+            count-value: HIGH
+            op: "=="
+            threshold: 0
+      emit:
+        cloud-event-type: io.casehub.logistics.fleet-status.v1

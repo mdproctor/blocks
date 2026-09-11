@@ -1,0 +1,45 @@
+type: supervisor
+routing:
+  type: first-match
+  guard: "descriptor != null && descriptor.briefing() != null"
+termination:
+  - type: max-iterations
+    iterations: 20
+  - type: goal-reached
+    when: "state != null && state.containsKey('resolved')"
+aggregation:
+  type: collect-all
+failurePolicy:
+  onRoutingFailure: RETRY_BROADER
+  onDeadlock: ESCALATE
+  agentRetry:
+    maxRetries: 3
+    backoff: PT2S
+    backoffStrategy: EXPONENTIAL
+    onExhausted: ESCALATE
+judgment:
+  trigger:
+    type: iteration-based
+    every: 3
+  caller:
+    type: single
+    callerName: fleet-supervisor
+agents:
+  - type: worker
+    name: route-analyst
+    description: "Examines degraded routes and identifies root causes — delay patterns, bottleneck locations, recurring issues"
+    capabilities:
+      - route-analysis
+      - anomaly-detection
+  - type: worker
+    name: dispatcher
+    description: "Recommends rerouting and schedule adjustments for critical routes"
+    capabilities:
+      - dispatch-planning
+      - route-optimisation
+  - type: worker
+    name: reporter
+    description: "Compiles fleet health summaries for operations dashboard"
+    capabilities:
+      - report-generation
+      - data-synthesis
