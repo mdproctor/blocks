@@ -230,12 +230,12 @@ and their implementation status. Update as gaps close.
 
 | Capability | Status | Notes |
 |-----------|--------|-------|
-| ExecutionBackend: reactive / choreographed | Gap | Named type |
-| EventConcurrencyPolicy: serialize / coalesce / coalesce-by-source | Gap | Named type |
-| Listener types: event-log / ledger / metrics | Gap | Named types |
-| CoalitionEvaluator: capability-coverage | Gap | Named type |
-| JointIntention (intentionId, plan, parties) | Gap | Pure data lifecycle |
-| ReconsiderationSignal (reason enum, detail) | Gap | |
+| ExecutionBackend: reactive / choreographed | Done | #251 — ExecutionBackendSpec sealed interface |
+| EventConcurrencyPolicy: serialize / coalesce / coalesce-by-source | Done | #251 — EventConcurrencyPolicySpec sealed interface |
+| Listener types: event-log / ledger / metrics | Done | #251 — ExecutionListenerSpec sealed interface |
+| CoalitionEvaluator: capability-coverage | Done | #251 — CoalitionEvaluatorSpec sealed interface |
+| JointIntention (intentionId, plan, parties) | Done | #251 — JointIntentionSpec adapted record |
+| ReconsiderationSignal (reason enum, detail) | Done | #251 — direct reuse |
 
 ### 19. Trust & Routing Config
 
@@ -341,7 +341,7 @@ and their implementation status. Update as gaps close.
 | blocks | Affordance (15) | 8 | **7** | — | — | 1 | — |
 | blocks | Channel (16) | 4 | **3** | — | — | 1 | — |
 | blocks | Prompt optim (17) | 8 | **8** | — | — | — | — |
-| blocks | Execution (18) | 6 | — | — | **6** | — | — |
+| blocks | Execution (18) | 6 | **6** | — | — | — | — |
 | blocks | Trust/routing (19) | 6 | — | — | **6** | — | — |
 | blocks | Oversight (20) | 3 | — | — | **3** | — | — |
 | engine-adapter | Engine (21) | 5 | — | — | **5** | — | — |
@@ -349,8 +349,8 @@ and their implementation status. Update as gaps close.
 | speech-ws | Avatar (23) | 2 | — | — | **2** | — | — |
 | speech-sherpa | Models (24) | 4 | — | — | **4** | — | — |
 | annotations | Governance (25) | 3 | — | — | **3** | — | — |
-| **Total** | | **165** | **91** | — | **64** | **4** | **6** |
+| **Total** | | **165** | **97** | — | **58** | **4** | **6** |
 
-**Coverage: 91/165 (55%).** Pattern orchestration, conversation, negotiation,
-channel, and prompt optimisation layers are complete. Remaining gaps: execution
-infrastructure, trust/routing, oversight, engine adapter, speech.
+**Coverage: 97/165 (59%).** Pattern orchestration, conversation, negotiation,
+channel, prompt optimisation, and execution infrastructure layers are complete.
+Remaining gaps: trust/routing, oversight, engine adapter, speech.
