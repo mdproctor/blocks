@@ -43,7 +43,10 @@ public class BlocksSchemaGenerator {
                 io.casehub.blocks.agentic.yaml.spec.EpistemicRuleSpec.class,
                 io.casehub.blocks.agentic.yaml.spec.ConvergencePolicySpec.class,
                 io.casehub.blocks.agentic.yaml.spec.ConflictResolutionSpec.class,
-                io.casehub.blocks.agentic.yaml.spec.TaskNodeSpec.class)) {
+                io.casehub.blocks.agentic.yaml.spec.TaskNodeSpec.class,
+                io.casehub.blocks.agentic.yaml.spec.PromptOptimiserSpec.class,
+                io.casehub.blocks.agentic.yaml.spec.DiversityStrategySpec.class,
+                io.casehub.blocks.agentic.yaml.spec.ConfidenceScorerSpec.class)) {
             extractJacksonDiscriminators(sealedType, overrides);
         }
         return overrides;

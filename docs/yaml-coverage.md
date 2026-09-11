@@ -217,14 +217,14 @@ and their implementation status. Update as gaps close.
 
 | Capability | Status | Notes |
 |-----------|--------|-------|
-| OptimiserConfig (maxExamples, qualityThreshold, minOutcomes) | Gap | |
-| SafetyConfig (qualityFloor, circuitBreaker, maxExperiments) | Gap | |
-| PromptOptimiser types: few-shot / instruction | Gap | Named registry types |
-| DiversityStrategy types: top-n / outcome-aware(weight) | Gap | Named registry types |
-| FewShotExample (input, output, outcome, qualityScore) | Gap | |
-| PromptVariant (examples, instructionDelta, qualityScore) | Gap | |
-| PromptSignature (id, description, baseSystemPrompt) | Gap | Has Class<?> fields — needs string type refs |
-| ConfidenceScorer types: arousal / surprise / composite | Gap | Named registry types |
+| OptimiserConfig (maxExamples, qualityThreshold, minOutcomes) | Done | #250 — direct reuse, no spec wrapper |
+| SafetyConfig (qualityFloor, circuitBreaker, maxExperiments) | Done | #250 — direct reuse, no spec wrapper |
+| PromptOptimiser types: few-shot / instruction | Done | #250 — PromptOptimiserSpec sealed interface |
+| DiversityStrategy types: top-n / outcome-aware(weight) | Done | #250 — DiversityStrategySpec sealed interface |
+| FewShotExample (input, output, outcome, qualityScore) | Done | #250 — direct reuse, no spec wrapper |
+| PromptVariant (examples, instructionDelta, qualityScore) | Done | #250 — declarative subset via pipeline spec |
+| PromptSignature (id, description, baseSystemPrompt) | Done | #250 — PromptSignatureSpec with string type refs |
+| ConfidenceScorer types: arousal / surprise / composite | Done | #250 — ConfidenceScorerSpec sealed interface |
 
 ### 18. Execution Infrastructure
 
@@ -340,7 +340,7 @@ and their implementation status. Update as gaps close.
 | blocks | Social configs (14) | 13 | **13** | — | — | — | — |
 | blocks | Affordance (15) | 8 | **7** | — | — | 1 | — |
 | blocks | Channel (16) | 4 | **3** | — | — | 1 | — |
-| blocks | Prompt optim (17) | 8 | — | — | **8** | — | — |
+| blocks | Prompt optim (17) | 8 | **8** | — | — | — | — |
 | blocks | Execution (18) | 6 | — | — | **6** | — | — |
 | blocks | Trust/routing (19) | 6 | — | — | **6** | — | — |
 | blocks | Oversight (20) | 3 | — | — | **3** | — | — |
@@ -349,8 +349,8 @@ and their implementation status. Update as gaps close.
 | speech-ws | Avatar (23) | 2 | — | — | **2** | — | — |
 | speech-sherpa | Models (24) | 4 | — | — | **4** | — | — |
 | annotations | Governance (25) | 3 | — | — | **3** | — | — |
-| **Total** | | **165** | **83** | — | **72** | **4** | **6** |
+| **Total** | | **165** | **91** | — | **64** | **4** | **6** |
 
-**Coverage: 83/165 (50%).** Pattern orchestration, conversation, negotiation,
-and channel layers are complete. Remaining gaps: prompt tuning, execution
+**Coverage: 91/165 (55%).** Pattern orchestration, conversation, negotiation,
+channel, and prompt optimisation layers are complete. Remaining gaps: execution
 infrastructure, trust/routing, oversight, engine adapter, speech.

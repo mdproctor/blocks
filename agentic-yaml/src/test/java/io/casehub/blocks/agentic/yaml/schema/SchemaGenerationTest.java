@@ -58,4 +58,32 @@ class SchemaGenerationTest {
         JsonNode schema = generator.generate(PatternSpec.class);
         assertThat(schema.toString()).contains("agents");
     }
+
+    @Test
+    void promptOptimiserSpecSchemaHasTypes() {
+        JsonNode schema = generator.generate(io.casehub.blocks.agentic.yaml.spec.PromptOptimiserSpec.class);
+        assertThat(schema).isNotNull();
+        var schemaText = schema.toString();
+        assertThat(schemaText).contains("few-shot");
+        assertThat(schemaText).contains("instruction");
+    }
+
+    @Test
+    void confidenceScorerSpecSchemaHasTypes() {
+        JsonNode schema = generator.generate(io.casehub.blocks.agentic.yaml.spec.ConfidenceScorerSpec.class);
+        assertThat(schema).isNotNull();
+        var schemaText = schema.toString();
+        assertThat(schemaText).contains("arousal");
+        assertThat(schemaText).contains("surprise");
+        assertThat(schemaText).contains("composite");
+    }
+
+    @Test
+    void promptOptimisationDefinitionSchemaHasPipelines() {
+        JsonNode schema = generator.generate(io.casehub.blocks.agentic.yaml.spec.PromptOptimisationDefinition.class);
+        assertThat(schema).isNotNull();
+        var schemaText = schema.toString();
+        assertThat(schemaText).contains("pipelines");
+    }
+
 }

@@ -78,6 +78,22 @@ public class AgenticYamlProcessor {
     }
 
     @BuildStep
+    PromptOptimisationBuildItem discoverPromptOptimisationConfig() throws IOException {
+        ClassLoader cl       = Thread.currentThread().getContextClassLoader();
+        URL         resource = cl.getResource("META-INF/prompt-optimisation.yaml");
+        if (resource == null) {
+            resource = cl.getResource("META-INF/prompt-optimisation.yml");
+        }
+        if (resource == null) {return new PromptOptimisationBuildItem(null);}
+        try (InputStream in = resource.openStream()) {
+            var definition = YAML.readValue(in,
+                                            io.casehub.blocks.agentic.yaml.spec.PromptOptimisationDefinition.class);
+            return new PromptOptimisationBuildItem(definition);
+        }
+    }
+
+
+    @BuildStep
     CognitionConfigBuildItem discoverCognitionConfig() throws IOException {
         ClassLoader cl       = Thread.currentThread().getContextClassLoader();
         URL         resource = cl.getResource("META-INF/cognition.yaml");
