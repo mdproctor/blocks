@@ -13,8 +13,8 @@ class PipelineValidatorTest {
 
     private PipelineDefinition pipeline(LevelDefinition... levels) {
         return new PipelineDefinition("test",
-                new SourceDefinition(null, "io.test.v1"),
-                List.of(levels));
+                new SourceDefinition(null, "io.test.v1", null),
+                List.of(levels), null);
     }
 
     private LevelDefinition level(String name, SummariserDefinition summariser) {
@@ -24,11 +24,11 @@ class PipelineValidatorTest {
     }
 
     private SummariserDefinition summariser(String type) {
-        return new SummariserDefinition(type, Map.of());
+        return new SummariserDefinition(type, null, Map.of());
     }
 
     private SummariserDefinition summariser(String type, Map<String, Object> config) {
-        return new SummariserDefinition(type, config);
+        return new SummariserDefinition(type, null, config);
     }
 
     @Test
@@ -81,9 +81,10 @@ class PipelineValidatorTest {
     @Test
     void rejects_missingGrouping() {
         var def = new PipelineDefinition("test",
-                new SourceDefinition(null, null),
+                new SourceDefinition(null, null, null),
                 List.of(new LevelDefinition("l1", null,
-                        summariser("pass-through"), null, List.of())));
+                        summariser("pass-through"), null, List.of())),
+                null);
         var errors = new PipelineValidator().validate(def, registry);
         assertThat(errors).anyMatch(e -> e.message().contains("grouping"));
     }
@@ -91,7 +92,7 @@ class PipelineValidatorTest {
     @Test
     void rejects_emptyLevels() {
         var def = new PipelineDefinition("test",
-                new SourceDefinition(null, null), List.of());
+                new SourceDefinition(null, null, null), List.of(), null);
         var errors = new PipelineValidator().validate(def, registry);
         assertThat(errors).anyMatch(e -> e.message().contains("level"));
     }

@@ -113,9 +113,9 @@ and their implementation status. Update as gaps close.
 |-----------|--------|-------|
 | PipelineDefinition (name, source, levels) | Done | Full YAML surface |
 | LevelDefinition (name, grouping, summariser, emit) | Done | |
-| SourceDefinition (type, cloudEventType) | Done | |
+| SourceDefinition (type, cloudEventType, typePrefix) | Done | #254 — typePrefix added |
 | GroupingDefinition.Windowed (age, count) | Done | |
-| GroupingDefinition.Keyed (keyExpr, completionExpr, staleTimeout) | Gap | Parses in YAML but `PipelineCompiler` throws UnsupportedOperationException |
+| GroupingDefinition.Keyed (keyExpr, completionExpr, staleTimeout) | Done | #254 — KeyedSummarisationRunner wired via PipelineCompiler |
 | PipelineCompiler (definition → CompiledPipeline) | Done | |
 | PipelineValidator | Done | |
 | SummariserRegistry (type:name → factory) | Done | |
@@ -127,15 +127,15 @@ and their implementation status. Update as gaps close.
 | `threshold-classify` | Done | Per-event MVEL predicate rules → category |
 | `phase-detect` | Done | Stateful state machine |
 | `count` | Done | Event counting |
-| `field-extract` | Gap | Class exists but NOT registered in SummarisationRecorder |
+| `field-extract` | Done | #254 — registered in SummarisationRecorder |
 | `pass-through` | Done | Registered in SummariserRegistry constructor |
-| `verbatim` | Gap | VerbatimContentSummariser exists in summarisation-api, not registered |
+| `verbatim` | Done | #254 — registered in SummarisationRecorder via asSummariser() bridge |
 
 ### 11. Summarisation Extensions (blocks module)
 
 | Capability | Status | Notes |
 |-----------|--------|-------|
-| SummaryMode (APPEND / EDIT) | Gap | Enum — YAML config for LlmContentSummariser |
+| SummaryMode (APPEND / EDIT) | Done | #254 — mode field on SummariserDefinition |
 | TieredContentSummariser thresholds | Gap | smallThreshold, mediumThreshold are YAML; delegates are code |
 | LlmContentSummariser (preamble, mode) | Partial | preamble + mode YAML; AgentProvider CDI |
 | ContentSummariser.asSummariser() bridge | Done | Built into summarisation-api |
@@ -148,9 +148,9 @@ and their implementation status. Update as gaps close.
 
 | Capability | Status | Notes |
 |-----------|--------|-------|
-| CloudEventIngestionAdapter config (typePrefix, tenancyId extension) | Gap | Config fields are YAML-expressible |
+| CloudEventIngestionAdapter config (typePrefix, tenancyId extension) | Done | #254 — typePrefix on SourceDefinition |
 | CloudEventEmitter config (cloudEventType) | Gap | Type name is YAML; serialiser is code |
-| PipelineTickScheduler (tickInterval) | Gap | `tickInterval: PT1S` — pure config |
+| PipelineTickScheduler (tickInterval) | Done | #254 — tickInterval on PipelineDefinition |
 | EventSink | Code-only | @FunctionalInterface |
 
 ---
@@ -165,7 +165,7 @@ and their implementation status. Update as gaps close.
 | EventLevel (name, ordinal) | Done | Used in LevelDefinition |
 | Summariser, StatefulSummariser, ContentSummariser | Code-only | @FunctionalInterface — computation logic |
 | SummarisationRunner | Done | Wired by PipelineCompiler |
-| KeyedSummarisationRunner | Gap | Keyed variant — needs KeyedGrouping compiler support |
+| KeyedSummarisationRunner | Done | #254 — wired via keyed grouping compiler |
 | EventStreamBus, EventAccumulator, KeyedAccumulator | Code-only | Runtime infrastructure |
 | Compactor | Code-only | @FunctionalInterface |
 
@@ -333,10 +333,10 @@ and their implementation status. Update as gaps close.
 | agentic-yaml | Negotiation (5) | 6 | **6** | — | — | — | — |
 | agentic-yaml | Normative (6) | 5 | **5** | — | — | — | — |
 | agentic-yaml | Expression/infra (7-8) | 7 | **4** | — | **3** | — | — |
-| summarisation-yaml | Pipeline (9-10) | 13 | **10** | — | **3** | — | — |
-| summarisation-yaml | Extensions (11) | 4 | 1 | — | **2** | 1 | — |
-| cloudevents | Bridge (12) | 4 | — | — | **3** | — | 1 |
-| summarisation-api | Core (13) | 9 | **3** | — | **1** | — | 5 |
+| summarisation-yaml | Pipeline (9-10) | 13 | **13** | — | — | — | — |
+| summarisation-yaml | Extensions (11) | 4 | 2 | — | **1** | 1 | — |
+| cloudevents | Bridge (12) | 4 | 2 | — | **1** | — | 1 |
+| summarisation-api | Core (13) | 9 | **4** | — | — | — | 5 |
 | blocks | Social configs (14) | 13 | **13** | — | — | — | — |
 | blocks | Affordance (15) | 8 | **7** | — | — | 1 | — |
 | blocks | Channel (16) | 4 | **3** | — | — | 1 | — |
@@ -349,8 +349,8 @@ and their implementation status. Update as gaps close.
 | speech-ws | Avatar (23) | 2 | — | — | **2** | — | — |
 | speech-sherpa | Models (24) | 4 | — | — | **4** | — | — |
 | annotations | Governance (25) | 3 | — | — | **3** | — | — |
-| **Total** | | **165** | **97** | — | **58** | **4** | **6** |
+| **Total** | | **165** | **104** | — | **51** | **4** | **6** |
 
-**Coverage: 97/165 (59%).** Pattern orchestration, conversation, negotiation,
+**Coverage: 104/165 (63%).** Pattern orchestration, conversation, negotiation,
 channel, prompt optimisation, and execution infrastructure layers are complete.
-Remaining gaps: engine adapter.
+Summarisation pipeline fully covered (§9-13). Remaining gaps: engine adapter.

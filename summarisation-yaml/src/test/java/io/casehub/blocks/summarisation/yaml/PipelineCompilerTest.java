@@ -1,12 +1,12 @@
 package io.casehub.blocks.summarisation.yaml;
 
 import io.casehub.blocks.summarisation.EventLevel;
-import io.casehub.blocks.summarisation.EventStreamBus;
 import io.casehub.blocks.summarisation.LevelEvent;
+import io.casehub.platform.api.expression.CompiledExpression;
+import io.casehub.platform.api.expression.ExpressionEngine;
 import io.cloudevents.CloudEvent;
 import org.junit.jupiter.api.Test;
 
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -17,14 +17,51 @@ class PipelineCompilerTest {
 
     static final EventLevel INPUT_LEVEL = new EventLevel("input", 0);
 
+    private static ExpressionEngine stubExpressionEngine() {
+        return new ExpressionEngine() {
+            @Override
+            public String type() {return "stub";}
+
+            @SuppressWarnings("unchecked")
+            @Override
+            public <C, R> CompiledExpression<C, R> compile(String expr, Class<C> ct, Class<R> rt) {
+                return new CompiledExpression<>() {
+                    @Override
+                    public String type() {return "stub";}
+
+                    @Override
+                    public R eval(C context) {
+                        if (context instanceof Map<?, ?> m) {
+                            return (R) m.get(expr);
+                        }
+                        if (context instanceof List<?> l) {
+                            return (R) Boolean.valueOf(l.size() >= 3);
+                        }
+                        return (R) context;
+                    }
+                };
+            }
+
+            @Override
+            public <C, R> CompiledExpression<C, R> compile(String expr, Class<C> ct, Class<R> rt, Map<String, Object> vars) {
+                return compile(expr, ct, rt);
+            }
+
+            @Override
+            public void validate(String expr) {}
+        };
+    }
+
+
     @Test
     void compiles_singleLevelPassThrough() {
         var def = new PipelineDefinition("test",
-                new SourceDefinition(null, null),
+                new SourceDefinition(null, null, null),
                 List.of(new LevelDefinition("out",
                         new GroupingDefinition.Windowed(null, 2),
-                        new SummariserDefinition("pass-through", Map.of()),
-                        null, List.of())));
+                        new SummariserDefinition("pass-through", null, Map.of()),
+                        null, List.of())),
+                null);
 
         var registry = new SummariserRegistry();
         var pipeline = new PipelineCompiler().compile(def, registry, null);
@@ -43,16 +80,17 @@ class PipelineCompilerTest {
     @Test
     void compiles_multiLevelPipeline() {
         var def = new PipelineDefinition("multi",
-                new SourceDefinition(null, null),
+                new SourceDefinition(null, null, null),
                 List.of(
                         new LevelDefinition("l1",
                                 new GroupingDefinition.Windowed(null, 2),
-                                new SummariserDefinition("pass-through", Map.of()),
+                                new SummariserDefinition("pass-through", null, Map.of()),
                                 null, List.of()),
                         new LevelDefinition("l2",
                                 new GroupingDefinition.Windowed(null, 2),
-                                new SummariserDefinition("pass-through", Map.of()),
-                                null, List.of())));
+                                new SummariserDefinition("pass-through", null, Map.of()),
+                                null, List.of())),
+                null);
 
         var registry = new SummariserRegistry();
         var pipeline = new PipelineCompiler().compile(def, registry, null);
@@ -75,12 +113,13 @@ class PipelineCompilerTest {
         var emitted = new ArrayList<CloudEvent>();
 
         var def = new PipelineDefinition("emitting",
-                new SourceDefinition(null, null),
+                new SourceDefinition(null, null, null),
                 List.of(new LevelDefinition("l1",
                         new GroupingDefinition.Windowed(null, 2),
-                        new SummariserDefinition("pass-through", Map.of()),
+                        new SummariserDefinition("pass-through", null, Map.of()),
                         new EmitDefinition("io.test.output.v1"),
-                        List.of())));
+                        List.of())),
+                null);
 
         var registry = new SummariserRegistry();
         var pipeline = new PipelineCompiler().compile(def, registry,
@@ -98,11 +137,12 @@ class PipelineCompilerTest {
     @Test
     void flush_drainsRemainingEvents() {
         var def = new PipelineDefinition("flush-test",
-                new SourceDefinition(null, null),
+                new SourceDefinition(null, null, null),
                 List.of(new LevelDefinition("out",
                         new GroupingDefinition.Windowed(null, 100),
-                        new SummariserDefinition("pass-through", Map.of()),
-                        null, List.of())));
+                        new SummariserDefinition("pass-through", null, Map.of()),
+                        null, List.of())),
+                null);
 
         var registry = new SummariserRegistry();
         var pipeline = new PipelineCompiler().compile(def, registry, null);
@@ -121,11 +161,12 @@ class PipelineCompilerTest {
     @Test
     void compiles_windowedWithAge() {
         var def = new PipelineDefinition("aged",
-                new SourceDefinition(null, null),
+                new SourceDefinition(null, null, null),
                 List.of(new LevelDefinition("out",
                         new GroupingDefinition.Windowed(100L, null),
-                        new SummariserDefinition("pass-through", Map.of()),
-                        null, List.of())));
+                        new SummariserDefinition("pass-through", null, Map.of()),
+                        null, List.of())),
+                null);
 
         var registry = new SummariserRegistry();
         var pipeline = new PipelineCompiler().compile(def, registry, null);
@@ -139,5 +180,29 @@ class PipelineCompilerTest {
 
         pipeline.tick(250L).toCompletableFuture().join();
         assertThat(output).hasSize(1);
+    }
+
+    @Test
+    void compiles_keyedGrouping() {
+        var def = new PipelineDefinition("keyed-test",
+                                         new SourceDefinition(null, null, null),
+                                         List.of(new LevelDefinition("out",
+                                                                     new GroupingDefinition.Keyed("category", "size", 5000L),
+                                                                     new SummariserDefinition("pass-through", null, Map.of()),
+                                                                     null, List.of())),
+                                         null);
+
+        var registry = new SummariserRegistry();
+        var pipeline = new PipelineCompiler().compile(def, registry, null, stubExpressionEngine());
+
+        var output = new ArrayList<LevelEvent<?>>();
+        pipeline.outputBus("out").subscribe(e -> true, output::add);
+
+        pipeline.inputBus().publish(new LevelEvent<>(Map.of("category", (Object) "A", "value", (Object) 1), 100L, INPUT_LEVEL, null));
+        pipeline.inputBus().publish(new LevelEvent<>(Map.of("category", (Object) "A", "value", (Object) 2), 200L, INPUT_LEVEL, null));
+        pipeline.inputBus().publish(new LevelEvent<>(Map.of("category", (Object) "A", "value", (Object) 3), 300L, INPUT_LEVEL, null));
+        pipeline.tick(400L).toCompletableFuture().join();
+
+        assertThat(output).isNotEmpty();
     }
 }

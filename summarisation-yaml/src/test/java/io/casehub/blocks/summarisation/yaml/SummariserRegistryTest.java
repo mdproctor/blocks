@@ -3,6 +3,9 @@ package io.casehub.blocks.summarisation.yaml;
 import io.casehub.blocks.summarisation.EventLevel;
 import io.casehub.blocks.summarisation.LevelEvent;
 import io.casehub.blocks.summarisation.Summariser;
+import io.casehub.blocks.summarisation.yaml.runtime.SummarisationRecorder;
+import io.casehub.platform.api.expression.CompiledExpression;
+import io.casehub.platform.api.expression.ExpressionEngine;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -14,6 +17,34 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class SummariserRegistryTest {
 
     static final EventLevel LEVEL = new EventLevel("test", 0);
+
+    private static ExpressionEngine stubExpressionEngine() {
+        return new ExpressionEngine() {
+            @Override
+            public String type() {return "stub";}
+
+            @SuppressWarnings("unchecked")
+            @Override
+            public <C, R> CompiledExpression<C, R> compile(String expr, Class<C> ct, Class<R> rt) {
+                return new CompiledExpression<>() {
+                    @Override
+                    public String type()     {return "stub";}
+
+                    @Override
+                    public R eval(C context) {return (R) context;}
+                };
+            }
+
+            @Override
+            public <C, R> CompiledExpression<C, R> compile(String expr, Class<C> ct, Class<R> rt, java.util.Map<String, Object> vars) {
+                return compile(expr, ct, rt);
+            }
+
+            @Override
+            public void validate(String expr) {}
+        };
+    }
+
 
     @Test
     void registry_createsRegisteredSummariser() {
@@ -64,5 +95,21 @@ class SummariserRegistryTest {
         var batch = List.of(new LevelEvent<>((Object) "x", 100L, LEVEL, null));
         var result = s.summarise(batch).toCompletableFuture().join();
         assertThat(result).containsExactly("custom");
+    }
+
+    @Test
+    void recorder_registers_fieldExtract() {
+        var recorder   = new SummarisationRecorder();
+        var registry   = recorder.createRegistry(stubExpressionEngine());
+        var summariser = registry.create("field-extract", Map.of("expression", ".name"));
+        assertThat(summariser).isNotNull();
+    }
+
+    @Test
+    void recorder_registers_verbatim() {
+        var recorder   = new SummarisationRecorder();
+        var registry   = recorder.createRegistry(stubExpressionEngine());
+        var summariser = registry.create("verbatim", Map.of("expression", "toString()"));
+        assertThat(summariser).isNotNull();
     }
 }

@@ -305,4 +305,103 @@ class PipelineDefinitionTest {
         assertThat(def.levels().get(0).name()).isEqualTo("anomalies");
         assertThat(def.levels().get(1).name()).isEqualTo("phases");
     }
+
+    @Test
+    void summariserDefinition_deserialises_mode() throws Exception {
+        String yaml = """
+                      pipeline:
+                        name: mode-test
+                        source:
+                          cloud-event-type: io.test.v1
+                        levels:
+                          - name: l1
+                            grouping:
+                              type: windowed
+                              count: 5
+                            summariser:
+                              type: llm
+                              mode: EDIT
+                      """;
+        var def = MAPPER.readValue(yaml, PipelineWrapper.class).pipeline();
+        assertThat(def.levels().get(0).summariser().mode()).isEqualTo("EDIT");
+    }
+
+    @Test
+    void summariserDefinition_mode_defaultsToNull() throws Exception {
+        String yaml = """
+                      pipeline:
+                        name: no-mode
+                        source:
+                          cloud-event-type: io.test.v1
+                        levels:
+                          - name: l1
+                            grouping:
+                              type: windowed
+                              count: 5
+                            summariser:
+                              type: count
+                      """;
+        var def = MAPPER.readValue(yaml, PipelineWrapper.class).pipeline();
+        assertThat(def.levels().get(0).summariser().mode()).isNull();
+    }
+
+    @Test
+    void sourceDefinition_deserialises_typePrefix() throws Exception {
+        String yaml = """
+                      pipeline:
+                        name: prefix-test
+                        source:
+                          type: cloud-event
+                          type-prefix: io.casehub.sensor
+                          cloud-event-type: io.casehub.output
+                        levels:
+                          - name: l1
+                            grouping:
+                              type: windowed
+                              count: 5
+                            summariser:
+                              type: pass-through
+                      """;
+        var def = MAPPER.readValue(yaml, PipelineWrapper.class).pipeline();
+        assertThat(def.source().typePrefix()).isEqualTo("io.casehub.sensor");
+    }
+
+    @Test
+    void pipelineDefinition_deserialises_tickInterval() throws Exception {
+        String yaml = """
+                      pipeline:
+                        name: tick-test
+                        tick-interval: 1000
+                        source:
+                          cloud-event-type: io.test.v1
+                        levels:
+                          - name: l1
+                            grouping:
+                              type: windowed
+                              count: 5
+                            summariser:
+                              type: pass-through
+                      """;
+        var def = MAPPER.readValue(yaml, PipelineWrapper.class).pipeline();
+        assertThat(def.tickInterval()).isEqualTo(1000L);
+    }
+
+    @Test
+    void pipelineDefinition_tickInterval_defaultsToNull() throws Exception {
+        String yaml = """
+                      pipeline:
+                        name: no-tick
+                        source:
+                          cloud-event-type: io.test.v1
+                        levels:
+                          - name: l1
+                            grouping:
+                              type: windowed
+                              count: 5
+                            summariser:
+                              type: pass-through
+                      """;
+        var def = MAPPER.readValue(yaml, PipelineWrapper.class).pipeline();
+        assertThat(def.tickInterval()).isNull();
+    }
 }
