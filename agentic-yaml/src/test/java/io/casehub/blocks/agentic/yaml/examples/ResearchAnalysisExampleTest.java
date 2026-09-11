@@ -50,6 +50,21 @@ class ResearchAnalysisExampleTest extends ExampleTestBase {
         assertThat(compiled.mentalModel()).isNotNull();
         assertThat(compiled.mentalModel().confidenceFloor()).isEqualTo(0.3);
 
+        assertThat(compiled.userModel().minSignalsForSynthesis()).isEqualTo(8);
+        assertThat(compiled.userModel().maxObservationsInPrompt()).isEqualTo(10);
+
+        assertThat(compiled.goalProposal().proposalThreshold()).isEqualTo(0.55);
+        assertThat(compiled.goalProposal().maxDriveGoals()).isEqualTo(4);
+
+        assertThat(compiled.goalEscalation().escalationSalienceThreshold()).isEqualTo(0.6);
+        assertThat(compiled.goalEscalation().maxPrimaryDriveGoals()).isEqualTo(2);
+
+        assertThat(compiled.normDetection().minObservationsForNorm()).isEqualTo(15);
+        assertThat(compiled.normDetection().establishedThreshold()).isEqualTo(0.75);
+
+        assertThat(compiled.collectiveGoal().alignmentThreshold()).isEqualTo(0.65);
+        assertThat(compiled.collectiveGoal().minAlignedAgents()).isEqualTo(2);
+
         assertThat(compiled.narrative().maxEpisodes()).isEqualTo(60);
         assertThat(compiled.retention().recencyWeight()).isEqualTo(0.55);
     }

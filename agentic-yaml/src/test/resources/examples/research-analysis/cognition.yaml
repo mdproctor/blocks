@@ -19,6 +19,30 @@ strategyLearning:
 mentalModel:
   confidenceFloor: 0.3
   minSignalsForInference: 3
+userModel:
+  minSignalsForSynthesis: 8
+  decayRate: 0.05
+  positiveWeight: 1.2
+  negativeWeight: 0.8
+  maxObservationsInPrompt: 10
+goalProposal:
+  proposalThreshold: 0.55
+  relevanceThreshold: 0.4
+  maxDriveGoals: 4
+  failureAbandonmentThreshold: 3
+goalEscalation:
+  escalationSalienceThreshold: 0.6
+  escalationCycles: 4
+  demotionCycles: 6
+  maxPrimaryDriveGoals: 2
+normDetection:
+  minObservationsForNorm: 15
+  establishedThreshold: 0.75
+  decliningThreshold: 0.3
+  minAgentsForNorm: 2
+collectiveGoal:
+  alignmentThreshold: 0.65
+  minAlignedAgents: 2
 narrative:
   maxEpisodes: 60
   synthesisGate:
