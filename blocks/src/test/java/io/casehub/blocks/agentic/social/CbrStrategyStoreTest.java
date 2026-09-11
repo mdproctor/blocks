@@ -83,7 +83,7 @@ class CbrStrategyStoreTest {
         when(cbrCase.features()).thenReturn(features);
         when(cbrCase.producerAgentId()).thenReturn("agent-1");
         when(cbrCase.problem()).thenReturn("guidelines: Be concise\nAsk questions");
-        var scored = new ScoredCbrCase<>(cbrCase, "case-1", 1.0, false,
+        var scored = new ScoredCbrCase<>(cbrCase, "case-1", "strategy", 1.0, false,
                 Map.of(), Instant.parse("2026-08-21T00:00:00Z"), Path.root(), null);
 
         when(cbrStore.retrieveSimilar(any(), any())).thenReturn(List.of(scored));

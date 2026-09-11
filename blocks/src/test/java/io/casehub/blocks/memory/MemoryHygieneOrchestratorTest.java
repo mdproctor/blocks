@@ -58,7 +58,7 @@ class MemoryHygieneOrchestratorTest {
                                                String agentId, Instant storedAt) {
         var cbrCase = new FeatureVectorCbrCase("problem text", "solution text", null, null,
                 Map.of("k", FeatureValue.string("v")), null, agentId);
-        return new ScoredCbrCase<>(cbrCase, caseId, 0.5, false,
+        return new ScoredCbrCase<>(cbrCase, caseId, "memory", 0.5, false,
                 Map.of(), storedAt, io.casehub.platform.api.path.Path.root(), null);
     }
 
