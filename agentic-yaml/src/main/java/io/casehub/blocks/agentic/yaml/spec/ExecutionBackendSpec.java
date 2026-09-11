@@ -10,11 +10,14 @@ import java.util.Objects;
 @JsonTypeInfo(use = Id.NAME, property = "type")
 @JsonSubTypes({
         @Type(value = ExecutionBackendSpec.Reactive.class, name = "reactive"),
-        @Type(value = ExecutionBackendSpec.Choreographed.class, name = "choreographed")
+        @Type(value = ExecutionBackendSpec.Choreographed.class, name = "choreographed"),
+        @Type(value = ExecutionBackendSpec.EngineHosted.class, name = "engine-hosted")
 })
 public sealed interface ExecutionBackendSpec {
 
     record Reactive() implements ExecutionBackendSpec {}
+
+    record EngineHosted() implements ExecutionBackendSpec {}
 
     record Choreographed(EventConcurrencyPolicySpec policy) implements ExecutionBackendSpec {
         public Choreographed {

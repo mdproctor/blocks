@@ -23,6 +23,10 @@ public class ExecutionListenerRegistry {
                 yield new LedgerExecutionListener(ledgerSink,
                         l.supervisorActorId() != null ? l.supervisorActorId() : "system");
             }
+            case ExecutionListenerSpec.Checkpointing ignored ->
+                throw new UnsupportedOperationException(
+                        "checkpointing listener requires engine runtime context — "
+                        + "resolved by PatternWorkerFunction, not the registry");
             case ExecutionListenerSpec.Metrics ignored -> {
                 if (meter == null)
                     throw new IllegalStateException("metrics listener requires Meter");

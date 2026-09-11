@@ -264,11 +264,11 @@ and their implementation status. Update as gaps close.
 
 | Capability | Status | Notes |
 |-----------|--------|-------|
-| PatternJudgmentConfig (prompt, callerConfig, verifierStrategy, mode) | Gap | Full judgment config for engine patterns |
-| EngineHostedBackend | Gap | Named backend: `type: engine-hosted` |
-| CheckpointingListener | Gap | Named listener: `type: checkpointing` |
-| LlmEvaluationVerifier | Gap | Named verifier: `type: llm-evaluation` |
-| SchemaValidationVerifier | Gap | Named verifier: `type: schema-validation` |
+| PatternJudgmentConfig (prompt, callerConfig, verifierStrategy, mode) | Done | #255 — PatternJudgmentConfigSpec + CallerConfigSpec (full mirror) |
+| EngineHostedBackend | Done | #255 — ExecutionBackendSpec.EngineHosted |
+| CheckpointingListener | Done | #255 — ExecutionListenerSpec.Checkpointing |
+| LlmEvaluationVerifier | Done | #255 — VerifierStrategySpec.LlmEvaluation |
+| SchemaValidationVerifier | Done | #255 — VerifierStrategySpec.SchemaValidation |
 
 ---
 
@@ -344,13 +344,13 @@ and their implementation status. Update as gaps close.
 | blocks | Execution (18) | 6 | **6** | — | — | — | — |
 | blocks | Trust/routing (19) | 6 | — | — | **6** | — | — |
 | blocks | Oversight (20) | 3 | — | — | **3** | — | — |
-| engine-adapter | Engine (21) | 5 | — | — | **5** | — | — |
+| engine-adapter | Engine (21) | 5 | **5** | — | — | — | — |
 | speech-api | Speech (22) | 7 | — | — | **6** | 1 | — |
 | speech-ws | Avatar (23) | 2 | — | — | **2** | — | — |
 | speech-sherpa | Models (24) | 4 | — | — | **4** | — | — |
 | annotations | Governance (25) | 3 | — | — | **3** | — | — |
-| **Total** | | **165** | **104** | — | **51** | **4** | **6** |
+| **Total** | | **165** | **109** | — | **46** | **4** | **6** |
 
-**Coverage: 104/165 (63%).** Pattern orchestration, conversation, negotiation,
-channel, prompt optimisation, and execution infrastructure layers are complete.
-Summarisation pipeline fully covered (§9-13). Remaining gaps: engine adapter.
+**Coverage: 109/165 (66%).** Pattern orchestration, conversation, negotiation,
+channel, prompt optimisation, execution infrastructure, and engine adapter
+layers are complete. Summarisation pipeline fully covered (§9-13).

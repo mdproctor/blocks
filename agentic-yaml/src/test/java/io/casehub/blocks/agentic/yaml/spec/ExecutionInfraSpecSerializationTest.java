@@ -7,6 +7,7 @@ import io.casehub.blocks.agentic.yaml.registry.CoalitionEvaluatorRegistry;
 import io.casehub.blocks.agentic.yaml.registry.EventConcurrencyPolicyRegistry;
 import io.casehub.blocks.agentic.yaml.registry.ExecutionBackendRegistry;
 import io.casehub.blocks.agentic.yaml.registry.ExecutionListenerRegistry;
+import io.casehub.blocks.agentic.yaml.registry.VerifierStrategyRegistry;
 import io.casehub.blocks.agentic.coalition.CapabilityCoverageEvaluator;
 import io.casehub.blocks.agentic.listener.EventLogListener;
 import io.casehub.blocks.agentic.listener.LedgerExecutionListener;
@@ -54,6 +55,12 @@ class ExecutionInfraSpecSerializationTest {
             assertThat(spec).isInstanceOf(ExecutionBackendSpec.Choreographed.class);
             var c = (ExecutionBackendSpec.Choreographed) spec;
             assertThat(c.policy()).isInstanceOf(EventConcurrencyPolicySpec.Serialize.class);
+        }
+
+        @Test
+        void engineHosted() throws Exception {
+            var spec = mapper.readValue("type: engine-hosted", ExecutionBackendSpec.class);
+            assertThat(spec).isInstanceOf(ExecutionBackendSpec.EngineHosted.class);
         }
     }
 
@@ -115,6 +122,27 @@ class ExecutionInfraSpecSerializationTest {
         void metrics() throws Exception {
             var spec = mapper.readValue("type: metrics", ExecutionListenerSpec.class);
             assertThat(spec).isInstanceOf(ExecutionListenerSpec.Metrics.class);
+        }
+
+        @Test
+        void checkpointing() throws Exception {
+            var spec = mapper.readValue("type: checkpointing", ExecutionListenerSpec.class);
+            assertThat(spec).isInstanceOf(ExecutionListenerSpec.Checkpointing.class);
+        }
+    }
+
+    @Nested
+    class VerifierStrategySpecs {
+        @Test
+        void llmEvaluation() throws Exception {
+            var spec = mapper.readValue("type: llm-evaluation", VerifierStrategySpec.class);
+            assertThat(spec).isInstanceOf(VerifierStrategySpec.LlmEvaluation.class);
+        }
+
+        @Test
+        void schemaValidation() throws Exception {
+            var spec = mapper.readValue("type: schema-validation", VerifierStrategySpec.class);
+            assertThat(spec).isInstanceOf(VerifierStrategySpec.SchemaValidation.class);
         }
     }
 
@@ -217,6 +245,27 @@ class ExecutionInfraSpecSerializationTest {
                     registry.resolve(new ExecutionListenerSpec.EventLog(), null, null, null))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("EventSink");
+        }
+
+        @Test
+        void executionBackendRegistryEngineHosted() {
+            var registry = new ExecutionBackendRegistry(new EventConcurrencyPolicyRegistry());
+            assertThatThrownBy(() -> registry.resolve(new ExecutionBackendSpec.EngineHosted()))
+                    .isInstanceOf(UnsupportedOperationException.class);
+        }
+
+        @Test
+        void executionListenerRegistryCheckpointing() {
+            var registry = new ExecutionListenerRegistry();
+            assertThatThrownBy(() -> registry.resolve(new ExecutionListenerSpec.Checkpointing(), null, null, null))
+                    .isInstanceOf(UnsupportedOperationException.class);
+        }
+
+        @Test
+        void verifierStrategyRegistry() {
+            var registry = new VerifierStrategyRegistry();
+            assertThat(registry.resolve(new VerifierStrategySpec.LlmEvaluation())).isEqualTo("llm-evaluation");
+            assertThat(registry.resolve(new VerifierStrategySpec.SchemaValidation())).isEqualTo("schema-validation");
         }
 
         @Test
