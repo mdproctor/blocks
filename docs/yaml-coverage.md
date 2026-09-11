@@ -5,7 +5,7 @@ and their implementation status. Update as gaps close.
 
 **Goal:** Build meaningful AI applications in just YAML.
 
-**Last audit:** 2026-09-09 (exhaustive — all 13 Maven modules scanned)
+**Last audit:** 2026-09-11 (exhaustive — all 13 Maven modules scanned, summary table synced)
 
 ---
 
@@ -326,31 +326,30 @@ and their implementation status. Update as gaps close.
 
 ## Summary
 
-| Module | Section | Total capabilities | Done | Spec only | Gap | Partial | Code-only |
-|--------|---------|-------------------|------|-----------|-----|---------|-----------|
+| Module | Section | Total | Done | Gap | Partial | Code-only | N/A |
+|--------|---------|-------|------|-----|---------|-----------|-----|
 | agentic-yaml | Patterns (1-3) | 41 | **41** | — | — | — | — |
 | agentic-yaml | Conversation (4) | 7 | **7** | — | — | — | — |
 | agentic-yaml | Negotiation (5) | 6 | **6** | — | — | — | — |
 | agentic-yaml | Normative (6) | 5 | **5** | — | — | — | — |
-| agentic-yaml | Expression/infra (7-8) | 7 | **4** | — | **3** | — | — |
-| summarisation-yaml | Pipeline (9-10) | 13 | **13** | — | — | — | — |
-| summarisation-yaml | Extensions (11) | 4 | 2 | — | **1** | 1 | — |
-| cloudevents | Bridge (12) | 4 | 2 | — | **1** | — | 1 |
-| summarisation-api | Core (13) | 9 | **4** | — | — | — | 5 |
+| agentic-yaml | Expression/infra (7-8) | 7 | **7** | — | — | — | — |
+| summarisation-yaml | Pipeline (9-10) | 14 | **14** | — | — | — | — |
+| summarisation-yaml | Extensions (11) | 4 | 2 | 1 | 1 | — | — |
+| cloudevents | Bridge (12) | 4 | 2 | 1 | — | 1 | — |
+| summarisation-api | Core (13) | 7 | **4** | — | — | 3 | — |
 | blocks | Social configs (14) | 13 | **13** | — | — | — | — |
-| blocks | Affordance (15) | 8 | **7** | — | — | 1 | — |
-| blocks | Channel (16) | 4 | **3** | — | — | 1 | — |
+| blocks | Affordance (15) | 8 | **7** | — | 1 | — | — |
+| blocks | Channel (16) | 4 | **3** | — | 1 | — | — |
 | blocks | Prompt optim (17) | 8 | **8** | — | — | — | — |
 | blocks | Execution (18) | 6 | **6** | — | — | — | — |
-| blocks | Trust/routing (19) | 6 | — | — | **6** | — | — |
-| blocks | Oversight (20) | 3 | — | — | **3** | — | — |
+| blocks | Trust/routing (19) | 6 | **4** | — | — | — | 2 |
+| blocks | Oversight (20) | 3 | **1** | — | — | — | 2 |
 | engine-adapter | Engine (21) | 5 | **5** | — | — | — | — |
-| speech-api | Speech (22) | 7 | — | — | **6** | 1 | — |
-| speech-ws | Avatar (23) | 2 | — | — | **2** | — | — |
-| speech-sherpa | Models (24) | 4 | — | — | **4** | — | — |
-| annotations | Governance (25) | 3 | — | — | **3** | — | — |
-| **Total** | | **165** | **109** | — | **46** | **4** | **6** |
+| speech-api | Speech (22) | 7 | **2** | — | 1 | — | 4 |
+| speech-ws | Avatar (23) | 2 | — | — | — | — | 2 |
+| speech-sherpa | Models (24) | 4 | **3** | — | — | — | 1 |
+| annotations | Governance (25) | 3 | **2** | 1 | — | — | — |
+| **Total** | | **164** | **141** | **3** | **4** | **4** | **11** |
 
-**Coverage: 109/165 (66%).** Pattern orchestration, conversation, negotiation,
-channel, prompt optimisation, execution infrastructure, and engine adapter
-layers are complete. Summarisation pipeline fully covered (§9-13).
+**Coverage: 141/149 countable (95%).** Countable excludes N/A (runtime data, static utilities)
+and Code-only (functional interfaces). 3 remaining Gaps, 4 Partials at their natural ceiling.
