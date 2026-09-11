@@ -15,12 +15,23 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
 public class TerminationConditionRegistry {
+
+    private @Nullable Function<TerminationSpec, @Nullable TerminationCondition<?>> fallback;
+
+    public void registerFallback(Function<TerminationSpec, @Nullable TerminationCondition<?>> fallback) {
+        this.fallback = fallback;
+    }
 
     @SuppressWarnings("unchecked")
     public <T> TerminationCondition<T> resolve(TerminationSpec spec,
                                                 @Nullable ExpressionEngine engine) {
+        if (fallback != null) {
+            var result = fallback.apply(spec);
+            if (result != null) return (TerminationCondition<T>) result;
+        }
         return switch (spec) {
             case TerminationSpec.MaxIterations mi ->
                     new MaxIterationsTermination<>(mi.iterations());

@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RegistryTest {
 
@@ -184,6 +185,61 @@ class RegistryTest {
                     new JudgmentSpec.CallerSpec.EscalationChain(List.of("junior", "senior")));
             assertThat(result).isInstanceOf(CallerStrategy.EscalationChain.class);
             assertThat(((CallerStrategy.EscalationChain) result).callers()).hasSize(2);
+        }
+    }
+
+    @Nested
+    class FallbackExtensibility {
+
+        @Test
+        void routingFallbackOverridesUnsupportedType() {
+            var registry = new RoutingStrategyRegistry();
+            var customRouting = new RoundRobinRouting<>();
+            registry.registerFallback(spec -> {
+                if (spec instanceof RoutingSpec.LlmSelected) return customRouting;
+                return null;
+            });
+            var result = registry.resolve(new RoutingSpec.LlmSelected(), null);
+            assertThat(result).isSameAs(customRouting);
+        }
+
+        @Test
+        void routingFallbackReturnsNullFallsThroughToBuiltIn() {
+            var registry = new RoutingStrategyRegistry();
+            registry.registerFallback(spec -> null);
+            var result = registry.resolve(new RoutingSpec.RoundRobin(), null);
+            assertThat(result).isInstanceOf(RoundRobinRouting.class);
+        }
+
+        @Test
+        void routingWithoutFallbackThrowsOnUnsupported() {
+            var registry = new RoutingStrategyRegistry();
+            assertThatThrownBy(() -> registry.resolve(new RoutingSpec.LlmSelected(), null))
+                    .isInstanceOf(UnsupportedOperationException.class);
+        }
+
+        @Test
+        void aggregationFallbackOverridesUnsupportedType() {
+            var registry = new AggregationStrategyRegistry();
+            var customAggregation = new CollectAll<>();
+            registry.registerFallback(spec -> {
+                if (spec instanceof AggregationSpec.Auction) return customAggregation;
+                return null;
+            });
+            var result = registry.resolve(new AggregationSpec.Auction("english"));
+            assertThat(result).isSameAs(customAggregation);
+        }
+
+        @Test
+        void terminationFallbackOverridesUnsupportedType() {
+            var registry = new TerminationConditionRegistry();
+            var customTermination = new MaxIterationsTermination<>(99);
+            registry.registerFallback(spec -> {
+                if (spec instanceof TerminationSpec.Convergence) return customTermination;
+                return null;
+            });
+            var result = registry.resolve(new TerminationSpec.Convergence(0.8), null);
+            assertThat(result).isSameAs(customTermination);
         }
     }
 }

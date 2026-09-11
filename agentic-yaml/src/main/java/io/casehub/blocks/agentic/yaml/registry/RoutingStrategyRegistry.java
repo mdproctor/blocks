@@ -4,6 +4,7 @@ import io.casehub.blocks.agentic.routing.FirstMatchRouting;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
 import io.casehub.blocks.agentic.routing.RoundRobinRouting;
 import io.casehub.blocks.agentic.routing.RoutingStrategy;
 import io.casehub.blocks.agentic.routing.SelectAllRouting;
@@ -14,8 +15,18 @@ import org.jspecify.annotations.Nullable;
 
 public class RoutingStrategyRegistry {
 
+    private @Nullable Function<RoutingSpec, @Nullable RoutingStrategy<?>> fallback;
+
+    public void registerFallback(Function<RoutingSpec, @Nullable RoutingStrategy<?>> fallback) {
+        this.fallback = fallback;
+    }
+
     @SuppressWarnings("unchecked")
     public <T> RoutingStrategy<T> resolve(RoutingSpec spec, @Nullable ExpressionEngine engine) {
+        if (fallback != null) {
+            var result = fallback.apply(spec);
+            if (result != null) return (RoutingStrategy<T>) result;
+        }
         return switch (spec) {
             case RoutingSpec.FirstMatch fm -> {
                 if (fm.guard() != null && engine != null) {
