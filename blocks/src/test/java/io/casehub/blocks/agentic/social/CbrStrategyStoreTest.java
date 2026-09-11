@@ -102,7 +102,7 @@ class CbrStrategyStoreTest {
         var cbrCase = mock(CbrCase.class);
         when(cbrCase.producerAgentId()).thenReturn("other-agent");
         when(cbrCase.features()).thenReturn(Map.of());
-        var scored = new ScoredCbrCase<>(cbrCase, "case-1", 1.0);
+        var scored = new ScoredCbrCase<>(cbrCase, "case-1", "strategy", 1.0);
 
         when(cbrStore.retrieveSimilar(any(), any())).thenReturn(List.of(scored));
 
@@ -113,12 +113,12 @@ class CbrStrategyStoreTest {
         var profileCase = mock(CbrCase.class);
         when(profileCase.producerAgentId()).thenReturn("agent-1");
         when(profileCase.features()).thenReturn(Map.of());
-        var profileScored = new ScoredCbrCase<>(profileCase, "profile-1", 1.0);
+        var profileScored = new ScoredCbrCase<>(profileCase, "profile-1", "strategy", 1.0);
 
         var engCase = mock(CbrCase.class);
         when(engCase.producerAgentId()).thenReturn("agent-1");
         when(engCase.features()).thenReturn(Map.of());
-        var engScored = new ScoredCbrCase<>(engCase, "eng-1", 1.0);
+        var engScored = new ScoredCbrCase<>(engCase, "eng-1", "strategy", 1.0);
 
         when(cbrStore.retrieveSimilar(any(), any()))
                 .thenReturn(List.of(profileScored))
@@ -133,7 +133,7 @@ class CbrStrategyStoreTest {
         var cbrCase = mock(CbrCase.class);
         when(cbrCase.producerAgentId()).thenReturn("other-agent");
         when(cbrCase.features()).thenReturn(Map.of());
-        var scored = new ScoredCbrCase<>(cbrCase, "case-1", 1.0);
+        var scored = new ScoredCbrCase<>(cbrCase, "case-1", "strategy", 1.0);
 
         when(cbrStore.retrieveSimilar(any(), any())).thenReturn(List.of(scored));
 
@@ -148,7 +148,7 @@ class CbrStrategyStoreTest {
         var cbrCase = mock(CbrCase.class);
         when(cbrCase.producerAgentId()).thenReturn("agent-1");
         when(cbrCase.features()).thenReturn(features);
-        var scored = new ScoredCbrCase<>(cbrCase, "case-1", 1.0);
+        var scored = new ScoredCbrCase<>(cbrCase, "case-1", "strategy", 1.0);
 
         when(cbrStore.retrieveSimilar(any(), any())).thenReturn(List.of(scored));
 
@@ -165,7 +165,7 @@ class CbrStrategyStoreTest {
         var cbrCase = mock(CbrCase.class);
         when(cbrCase.producerAgentId()).thenReturn("agent-1");
         when(cbrCase.features()).thenReturn(features);
-        var scored = new ScoredCbrCase<>(cbrCase, "case-1", 1.0);
+        var scored = new ScoredCbrCase<>(cbrCase, "case-1", "strategy", 1.0);
 
         when(cbrStore.retrieveSimilar(any(), any())).thenReturn(List.of(scored));
 
@@ -183,7 +183,7 @@ class CbrStrategyStoreTest {
         var cbrCase = mock(CbrCase.class);
         when(cbrCase.producerAgentId()).thenReturn("agent-1");
         when(cbrCase.features()).thenReturn(features);
-        var scored = new ScoredCbrCase<>(cbrCase, "case-1", 1.0);
+        var scored = new ScoredCbrCase<>(cbrCase, "case-1", "strategy", 1.0);
 
         when(cbrStore.retrieveSimilar(any(), any())).thenReturn(List.of(scored));
 
@@ -201,7 +201,7 @@ class CbrStrategyStoreTest {
         var cbrCase = mock(CbrCase.class);
         when(cbrCase.producerAgentId()).thenReturn("other-agent");
         when(cbrCase.features()).thenReturn(features);
-        var scored = new ScoredCbrCase<>(cbrCase, "case-1", 1.0);
+        var scored = new ScoredCbrCase<>(cbrCase, "case-1", "strategy", 1.0);
 
         when(cbrStore.retrieveSimilar(any(), any())).thenReturn(List.of(scored));
 
