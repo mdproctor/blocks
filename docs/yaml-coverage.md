@@ -278,13 +278,13 @@ and their implementation status. Update as gaps close.
 
 | Capability | Status | Notes |
 |-----------|--------|-------|
-| TranscriptionOptions (audioFormat, languageHint, modelSize, vocabularyHint) | Gap | STT config |
-| SynthesisOptions (voice, language, audioFormat, includePhonemes) | Gap | TTS config |
+| TranscriptionOptions (audioFormat, languageHint, modelSize, vocabularyHint) | Done | #253 — direct reuse |
+| SynthesisOptions (voice, language, audioFormat, includePhonemes) | Done | #253 — direct reuse |
 | CleanupConfig (maxDestructiveness + filter list) | Partial | Threshold YAML; TextFilter list CDI |
-| CorrectionStrategy (NONE / BASIC / AGGRESSIVE) | Gap | Enum |
-| ConversationTurn (role, content) | Gap | History entry |
-| AssembledPrompt (systemPrompt, userPrompt, model override) | Gap | |
-| PromptContext (agentId, tenantId, subjectId) | Gap | |
+| CorrectionStrategy (NONE / BASIC / AGGRESSIVE) | N/A | @FunctionalInterface, not enum |
+| ConversationTurn (role, content) | N/A | Runtime data |
+| AssembledPrompt (systemPrompt, userPrompt, model override) | N/A | Runtime output |
+| PromptContext (agentId, tenantId, subjectId) | N/A | Runtime context |
 
 ---
 
@@ -294,8 +294,8 @@ and their implementation status. Update as gaps close.
 
 | Capability | Status | Notes |
 |-----------|--------|-------|
-| AvatarConfig (sampleRate, maxDestructiveness, systemPrompt, agentId, tenantId, proactiveTickInterval) | Gap | Full avatar session config |
-| VisemeMapping (IPA → viseme mapping with weights) | Gap | Lip-sync config table |
+| AvatarConfig (sampleRate, maxDestructiveness, systemPrompt, agentId, tenantId, proactiveTickInterval) | N/A | Already @ConfigMapping via Quarkus YAML |
+| VisemeMapping (IPA → viseme mapping with weights) | N/A | Static utility class |
 
 ---
 
@@ -305,10 +305,10 @@ and their implementation status. Update as gaps close.
 
 | Capability | Status | Notes |
 |-----------|--------|-------|
-| SherpaConfig (modelDir, numThreads, provider) | Gap | STT model config |
-| KokoroConfig (modelDir, voiceId, lengthScale, numThreads) | Gap | Kokoro TTS config |
-| Audio8Config (modelDir, variant, numThreads, temperature, topP, topK) | Gap | DualAR TTS config |
-| GectorConfig (modelPath, maxIterations, keepConfidence, minErrorProb) | Gap | Grammar correction config |
+| SherpaConfig (modelDir, numThreads, provider) | Done | #253 — adapted record |
+| KokoroConfig (modelDir, voiceId, lengthScale, numThreads) | Done | #253 — adapted record |
+| Audio8Config (modelDir, variant, numThreads, temperature, topP, topK) | Done | #253 — adapted record |
+| GectorConfig (modelPath, maxIterations, keepConfidence, minErrorProb) | N/A | Filesystem-derived |
 
 ---
 
@@ -353,4 +353,4 @@ and their implementation status. Update as gaps close.
 
 **Coverage: 97/165 (59%).** Pattern orchestration, conversation, negotiation,
 channel, prompt optimisation, and execution infrastructure layers are complete.
-Remaining gaps: engine adapter, speech.
+Remaining gaps: engine adapter.

@@ -7,8 +7,13 @@ import io.casehub.blocks.agentic.yaml.spec.PatternSpec;
 import io.casehub.blocks.agentic.yaml.spec.RiskDecisionSpec;
 import io.casehub.blocks.agentic.yaml.spec.RoutingSpec;
 import io.casehub.blocks.agentic.yaml.spec.TerminationSpec;
+import io.casehub.blocks.agentic.yaml.spec.Audio8ConfigSpec;
+import io.casehub.blocks.agentic.yaml.spec.KokoroConfigSpec;
+import io.casehub.blocks.agentic.yaml.spec.SherpaConfigSpec;
 import io.casehub.blocks.agentic.yaml.spec.TrustRoutingPolicyKeysSpec;
 import io.casehub.blocks.routing.agent.DispositionProfile;
+import io.casehub.blocks.speech.SynthesisOptions;
+import io.casehub.blocks.speech.TranscriptionOptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -126,6 +131,41 @@ class SchemaGenerationTest {
         JsonNode schema = generator.generate(DispositionProfile.class);
         assertThat(schema).isNotNull();
         assertThat(schema.toString()).contains("desired");
+    }
+
+    @Test
+    void sherpaConfigSpecSchemaGenerates() {
+        JsonNode schema = generator.generate(SherpaConfigSpec.class);
+        assertThat(schema).isNotNull();
+        assertThat(schema.toString()).contains("modelDir");
+    }
+
+    @Test
+    void kokoroConfigSpecSchemaGenerates() {
+        JsonNode schema = generator.generate(KokoroConfigSpec.class);
+        assertThat(schema).isNotNull();
+        assertThat(schema.toString()).contains("modelDir");
+    }
+
+    @Test
+    void audio8ConfigSpecSchemaGenerates() {
+        JsonNode schema = generator.generate(Audio8ConfigSpec.class);
+        assertThat(schema).isNotNull();
+        assertThat(schema.toString()).contains("variant");
+    }
+
+    @Test
+    void transcriptionOptionsSchemaGenerates() {
+        JsonNode schema = generator.generate(TranscriptionOptions.class);
+        assertThat(schema).isNotNull();
+        assertThat(schema.toString()).contains("audioFormat");
+    }
+
+    @Test
+    void synthesisOptionsSchemaGenerates() {
+        JsonNode schema = generator.generate(SynthesisOptions.class);
+        assertThat(schema).isNotNull();
+        assertThat(schema.toString()).contains("voice");
     }
 
 }
