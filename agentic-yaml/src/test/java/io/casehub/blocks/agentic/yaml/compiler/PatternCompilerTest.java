@@ -188,6 +188,49 @@ class PatternCompilerTest {
         assertThat(model.task()).isEqualTo("execution");
     }
 
+    @Test
+    void candidateDescriptorWiredFromSpec() throws IOException {
+        var spec = loadPattern("supervisor");
+        var model = compiler.compile(spec);
+        var candidates = model.candidateSupplier().get();
+
+        var analyst = candidates.get(0);
+        assertThat(analyst.descriptor()).isNotNull();
+        assertThat(analyst.descriptor().name()).isEqualTo("analyst");
+        assertThat(analyst.descriptor().briefing()).isEqualTo("Analyses input data");
+        assertThat(analyst.descriptor().capabilities()).hasSize(1);
+        assertThat(analyst.descriptor().capabilities().get(0).name()).isEqualTo("data-analysis");
+
+        var reviewer = candidates.get(1);
+        assertThat(reviewer.descriptor()).isNotNull();
+        assertThat(reviewer.descriptor().name()).isEqualTo("reviewer");
+        assertThat(reviewer.descriptor().briefing()).isNull();
+        assertThat(reviewer.descriptor().capabilities()).isEmpty();
+    }
+
+    @Test
+    void candidateDescriptorMultipleCapabilities() throws IOException {
+        var yaml = """
+                type: supervisor
+                agents:
+                  - type: worker
+                    name: multi-agent
+                    description: "Does many things"
+                    capabilities:
+                      - analysis
+                      - synthesis
+                      - reporting
+                """;
+        var spec = mapper.readValue(yaml, PatternSpec.class);
+        var model = compiler.compile(spec);
+        var candidate = model.candidateSupplier().get().get(0);
+        assertThat(candidate.descriptor()).isNotNull();
+        assertThat(candidate.descriptor().capabilities()).hasSize(3);
+        assertThat(candidate.descriptor().capabilities().get(0).name()).isEqualTo("analysis");
+        assertThat(candidate.descriptor().capabilities().get(1).name()).isEqualTo("synthesis");
+        assertThat(candidate.descriptor().capabilities().get(2).name()).isEqualTo("reporting");
+    }
+
     private PatternSpec loadPattern(String name) throws IOException {
         try (var is = getClass().getResourceAsStream("/patterns/" + name + ".yaml")) {
             return mapper.readValue(is, PatternSpec.class);

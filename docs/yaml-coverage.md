@@ -100,7 +100,7 @@ and their implementation status. Update as gaps close.
 | Capability | Status | Issue |
 |-----------|--------|-------|
 | Schema drift test with committed baseline | Done | #243 |
-| AgentDescriptor wiring from spec fields | Gap | #244 |
+| AgentDescriptor wiring from spec fields | Done | #244 |
 | Registry extensibility | Gap | #245 |
 
 ---

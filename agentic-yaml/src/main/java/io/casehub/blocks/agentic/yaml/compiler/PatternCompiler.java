@@ -36,6 +36,8 @@ import io.casehub.blocks.agentic.yaml.spec.AgentRefSpec;
 import io.casehub.blocks.agentic.yaml.spec.JudgmentSpec;
 import io.casehub.blocks.agentic.yaml.spec.PatternSpec;
 import io.casehub.blocks.agentic.yaml.spec.TerminationSpec;
+import io.casehub.eidos.api.AgentCapability;
+import io.casehub.eidos.api.AgentDescriptor;
 import io.casehub.engine.plan.DecompositionStrategy;
 import io.casehub.platform.api.expression.ExpressionEngine;
 import org.jspecify.annotations.Nullable;
@@ -202,7 +204,28 @@ public class PatternCompiler {
 
     private RoutingCandidate buildCandidate(AgentRefSpec agentSpec) {
         var ref = buildAgentRef(agentSpec);
-        return new RoutingCandidate(ref, null);
+        var descriptor = buildDescriptor(agentSpec);
+        return new RoutingCandidate(ref, descriptor);
+    }
+
+    private @Nullable AgentDescriptor buildDescriptor(AgentRefSpec spec) {
+        if (spec instanceof AgentRefSpec.Composed) {
+            return null;
+        }
+        var builder = AgentDescriptor.builder()
+                .agentId(spec.name())
+                .name(spec.name())
+                .slot("yaml")
+                .tenancyId("yaml");
+        if (spec.description() != null) {
+            builder.briefing(spec.description());
+        }
+        if (spec.capabilities() != null && !spec.capabilities().isEmpty()) {
+            builder.capabilities(spec.capabilities().stream()
+                    .map(name -> AgentCapability.builder().name(name).build())
+                    .toList());
+        }
+        return builder.build();
     }
 
     private AgentRef buildAgentRef(AgentRefSpec spec) {
