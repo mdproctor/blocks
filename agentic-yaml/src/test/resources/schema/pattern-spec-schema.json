@@ -1,0 +1,1027 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$defs" : {
+    "ActivationSpec" : {
+      "oneOf" : [ {
+        "properties" : {
+          "type" : {
+            "const" : "on-dispatch"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object"
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "max-iterations"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object",
+        "unevaluatedProperties" : false
+      } ]
+    },
+    "AgentRefSpec" : {
+      "oneOf" : [ {
+        "properties" : {
+          "type" : {
+            "const" : "worker"
+          }
+        },
+        "required" : [ "type" ],
+        "$ref" : "#/$defs/Worker"
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "channel"
+          }
+        },
+        "required" : [ "type" ],
+        "$ref" : "#/$defs/Channel"
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "human"
+          }
+        },
+        "required" : [ "type" ],
+        "$ref" : "#/$defs/Human"
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "external"
+          }
+        },
+        "required" : [ "type" ],
+        "$ref" : "#/$defs/External"
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "composed"
+          }
+        },
+        "required" : [ "type" ],
+        "$ref" : "#/$defs/Composed"
+      } ]
+    },
+    "AggregationSpec" : {
+      "oneOf" : [ {
+        "properties" : {
+          "type" : {
+            "const" : "pass-through"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object"
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "collect-all"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object"
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "majority-vote"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object"
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "auction"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object",
+        "unevaluatedProperties" : false
+      } ]
+    },
+    "AgreementSpec" : {
+      "oneOf" : [ {
+        "properties" : {
+          "type" : {
+            "const" : "unanimous"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object"
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "majority"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object"
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "threshold"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object",
+        "unevaluatedProperties" : false
+      } ]
+    },
+    "Channel" : {
+      "type" : "object",
+      "properties" : {
+        "capabilities" : {
+          "type" : "array",
+          "items" : {
+            "type" : "string"
+          }
+        },
+        "channelId" : {
+          "type" : "string"
+        },
+        "description" : {
+          "type" : "string"
+        },
+        "name" : {
+          "type" : "string"
+        }
+      },
+      "unevaluatedProperties" : false
+    },
+    "Composed" : {
+      "type" : "object",
+      "properties" : {
+        "capabilities" : {
+          "type" : "array",
+          "items" : {
+            "type" : "string"
+          }
+        },
+        "description" : {
+          "type" : "string"
+        },
+        "name" : {
+          "type" : "string"
+        },
+        "pattern" : {
+          "$ref" : "#"
+        }
+      },
+      "unevaluatedProperties" : false
+    },
+    "Compound" : {
+      "type" : "object",
+      "properties" : {
+        "name" : {
+          "type" : "string"
+        },
+        "subtasks" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/$defs/TaskNodeSpec"
+          }
+        }
+      },
+      "unevaluatedProperties" : false
+    },
+    "Conditional" : {
+      "type" : "object",
+      "properties" : {
+        "activation" : {
+          "$ref" : "#/$defs/ActivationSpec"
+        },
+        "agents" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/$defs/AgentRefSpec"
+          }
+        },
+        "aggregation" : {
+          "$ref" : "#/$defs/AggregationSpec"
+        },
+        "branches" : {
+          "type" : "array",
+          "items" : {
+            "type" : "object",
+            "properties" : {
+              "agent" : {
+                "$ref" : "#/$defs/AgentRefSpec"
+              },
+              "condition" : {
+                "type" : "string"
+              }
+            },
+            "unevaluatedProperties" : false
+          }
+        },
+        "decomposition" : {
+          "$ref" : "#/$defs/DecompositionSpec"
+        },
+        "failurePolicy" : {
+          "$ref" : "#/$defs/FailurePolicy"
+        },
+        "judgment" : {
+          "$ref" : "#/$defs/JudgmentSpec"
+        },
+        "routing" : {
+          "$ref" : "#/$defs/RoutingSpec"
+        },
+        "task" : {
+          "type" : "string"
+        },
+        "termination" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/$defs/TerminationSpec"
+          }
+        }
+      },
+      "unevaluatedProperties" : false
+    },
+    "Debate" : {
+      "type" : "object",
+      "properties" : {
+        "activation" : {
+          "$ref" : "#/$defs/ActivationSpec"
+        },
+        "agents" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/$defs/AgentRefSpec"
+          }
+        },
+        "aggregation" : {
+          "$ref" : "#/$defs/AggregationSpec"
+        },
+        "decomposition" : {
+          "$ref" : "#/$defs/DecompositionSpec"
+        },
+        "failurePolicy" : {
+          "$ref" : "#/$defs/FailurePolicy"
+        },
+        "judge" : {
+          "$ref" : "#/$defs/AgentRefSpec"
+        },
+        "judgment" : {
+          "$ref" : "#/$defs/JudgmentSpec"
+        },
+        "maxRounds" : {
+          "type" : "integer"
+        },
+        "routing" : {
+          "$ref" : "#/$defs/RoutingSpec"
+        },
+        "task" : {
+          "type" : "string"
+        },
+        "termination" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/$defs/TerminationSpec"
+          }
+        }
+      },
+      "unevaluatedProperties" : false
+    },
+    "DecompositionSpec" : {
+      "oneOf" : [ {
+        "properties" : {
+          "type" : {
+            "const" : "identity"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object"
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "static"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object",
+        "unevaluatedProperties" : false
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "llm"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object",
+        "unevaluatedProperties" : false
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "hybrid"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object",
+        "unevaluatedProperties" : false
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "heuristic"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object",
+        "unevaluatedProperties" : false
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "goap"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object"
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "capability-dependency"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object"
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "forward-reasoning"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object"
+      } ]
+    },
+    "External" : {
+      "type" : "object",
+      "properties" : {
+        "capabilities" : {
+          "type" : "array",
+          "items" : {
+            "type" : "string"
+          }
+        },
+        "description" : {
+          "type" : "string"
+        },
+        "name" : {
+          "type" : "string"
+        }
+      },
+      "unevaluatedProperties" : false
+    },
+    "FailurePolicy" : {
+      "type" : "object",
+      "properties" : {
+        "agentRetry" : {
+          "type" : "object",
+          "properties" : {
+            "backoff" : {
+              "type" : "string",
+              "format" : "duration"
+            },
+            "backoffStrategy" : {
+              "type" : "string",
+              "enum" : [ "FIXED", "EXPONENTIAL", "EXPONENTIAL_WITH_JITTER" ]
+            },
+            "maxRetries" : {
+              "type" : "integer"
+            },
+            "onExhausted" : {
+              "type" : "string",
+              "enum" : [ "FAIL", "ESCALATE", "SKIP" ]
+            }
+          },
+          "unevaluatedProperties" : false
+        },
+        "onDeadlock" : {
+          "type" : "string",
+          "enum" : [ "FAIL", "ESCALATE", "RETRY_DIFFERENT" ]
+        },
+        "onRoutingFailure" : {
+          "type" : "string",
+          "enum" : [ "FAIL", "RETRY_BROADER", "ESCALATE" ]
+        },
+        "replanPolicy" : {
+          "type" : "object",
+          "properties" : {
+            "fallbackAction" : {
+              "type" : "string",
+              "enum" : [ "FAIL", "RETRY_BROADER", "ESCALATE" ]
+            },
+            "maxReplans" : {
+              "type" : "integer"
+            }
+          },
+          "unevaluatedProperties" : false
+        }
+      },
+      "unevaluatedProperties" : false
+    },
+    "Htn" : {
+      "type" : "object",
+      "properties" : {
+        "activation" : {
+          "$ref" : "#/$defs/ActivationSpec"
+        },
+        "agents" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/$defs/AgentRefSpec"
+          }
+        },
+        "aggregation" : {
+          "$ref" : "#/$defs/AggregationSpec"
+        },
+        "decomposition" : {
+          "$ref" : "#/$defs/DecompositionSpec"
+        },
+        "failurePolicy" : {
+          "$ref" : "#/$defs/FailurePolicy"
+        },
+        "judgment" : {
+          "$ref" : "#/$defs/JudgmentSpec"
+        },
+        "rootTask" : {
+          "$ref" : "#/$defs/TaskNodeSpec"
+        },
+        "routing" : {
+          "$ref" : "#/$defs/RoutingSpec"
+        },
+        "task" : {
+          "type" : "string"
+        },
+        "termination" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/$defs/TerminationSpec"
+          }
+        }
+      },
+      "unevaluatedProperties" : false
+    },
+    "Human" : {
+      "type" : "object",
+      "properties" : {
+        "capabilities" : {
+          "type" : "array",
+          "items" : {
+            "type" : "string"
+          }
+        },
+        "description" : {
+          "type" : "string"
+        },
+        "name" : {
+          "type" : "string"
+        }
+      },
+      "unevaluatedProperties" : false
+    },
+    "JudgmentSpec" : {
+      "type" : "object",
+      "properties" : {
+        "agreement" : {
+          "$ref" : "#/$defs/AgreementSpec"
+        },
+        "caller" : {
+          "oneOf" : [ {
+            "properties" : {
+              "type" : {
+                "const" : "single"
+              }
+            },
+            "required" : [ "type" ],
+            "type" : "object",
+            "unevaluatedProperties" : false
+          }, {
+            "properties" : {
+              "type" : {
+                "const" : "fanOut"
+              }
+            },
+            "required" : [ "type" ],
+            "type" : "object",
+            "unevaluatedProperties" : false
+          }, {
+            "properties" : {
+              "type" : {
+                "const" : "escalationChain"
+              }
+            },
+            "required" : [ "type" ],
+            "type" : "object",
+            "unevaluatedProperties" : false
+          } ]
+        },
+        "trigger" : {
+          "oneOf" : [ {
+            "properties" : {
+              "type" : {
+                "const" : "alwaysYield"
+              }
+            },
+            "required" : [ "type" ],
+            "type" : "object"
+          }, {
+            "properties" : {
+              "type" : {
+                "const" : "neverYield"
+              }
+            },
+            "required" : [ "type" ],
+            "type" : "object"
+          }, {
+            "properties" : {
+              "type" : {
+                "const" : "iterationBased"
+              }
+            },
+            "required" : [ "type" ],
+            "type" : "object",
+            "unevaluatedProperties" : false
+          }, {
+            "properties" : {
+              "type" : {
+                "const" : "confidenceThreshold"
+              }
+            },
+            "required" : [ "type" ],
+            "type" : "object",
+            "unevaluatedProperties" : false
+          } ]
+        }
+      },
+      "unevaluatedProperties" : false
+    },
+    "Loop" : {
+      "type" : "object",
+      "properties" : {
+        "activation" : {
+          "$ref" : "#/$defs/ActivationSpec"
+        },
+        "agents" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/$defs/AgentRefSpec"
+          }
+        },
+        "aggregation" : {
+          "$ref" : "#/$defs/AggregationSpec"
+        },
+        "decomposition" : {
+          "$ref" : "#/$defs/DecompositionSpec"
+        },
+        "exitCondition" : {
+          "type" : "string"
+        },
+        "failurePolicy" : {
+          "$ref" : "#/$defs/FailurePolicy"
+        },
+        "judgment" : {
+          "$ref" : "#/$defs/JudgmentSpec"
+        },
+        "maxIterations" : {
+          "type" : "integer"
+        },
+        "routing" : {
+          "$ref" : "#/$defs/RoutingSpec"
+        },
+        "task" : {
+          "type" : "string"
+        },
+        "termination" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/$defs/TerminationSpec"
+          }
+        }
+      },
+      "unevaluatedProperties" : false
+    },
+    "Parallel" : {
+      "type" : "object",
+      "properties" : {
+        "activation" : {
+          "$ref" : "#/$defs/ActivationSpec"
+        },
+        "agents" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/$defs/AgentRefSpec"
+          }
+        },
+        "aggregation" : {
+          "$ref" : "#/$defs/AggregationSpec"
+        },
+        "decomposition" : {
+          "$ref" : "#/$defs/DecompositionSpec"
+        },
+        "failurePolicy" : {
+          "$ref" : "#/$defs/FailurePolicy"
+        },
+        "judgment" : {
+          "$ref" : "#/$defs/JudgmentSpec"
+        },
+        "routing" : {
+          "$ref" : "#/$defs/RoutingSpec"
+        },
+        "task" : {
+          "type" : "string"
+        },
+        "termination" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/$defs/TerminationSpec"
+          }
+        }
+      },
+      "unevaluatedProperties" : false
+    },
+    "Primitive" : {
+      "type" : "object",
+      "properties" : {
+        "executor" : {
+          "type" : "string"
+        },
+        "name" : {
+          "type" : "string"
+        }
+      },
+      "unevaluatedProperties" : false
+    },
+    "RoutingSpec" : {
+      "oneOf" : [ {
+        "properties" : {
+          "type" : {
+            "const" : "first-match"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object",
+        "unevaluatedProperties" : false
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "round-robin"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object"
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "sequential"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object"
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "llm-selected"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object"
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "select-all"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object"
+      } ]
+    },
+    "Sequence" : {
+      "type" : "object",
+      "properties" : {
+        "activation" : {
+          "$ref" : "#/$defs/ActivationSpec"
+        },
+        "agents" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/$defs/AgentRefSpec"
+          }
+        },
+        "aggregation" : {
+          "$ref" : "#/$defs/AggregationSpec"
+        },
+        "decomposition" : {
+          "$ref" : "#/$defs/DecompositionSpec"
+        },
+        "failurePolicy" : {
+          "$ref" : "#/$defs/FailurePolicy"
+        },
+        "judgment" : {
+          "$ref" : "#/$defs/JudgmentSpec"
+        },
+        "routing" : {
+          "$ref" : "#/$defs/RoutingSpec"
+        },
+        "task" : {
+          "type" : "string"
+        },
+        "termination" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/$defs/TerminationSpec"
+          }
+        }
+      },
+      "unevaluatedProperties" : false
+    },
+    "Supervisor" : {
+      "type" : "object",
+      "properties" : {
+        "activation" : {
+          "$ref" : "#/$defs/ActivationSpec"
+        },
+        "agents" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/$defs/AgentRefSpec"
+          }
+        },
+        "aggregation" : {
+          "$ref" : "#/$defs/AggregationSpec"
+        },
+        "decomposition" : {
+          "$ref" : "#/$defs/DecompositionSpec"
+        },
+        "failurePolicy" : {
+          "$ref" : "#/$defs/FailurePolicy"
+        },
+        "judgment" : {
+          "$ref" : "#/$defs/JudgmentSpec"
+        },
+        "routing" : {
+          "$ref" : "#/$defs/RoutingSpec"
+        },
+        "task" : {
+          "type" : "string"
+        },
+        "termination" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/$defs/TerminationSpec"
+          }
+        }
+      },
+      "unevaluatedProperties" : false
+    },
+    "TaskNodeSpec" : {
+      "oneOf" : [ {
+        "properties" : {
+          "type" : {
+            "const" : "primitive"
+          }
+        },
+        "required" : [ "type" ],
+        "$ref" : "#/$defs/Primitive"
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "compound"
+          }
+        },
+        "required" : [ "type" ],
+        "$ref" : "#/$defs/Compound"
+      } ]
+    },
+    "TerminationSpec" : {
+      "oneOf" : [ {
+        "properties" : {
+          "type" : {
+            "const" : "max-iterations"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object",
+        "unevaluatedProperties" : false
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "goal-reached"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object",
+        "unevaluatedProperties" : false
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "judge-convergence"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object",
+        "unevaluatedProperties" : false
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "all-agreed"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object",
+        "unevaluatedProperties" : false
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "supervisor"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object",
+        "unevaluatedProperties" : false
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "contested"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object",
+        "unevaluatedProperties" : false
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "convergence"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object",
+        "unevaluatedProperties" : false
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "single-pass"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object"
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "agent-count"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object"
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "accepted"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object"
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "terminal-outcome"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object"
+      }, {
+        "properties" : {
+          "type" : {
+            "const" : "deadline"
+          }
+        },
+        "required" : [ "type" ],
+        "type" : "object",
+        "unevaluatedProperties" : false
+      } ]
+    },
+    "Voting" : {
+      "type" : "object",
+      "properties" : {
+        "activation" : {
+          "$ref" : "#/$defs/ActivationSpec"
+        },
+        "agents" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/$defs/AgentRefSpec"
+          }
+        },
+        "aggregation" : {
+          "$ref" : "#/$defs/AggregationSpec"
+        },
+        "decomposition" : {
+          "$ref" : "#/$defs/DecompositionSpec"
+        },
+        "failurePolicy" : {
+          "$ref" : "#/$defs/FailurePolicy"
+        },
+        "judgment" : {
+          "$ref" : "#/$defs/JudgmentSpec"
+        },
+        "routing" : {
+          "$ref" : "#/$defs/RoutingSpec"
+        },
+        "task" : {
+          "type" : "string"
+        },
+        "termination" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/$defs/TerminationSpec"
+          }
+        }
+      },
+      "unevaluatedProperties" : false
+    },
+    "Worker" : {
+      "type" : "object",
+      "properties" : {
+        "capabilities" : {
+          "type" : "array",
+          "items" : {
+            "type" : "string"
+          }
+        },
+        "description" : {
+          "type" : "string"
+        },
+        "name" : {
+          "type" : "string"
+        }
+      },
+      "unevaluatedProperties" : false
+    }
+  },
+  "oneOf" : [ {
+    "properties" : {
+      "type" : {
+        "const" : "supervisor"
+      }
+    },
+    "required" : [ "type" ],
+    "$ref" : "#/$defs/Supervisor"
+  }, {
+    "properties" : {
+      "type" : {
+        "const" : "debate"
+      }
+    },
+    "required" : [ "type" ],
+    "$ref" : "#/$defs/Debate"
+  }, {
+    "properties" : {
+      "type" : {
+        "const" : "loop"
+      }
+    },
+    "required" : [ "type" ],
+    "$ref" : "#/$defs/Loop"
+  }, {
+    "properties" : {
+      "type" : {
+        "const" : "parallel"
+      }
+    },
+    "required" : [ "type" ],
+    "$ref" : "#/$defs/Parallel"
+  }, {
+    "properties" : {
+      "type" : {
+        "const" : "voting"
+      }
+    },
+    "required" : [ "type" ],
+    "$ref" : "#/$defs/Voting"
+  }, {
+    "properties" : {
+      "type" : {
+        "const" : "conditional"
+      }
+    },
+    "required" : [ "type" ],
+    "$ref" : "#/$defs/Conditional"
+  }, {
+    "properties" : {
+      "type" : {
+        "const" : "sequence"
+      }
+    },
+    "required" : [ "type" ],
+    "$ref" : "#/$defs/Sequence"
+  }, {
+    "properties" : {
+      "type" : {
+        "const" : "htn"
+      }
+    },
+    "required" : [ "type" ],
+    "$ref" : "#/$defs/Htn"
+  } ]
+}
