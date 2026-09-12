@@ -181,9 +181,15 @@ Domain repos override these by providing `@ApplicationScoped` beans without `@De
 
 `SummarisationRunner` orchestrates this for flat event streams. `KeyedSummarisationRunner` adds grouping via `KeyedAccumulator` (groups by key, drains completed/stale groups independently). Both implement `Tickable` -- the common `tick()`/`flush()` contract used by `CompiledPipeline` for polymorphic runner dispatch.
 
-**Stateful summarisation:** Both runners detect `StatefulSummariser` via `instanceof` and manage per-partition (SummarisationRunner, keyed by `tenancyId`) or per-key (KeyedSummarisationRunner, keyed by group key `K`) state in a `ConcurrentHashMap`. `ContentSummariser<T, R>.asSummariser()` bridges to `StatefulSummariser<T, R, R>` -- the `R previous` parameter carries accumulated state across batches. `KeyedSummarisationRunner.evictState(K)` removes per-key state for explicit lifecycle cleanup (e.g. case close).
+**Builder API:** Both runners offer a builder for opt-in SPI extensions: `SummarisationRunner.builder(summariser, bus, level).emissionPolicy(...).stateStore(...).stateKeyResolver(...).outputProcessor(...).build()`. Legacy `WindowPolicy` constructors are unchanged. The builder requires exactly one of `windowPolicy()` or `emissionPolicy()`.
 
-**Tick semantics:** `tick(now)` checks if the `WindowPolicy` is satisfied (by age or count), drains if ready, runs compactor + summariser, publishes to output bus. `flush()` does an unconditional drain regardless of policy -- use at shutdown. Both return `CompletionStage<Void>` for async summarisers.
+**Stateful summarisation:** Both runners detect `StatefulSummariser` via `instanceof` and manage per-partition (SummarisationRunner, keyed by `tenancyId`) or per-key (KeyedSummarisationRunner, keyed by group key `K`) state in a `ConcurrentHashMap`. `ContentSummariser<T, R>.asSummariser()` bridges to `StatefulSummariser<T, R, R>` -- the `R previous` parameter carries accumulated state across batches. `KeyedSummarisationRunner.evictState(K)` removes per-key state for explicit lifecycle cleanup (e.g. case close). Optional `StateStore<S>` provides persistent state via write-through cache -- reads check in-memory first, fall back to `StateStore.load()`, writes go to both.
+
+**Emission gating:** `EmissionPolicy<IN, S>` replaces `WindowPolicy` as the gating mechanism when state-aware decisions are needed (e.g. novelty checks comparing new input against existing state). `WindowPolicy` is wrapped internally as `EmissionPolicy` via the builder. `anyOf()`/`allOf()` static factories for composition.
+
+**Output processing:** `OutputProcessor<OUT, S>` is called after `summarise()` and before output bus publish. Use for post-summarisation transformations (e.g. pruning, filtering, enrichment).
+
+**Tick semantics:** `tick(now)` checks if the `WindowPolicy` (legacy path) or `EmissionPolicy` (builder path) is satisfied, drains if ready, runs compactor + summariser + output processor, publishes to output bus. `flush()` does an unconditional drain regardless of policy -- use at shutdown. Both return `CompletionStage<Void>` for async summarisers.
 
 **Content summarisation layer:** `ContentSummariser<T, R>` is a higher-level contract decoupled from `LevelEvent` wrappers. Generified result type `R` (not tied to `SummaryResult`). `asSummariser()` bridges to `StatefulSummariser` for pipeline use with state. `TieredContentSummariser<T>` routes to different strategies based on batch size. `VerbatimContentSummariser<T>` renders each item as a bullet point (no LLM). `LlmContentSummariser<T>` uses `AgentProvider` with configurable EDIT/APPEND mode.
 
@@ -245,7 +251,7 @@ The goal sub-package (`agentic.social.goal`) is Layer 2 of the autonomous intell
 
 **LLM goal formation:** `DriveGoalFormationStrategy` SPI with `LlmDriveGoalFormationStrategy` implementation provides drive-specific LLM prompt framing as an opt-in alternative to heuristic mappers. Accepts `DriveGoalFormationContext` (axis, intensity, trigger, existing goals, remaining capacity) and produces richer `DriveGoalProposal` descriptions via `AgentProvider`. Graceful degradation on LLM failure. Follows the heuristic/LLM tiering pattern from summarisation.
 
-**Consumer integration:** The scheduler (quarkmind, claudony, etc.) wires the full tick loop -- source orchestrators → NarrativeSynthesiser → NarrativeOrchestrator → DriveOrchestrator → GoalProposalOrchestrator → GoalFormationService. The scheduler reads `GoalProposalTick.Changes` and applies all four signal types: register proposals via GoalFormationService, remove abandoned goals, apply priority adjustments via `AgentGoal.toBuilder().priority()`, apply governance attribute updates via `AgentGoal.toBuilder().attributes()`.
+**Consumer integration:** The scheduler (quarkmind, claudony, etc.) wires the full tick loop -- source orchestrators → NarrativePipeline → NarrativeOrchestrator → DriveOrchestrator → GoalProposalOrchestrator → GoalFormationService. The scheduler reads `GoalProposalTick.Changes` and applies all four signal types: register proposals via GoalFormationService, remove abandoned goals, apply priority adjustments via `AgentGoal.toBuilder().priority()`, apply governance attribute updates via `AgentGoal.toBuilder().attributes()`.
 
 **Governed priority escalation (#166):** GoalProposalOrchestrator pipeline extends with three phases after per-axis mapping: (1) cross-axis composition — detects `DerivedTheme`s with ≥2 positive axis weights above `crossAxisMinWeight`, creates compound proposals with dominant axis; (2) escalation evaluation — `GoalEscalationPolicy` SPI checks narrative alignment, synthesis-cycle tracking counts confirmed alignment cycles before escalating to PRIMARY; (3) demotion evaluation — checks existing PRIMARY drive-sourced goals for lost alignment with their escalation theme, demotes after sustained misalignment. All phases require `Instance<NarrativeOrchestrator>` (optional — when absent, phases are skipped and goals stay SECONDARY).
 
@@ -259,15 +265,16 @@ The goal sub-package (`agentic.social.goal`) is Layer 2 of the autonomous intell
 
 Layer 3a of the autonomous intelligence stack. Agents construct a first-person autobiography from accumulated reflections. The architecture splits into effectful synthesis and side-effect-free orchestration:
 
-- **NarrativeSynthesiser** (`@ApplicationScoped`, effectful) -- composite gate evaluation (count + novelty + quiet period), LLM synthesis via `AgentProvider`, writes `NarrativeState` to `NarrativeStore`. Called by the consumer's scheduler before the compositor ticks.
-- **NarrativeOrchestrator** (`@ApplicationScoped`, compositor) -- reads `NarrativeStore`, caches `NarrativeState` per agent, returns `NarrativeTick` (Updated/NoChange). No LLM, no side effects.
+- **NarrativePipeline** (`@ApplicationScoped`, factory) -- wires `ReflectionEventAdapter` (pull-to-push from `ReflectionQueryStore`) → `SummarisationRunner` (with `NarrativeEmissionPolicy` for count + novelty + quiet period gating, `CbrStateStore` for persistent state, `NarrativeOutputProcessor` for episode/theme pruning, `NarrativeContentSummariser.asSummariser()` for LLM synthesis). `tick(agentId, tenantId)` drives the full cycle.
+- **NarrativeContentSummariser** (`@ApplicationScoped`, `ContentSummariser<ReflectionEntry, NarrativeState>`) -- LLM synthesis via `AgentProvider`, incremental episode merge + full theme re-derivation. No gate logic, no pruning, no store writes -- those are pipeline SPI concerns.
+- **NarrativeOrchestrator** (`@ApplicationScoped`, compositor) -- reads `NarrativeStore`, caches `NarrativeState` per agent, returns `NarrativeTick` (Updated/NoChange). No LLM, no side effects. Reads independently from `CbrNarrativeStore` -- no coupling to the pipeline's write-through cache.
 - **GroupNarrativeOrchestrator** (compositor, not CDI-managed) -- GROUP-scoped mirror of NarrativeOrchestrator. Consumer constructs with `Set<String> memberIds`. `tick(groupId, tenantId)` detects new `GroupEpisode`s and themes.
 
-**Persistence:** `NarrativeStore` SPI with `CbrNarrativeStore` `@DefaultBean`. `NarrativeStateSchema` handles polymorphic `NarrativeFragment` serialization (type discriminators for `IndividualEpisode`/`GroupEpisode`/`DerivedTheme`). `ReflectionQueryStore` SPI provides read access to stored reflections for synthesis.
+**Persistence:** `NarrativeStore` SPI with `CbrNarrativeStore` `@DefaultBean`. `NarrativeStateSchema` handles polymorphic `NarrativeFragment` serialization (type discriminators for `IndividualEpisode`/`GroupEpisode`/`DerivedTheme`). `CbrStateStore` adapts `CbrNarrativeStore` as `StateStore<NarrativeState>` for the pipeline's write-through cache. `ReflectionQueryStore` SPI provides read access to stored reflections for `ReflectionEventAdapter`.
 
 **Drive modulation:** `NarrativeModulation.compute(NarrativeState)` converts themes to per-axis drive coefficients. `DriveOrchestrator` reads from `NarrativeOrchestrator` via `Instance<>` (optional) and passes modulation to `DriveComposer`. Works identically for individual and group narratives.
 
-**Tick ordering:** Source orchestrators → NarrativeSynthesiser → NarrativeOrchestrator → DriveOrchestrator → GoalProposalOrchestrator.
+**Tick ordering:** Source orchestrators → NarrativePipeline → NarrativeOrchestrator → DriveOrchestrator → GoalProposalOrchestrator.
 
 ### Social Emergence
 

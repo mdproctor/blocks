@@ -439,15 +439,18 @@ Layered event summarisation framework -- temporal event accumulation with config
 | `EventLevel` | record | Named level in the temporal hierarchy: `name`, `ordinal` |
 | `LevelEvent<E>` | record | Typed event at a specific level: `payload`, `timestamp`, `level` |
 | `WindowPolicy` | record | Window boundaries: `maxAge` (ms), `maxCount`. At least one must be positive. Factory methods: `ofCount(int)`, `ofAge(long)`, `of(long, int)`. |
-| `EventAccumulator<E>` | class | Thread-safe event buffer with `collect()`, `shouldEmit()`, `drain()`, `drainIfReady(now)`, `clear()`, `size()`. All methods synchronized. |
+| `EventAccumulator<E>` | class | Thread-safe event buffer with `collect()`, `shouldEmit()`, `drain()`, `drainIfReady(now)`, `peekBuffer()` (read-only snapshot), `clear()`, `size()`. All methods synchronized. |
 | `EventStreamBus<E>` | class | Predicate-based pub/sub. `subscribe(Predicate, Consumer)`, `publish(LevelEvent)`. `clearSubscriptions()`. Backed by `CopyOnWriteArrayList`. Synchronous dispatch. |
 | `Summariser<IN, OUT>` | @FunctionalInterface | Core contract: `summarise(List<LevelEvent<IN>>) -> CompletionStage<List<OUT>>`. Static: `ofSync(SyncSummariser)`. Inner type: `SyncSummariser<IN, OUT>` (@FunctionalInterface). |
 | `Compactor<E>` | @FunctionalInterface | Pre-processing SPI: `compact(List<LevelEvent<E>>) -> List<LevelEvent<E>>`. Runs between drain and summarise for merge/deduplicate/filter. |
 | `Tickable` | interface | Common `tick(long now)`/`flush()` contract for both `SummarisationRunner` and `KeyedSummarisationRunner`. |
 | `StatefulSummariser<IN, OUT, S>` | interface | Extends `Summariser` with framework-managed state per partition: `summarise(batch, @Nullable previousState) -> SummariseResult<OUT, S>`. |
-| `SummarisationRunner<IN, OUT>` | class | Wires accumulator -> optional compactor -> summariser -> output bus. Tick-driven via `tick(now)`. `flush()` for unconditional drain at shutdown. Implements `Tickable`. Detects `StatefulSummariser` and manages per-partition state. |
+| `EmissionPolicy<IN, S>` | @FunctionalInterface | State-aware emission gating: `shouldEmit(buffered, currentState, now)`. Static `anyOf()`/`allOf()` composition. Used via builder API as alternative to `WindowPolicy`. |
+| `StateStore<S>` | interface | Opt-in persistent state: `load(partitionKey)`, `store(partitionKey, state)`. Write-through cache in runners — reads check in-memory cache first, fall back to store. |
+| `OutputProcessor<OUT, S>` | @FunctionalInterface | Post-summarisation processing: `process(outputs, currentState)`. Called after `summarise()`, before output bus publish. |
+| `SummarisationRunner<IN, OUT>` | class | Wires accumulator -> optional compactor -> summariser -> output bus. Tick-driven via `tick(now)`. `flush()` for unconditional drain at shutdown. Implements `Tickable`. Detects `StatefulSummariser` and manages per-partition state. Builder API: `.emissionPolicy()`, `.stateStore()`, `.stateKeyResolver()`, `.outputProcessor()`, `.compactor()`, `.onFailure()`. Legacy `WindowPolicy` constructors unchanged. |
 | `KeyedAccumulator<K, E>` | class | Groups events by key, emits each group on completion predicate or stale timeout. `collect()`, `drain(now)`, `drainAll()`, `keyExtractor()`. |
-| `KeyedSummarisationRunner<K, IN, OUT>` | class | Grouped variant: per-key summarisation with independent failure recovery. `collect()`, `tick(now)`, `flush()`, `evictState(K)`. Implements `Tickable`. Detects `StatefulSummariser` and manages per-key state via `ConcurrentHashMap`. |
+| `KeyedSummarisationRunner<K, IN, OUT>` | class | Grouped variant: per-key summarisation with independent failure recovery. `collect()`, `tick(now)`, `flush()`, `evictState(K)`. Implements `Tickable`. Detects `StatefulSummariser` and manages per-key state via `ConcurrentHashMap`. Builder API: `.stateStore()`, `.outputProcessor()`, `.compactor()`, `.onFailure()`. |
 | `ContentSummariser<T, R>` | @FunctionalInterface | Higher-level SPI: `summarise(List<T>, @Nullable R previous) -> CompletionStage<R>`. Generified result type. `asSummariser()` bridges to `StatefulSummariser<T, R, R>`. |
 | `TieredContentSummariser<T>` | class | Routes to one of three `ContentSummariser<T>` delegates (small/medium/large) based on item count thresholds. |
 | `VerbatimContentSummariser<T>` | class | Renders each item as a bullet point using a `Function<T, String>` renderer. Prepends previous summary. Annotates with `tier=verbatim`. No LLM. |
@@ -613,13 +616,15 @@ TranscriptionResult result = stt.transcribe(audioFile, TranscriptionOptions.defa
 
 ## Key Integration Patterns
 
-**Summarisation Pattern A** (SummarisationRunner pipeline): sync heuristics, microsecond latency. Wire accumulator -> optional compactor -> summariser -> output bus. Use `flush()` at shutdown for unconditional drain.
+**Summarisation Pattern A** (SummarisationRunner pipeline): sync heuristics, microsecond latency. Wire accumulator -> optional compactor -> summariser -> output bus. Use `flush()` at shutdown for unconditional drain. Builder API available for opt-in SPIs: `SummarisationRunner.builder(summariser, bus, level).emissionPolicy(...).stateStore(...).outputProcessor(...).build()`.
 
 **Summarisation Pattern B** (direct EventAccumulator): async LLM dispatch, caller manages the accumulator lifecycle.
 
 **Summarisation Pattern C** (TieredContentSummariser): volume-adaptive summarisation -- verbatim for small batches, grouped for medium, LLM-synthesised for large.
 
 **Summarisation Pattern D** (Decision narrative pipeline): `DecisionNarrativePipeline` wires a two-level `KeyedSummarisationRunner` chain -- L1 groups raw `DecisionSignal` events by step (heuristic, no LLM), L2 groups step summaries by case and synthesises `DecisionNarrative` via LLM with incremental state. Domain repos implement `NarrativeSignalStrategy` to feed platform signals. `evictCaseState()` on case close.
+
+**Summarisation Pattern E** (Identity narrative pipeline): `NarrativePipeline` wires `ReflectionEventAdapter` (pull-to-push bridge from `ReflectionQueryStore`) → `SummarisationRunner` (with `NarrativeEmissionPolicy`, `CbrStateStore`, `NarrativeOutputProcessor`, `NarrativeContentSummariser.asSummariser()`). `tick(agentId, tenantId)` drives the full cycle. `NarrativeOrchestrator` reads results independently from `NarrativeStore`.
 
 **Channel bridges**: `ChannelEventAdapter` (channel -> event bus) and `ChannelEventPublisher` (event bus -> channel) provide bidirectional integration between qhorus channels and the summarisation pipeline.
 
