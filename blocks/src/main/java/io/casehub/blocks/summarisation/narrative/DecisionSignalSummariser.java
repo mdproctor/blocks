@@ -26,7 +26,7 @@ public class DecisionSignalSummariser
                 batch.get(batch.size() - 1).payload().timestamp()));
     }
 
-    static SignalDigest toDigest(DecisionSignal signal) {
+    private static SignalDigest toDigest(DecisionSignal signal) {
         return switch (signal) {
             case RoutingDecision r -> new SignalDigest(
                     "RoutingDecision",

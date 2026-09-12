@@ -17,7 +17,7 @@ public class KeyedSummarisationRunner<K, IN, OUT> implements Tickable {
     private final EventStreamBus<OUT>            outputBus;
     private final EventLevel                     outputLevel;
     private final Consumer<List<LevelEvent<IN>>> onFailure;
-    private final java.util.concurrent.ConcurrentHashMap<K, Object> keyState = new java.util.concurrent.ConcurrentHashMap<>();
+    private final ConcurrentHashMap<K, Object> keyState = new ConcurrentHashMap<>();
 
 
     public KeyedSummarisationRunner(Function<LevelEvent<IN>, K> keyExtractor,
