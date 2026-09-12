@@ -1,9 +1,8 @@
 package io.casehub.blocks.agentic.social.narrative;
 
-import io.casehub.blocks.agentic.social.TokenJaccardDistance;
 import io.casehub.blocks.agentic.social.drive.DriveAxis;
 import io.casehub.blocks.memory.ReflectionEntry;
-import io.casehub.blocks.memory.ReflectionQueryStore;
+import io.casehub.blocks.summarisation.ContentSummariser;
 import io.casehub.platform.agent.AgentEvent;
 import io.casehub.platform.agent.AgentProvider;
 import io.casehub.platform.agent.AgentSessionConfig;
@@ -11,29 +10,27 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.json.Json;
 import jakarta.json.JsonObject;
+import org.jspecify.annotations.Nullable;
 
 import java.io.StringReader;
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.ReentrantLock;
-import java.util.logging.Level;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 @ApplicationScoped
-public class NarrativeSynthesiser {
+public class NarrativeContentSummariser
+        implements ContentSummariser<ReflectionEntry, NarrativeState> {
 
-    private static final Logger LOG = Logger.getLogger(NarrativeSynthesiser.class.getName());
+    private static final Logger LOG = Logger.getLogger(NarrativeContentSummariser.class.getName());
 
     static final String SYSTEM_PROMPT = """
             You are synthesising a first-person narrative identity from an agent's \
@@ -55,86 +52,39 @@ public class NarrativeSynthesiser {
             Respond with JSON only. No explanation outside the JSON.""";
 
     private final AgentProvider agentProvider;
-    private final NarrativeStore narrativeStore;
-    private final ReflectionQueryStore reflectionQueryStore;
     private final NarrativeConfig config;
     private final Clock clock;
 
-    private final ConcurrentHashMap<String, ReentrantLock> synthesisLocks =
-            new ConcurrentHashMap<>();
-
     @Inject
-    public NarrativeSynthesiser(AgentProvider agentProvider,
-                                 NarrativeStore narrativeStore,
-                                 ReflectionQueryStore reflectionQueryStore,
-                                 NarrativeConfig config) {
-        this(agentProvider, narrativeStore, reflectionQueryStore,
-                config, Clock.systemUTC());
+    public NarrativeContentSummariser(AgentProvider agentProvider,
+                                       NarrativeConfig config) {
+        this(agentProvider, config, Clock.systemUTC());
     }
 
-    NarrativeSynthesiser(AgentProvider agentProvider,
-                          NarrativeStore narrativeStore,
-                          ReflectionQueryStore reflectionQueryStore,
-                          NarrativeConfig config,
-                          Clock clock) {
+    NarrativeContentSummariser(AgentProvider agentProvider,
+                                NarrativeConfig config,
+                                Clock clock) {
         this.agentProvider = agentProvider;
-        this.narrativeStore = narrativeStore;
-        this.reflectionQueryStore = reflectionQueryStore;
         this.config = config;
         this.clock = clock;
     }
 
-    public NarrativeSynthesisTick synthesiseIfNeeded(String agentId, String tenantId) {
-        var key = agentId + ":" + tenantId;
-        var lock = synthesisLocks.computeIfAbsent(key, k -> new ReentrantLock());
-        lock.lock();
-        try {
-            return doSynthesise(agentId, tenantId);
-        } finally {
-            lock.unlock();
-        }
-    }
+    @Override
+    public CompletionStage<NarrativeState> summarise(
+            List<ReflectionEntry> items,
+            @Nullable NarrativeState previous) {
 
-    private NarrativeSynthesisTick doSynthesise(String agentId, String tenantId) {
-        var currentState = narrativeStore.load(agentId, tenantId);
-        var since = currentState != null ? currentState.synthesisedAt() : Instant.EPOCH;
-        var now = Instant.now(clock);
-
-        int count = reflectionQueryStore.countSince(agentId, tenantId, since);
-        var gate = config.synthesisGate();
-        boolean quietPeriodTriggered = Duration.between(since, now)
-                .compareTo(gate.quietPeriodBypass()) >= 0;
-
-        if (count == 0) {
-            return new NarrativeSynthesisTick.Skipped("no new reflections");
+        if (items.isEmpty()) {
+            return CompletableFuture.completedFuture(previous);
         }
 
-        if (!quietPeriodTriggered && count < gate.minNewReflections()) {
-            return new NarrativeSynthesisTick.Skipped("insufficient reflections: " + count);
-        }
-
-        var reflections = reflectionQueryStore.findSince(agentId, tenantId, since);
+        var reflections = items;
         boolean capped = reflections.size() > config.maxReflectionsPerSynthesis();
         if (capped) {
             reflections = reflections.subList(0, config.maxReflectionsPerSynthesis());
         }
 
-        if (!quietPeriodTriggered) {
-            var reflectionText = reflections.stream()
-                    .map(ReflectionEntry::insight)
-                    .collect(Collectors.joining("\n"));
-            var currentNarrativeText = currentState != null
-                    ? currentState.episodes().stream()
-                    .map(IndividualEpisode::description)
-                    .collect(Collectors.joining("\n"))
-                    : "";
-            double novelty = TokenJaccardDistance.distance(reflectionText, currentNarrativeText);
-            if (novelty < gate.noveltyThreshold()) {
-                return new NarrativeSynthesisTick.Skipped("low novelty");
-            }
-        }
-
-        var userPrompt = assembleUserPrompt(currentState, reflections);
+        var userPrompt = assembleUserPrompt(previous, reflections);
 
         String responseText;
         try {
@@ -145,32 +95,33 @@ public class NarrativeSynthesiser {
                     .await().indefinitely()
                     .stream().collect(Collectors.joining());
         } catch (Exception e) {
-            LOG.log(Level.WARNING, "LLM invocation failed for agent " + agentId, e);
-            return new NarrativeSynthesisTick.Skipped("llm failure");
+            LOG.warning("LLM invocation failed: " + e.getMessage());
+            return CompletableFuture.completedFuture(previous);
         }
 
         if (responseText == null || responseText.isBlank()) {
-            return new NarrativeSynthesisTick.Skipped("empty response");
+            return CompletableFuture.completedFuture(previous);
         }
 
         SynthesisResult result;
         try {
             result = parseResponse(responseText);
         } catch (Exception e) {
-            LOG.log(Level.WARNING, "Failed to parse synthesis response: " + e.getMessage());
-            return new NarrativeSynthesisTick.Skipped("parse failure");
+            LOG.warning("Failed to parse synthesis response: " + e.getMessage());
+            return CompletableFuture.completedFuture(previous);
         }
 
+        var now = Instant.now(clock);
         var newEpisodes = buildEpisodes(result.newEpisodes(), reflections, now);
 
         var allEpisodes = new ArrayList<IndividualEpisode>();
-        if (currentState != null) {
-            allEpisodes.addAll(currentState.episodes());
+        if (previous != null) {
+            allEpisodes.addAll(previous.episodes());
         }
         allEpisodes.addAll(newEpisodes);
 
-        var groupEpisodes = currentState != null
-                ? currentState.groupEpisodes()
+        var groupEpisodes = previous != null
+                ? previous.groupEpisodes()
                 : List.<GroupEpisode>of();
 
         var allFragmentsForTagMatching = new ArrayList<NarrativeFragment>();
@@ -180,35 +131,34 @@ public class NarrativeSynthesiser {
         var themes = buildThemes(result.themes(), allFragmentsForTagMatching, now);
 
         if (newEpisodes.isEmpty() && themes.isEmpty()) {
-            return new NarrativeSynthesisTick.Skipped("empty synthesis result");
+            return CompletableFuture.completedFuture(previous);
         }
 
         if (themes.isEmpty() && !allEpisodes.isEmpty()) {
             LOG.warning("LLM produced no themes despite existing episodes — treating as failure");
-            return new NarrativeSynthesisTick.Skipped("no themes produced");
+            return CompletableFuture.completedFuture(previous);
         }
-
-        pruneEpisodes(allEpisodes);
-        pruneThemes(themes);
 
         var allFragments = new ArrayList<NarrativeFragment>();
         allFragments.addAll(allEpisodes);
         allFragments.addAll(groupEpisodes);
         allFragments.addAll(themes);
 
+        var scopeId = previous != null ? previous.scopeId() : reflections.get(0).agentId();
+        var tenantId = previous != null ? previous.tenantId() : reflections.get(0).tenantId();
+
         var synthesisedAt = capped
                 ? reflections.getLast().generatedAt()
                 : now;
 
-        var state = new NarrativeState(agentId, tenantId,
+        var state = new NarrativeState(scopeId, tenantId,
                 NarrativeScope.INDIVIDUAL, allFragments, synthesisedAt,
                 reflections.size());
-        narrativeStore.store(state);
 
-        return new NarrativeSynthesisTick.Synthesised(state, reflections.size());
+        return CompletableFuture.completedFuture(state);
     }
 
-    String assembleUserPrompt(NarrativeState currentState,
+    String assembleUserPrompt(@Nullable NarrativeState currentState,
                                List<ReflectionEntry> reflections) {
         var sb = new StringBuilder();
 
@@ -416,24 +366,5 @@ public class NarrativeSynthesiser {
             }
         }
         return themes;
-    }
-
-    private void pruneEpisodes(List<IndividualEpisode> episodes) {
-        if (episodes.size() > config.maxEpisodes()) {
-            episodes.sort(Comparator.comparing(IndividualEpisode::from));
-            while (episodes.size() > config.maxEpisodes()) {
-                episodes.removeFirst();
-            }
-        }
-    }
-
-    private void pruneThemes(List<DerivedTheme> themes) {
-        themes.removeIf(t -> t.salience() < config.themeSalienceFloor());
-        if (themes.size() > config.maxThemes()) {
-            themes.sort(Comparator.comparingDouble(DerivedTheme::salience));
-            while (themes.size() > config.maxThemes()) {
-                themes.removeFirst();
-            }
-        }
     }
 }
