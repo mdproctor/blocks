@@ -7,7 +7,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
-public class KeyedSummarisationRunner<K, IN, OUT> {
+public class KeyedSummarisationRunner<K, IN, OUT> implements Tickable {
 
     private static final System.Logger LOG = System.getLogger(KeyedSummarisationRunner.class.getName());
 

@@ -4,22 +4,25 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.blocks.summarisation.EventLevel;
 import io.casehub.blocks.summarisation.EventStreamBus;
+import io.casehub.blocks.summarisation.KeyedSummarisationRunner;
+import io.casehub.blocks.summarisation.LevelEvent;
 import io.casehub.blocks.summarisation.SummarisationRunner;
 import io.casehub.blocks.summarisation.Summariser;
 import io.casehub.blocks.summarisation.WindowPolicy;
-import io.casehub.platform.api.expression.ExpressionEngine;
 import io.casehub.blocks.summarisation.cloudevents.CloudEventEmitter;
 import io.casehub.blocks.summarisation.cloudevents.EventSink;
+import io.casehub.platform.api.expression.CompiledExpression;
+import io.casehub.platform.api.expression.ExpressionEngine;
 import io.cloudevents.CloudEvent;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.Map;
 
 public class PipelineCompiler {
 
     private static final ObjectMapper JSON = new ObjectMapper();
-
 
     @SuppressWarnings("unchecked")
     public <IN> CompiledPipeline<IN> compile(PipelineDefinition definition,
@@ -47,19 +50,11 @@ public class PipelineCompiler {
             Summariser<Object, Object> summariser = registry.create(
                     level.summariser().type(), level.summariser().config());
 
-            if (level.grouping() instanceof GroupingDefinition.Keyed k) {
+            if (level.grouping() instanceof GroupingDefinition.Keyed keyed) {
                 if (expressionEngine == null) {
                     throw new IllegalStateException("Keyed grouping requires ExpressionEngine");
                 }
-                var keyCompiled = expressionEngine.compile(k.keyExpression(), Object.class, Object.class);
-                java.util.function.Function<io.casehub.blocks.summarisation.LevelEvent<Object>, Object> keyExtractor =
-                        event -> keyCompiled.eval(event.payload());
-                var completionCompiled = expressionEngine.compile(k.completionExpression(), Object.class, Object.class);
-                java.util.function.Predicate<java.util.List<io.casehub.blocks.summarisation.LevelEvent<Object>>> completionTest =
-                        events -> Boolean.TRUE.equals(completionCompiled.eval(events));
-                var keyedRunner = new io.casehub.blocks.summarisation.KeyedSummarisationRunner<>(
-                        keyExtractor, completionTest, k.staleTimeout(),
-                        summariser, outputBus, outputLevel);
+                var keyedRunner = createKeyedRunner(keyed, expressionEngine, summariser, outputBus, outputLevel);
                 currentInput.subscribe(e -> true, keyedRunner::collect);
                 levelRunners.add(new CompiledPipeline.LevelRunner(
                         now -> keyedRunner.tick(now), keyedRunner::flush));
@@ -89,6 +84,40 @@ public class PipelineCompiler {
                 definition.name(), inputBus, levelRunners, outputBuses);
     }
 
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private KeyedSummarisationRunner<Object, Object, Object> createKeyedRunner(
+            GroupingDefinition.Keyed keyed,
+            ExpressionEngine expressionEngine,
+            Summariser<Object, Object> summariser,
+            EventStreamBus<Object> outputBus,
+            EventLevel outputLevel) {
+        CompiledExpression<Map, Object> keyExpr =
+                expressionEngine.compile(keyed.keyExpression(), Map.class, Object.class);
+        CompiledExpression<Map, Boolean> completionExpr =
+                expressionEngine.compile(keyed.completionExpression(), Map.class, Boolean.class);
+
+        return new KeyedSummarisationRunner<>(
+                (LevelEvent<Object> e) -> {
+                    var payload = e.payload();
+                    if (payload instanceof Map<?, ?> m) {
+                        return keyExpr.eval((Map) m);
+                    }
+                    return payload.toString();
+                },
+                group -> group.stream().anyMatch(e -> {
+                    var payload = e.payload();
+                    if (payload instanceof Map<?, ?> m) {
+                        var result = completionExpr.eval((Map) m);
+                        return Boolean.TRUE.equals(result);
+                    }
+                    return false;
+                }),
+                keyed.staleTimeout(),
+                summariser,
+                outputBus,
+                outputLevel);
+    }
+
     private WindowPolicy toWindowPolicy(GroupingDefinition grouping) {
         if (grouping instanceof GroupingDefinition.Windowed w) {
             if (w.count() != null && w.age() != null) {
@@ -102,6 +131,6 @@ public class PipelineCompiler {
             }
             throw new IllegalArgumentException("Windowed grouping requires count and/or age");
         }
-        throw new UnsupportedOperationException("Keyed grouping not yet implemented");
+        throw new IllegalStateException("Unknown grouping type: " + grouping.getClass());
     }
 }

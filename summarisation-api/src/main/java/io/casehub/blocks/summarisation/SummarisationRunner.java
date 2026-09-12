@@ -6,7 +6,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
-public class SummarisationRunner<IN, OUT> {
+public class SummarisationRunner<IN, OUT> implements Tickable {
 
     private static final System.Logger LOG = System.getLogger(SummarisationRunner.class.getName());
     private static final String DEFAULT_PARTITION = "__default__";

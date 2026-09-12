@@ -1,0 +1,52 @@
+pipeline:
+  name: decision-narrative
+  source:
+    cloud-event-type: io.casehub.decision.signal.v1
+  levels:
+    - name: step-signals
+      grouping:
+        type: keyed
+        key: "caseId + \":\" + stepName"
+        completion: "signalType == \"step_outcome\""
+        stale-timeout: 30000
+      summariser:
+        type: threshold-classify
+        rules:
+          - name: routing-decision
+            when: "signalType == \"routing\""
+            category: ROUTING
+            severity: INFO
+          - name: cbr-match
+            when: "signalType == \"cbr\""
+            category: CBR_EVIDENCE
+            severity: INFO
+          - name: trust-pass
+            when: "signalType == \"trust\" && passed == true"
+            category: TRUST_PASSED
+            severity: INFO
+          - name: trust-fail
+            when: "signalType == \"trust\" && passed == false"
+            category: TRUST_FAILED
+            severity: HIGH
+          - name: step-completed
+            when: "signalType == \"step_outcome\" && status == \"COMPLETED\""
+            category: STEP_COMPLETED
+            severity: INFO
+          - name: step-failed
+            when: "signalType == \"step_outcome\" && status == \"FAILED\""
+            category: STEP_FAILED
+            severity: HIGH
+      emit:
+        cloud-event-type: io.casehub.decision.step-summary.v1
+
+    - name: case-narrative
+      grouping:
+        type: keyed
+        key: caseId
+        completion: "category == \"STEP_COMPLETED\" || category == \"STEP_FAILED\""
+        stale-timeout: 60000
+      summariser:
+        type: count
+        category-field: category
+      emit:
+        cloud-event-type: io.casehub.decision.narrative.v1
