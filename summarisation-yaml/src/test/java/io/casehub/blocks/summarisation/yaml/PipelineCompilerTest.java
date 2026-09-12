@@ -187,7 +187,7 @@ class PipelineCompilerTest {
         var def = new PipelineDefinition("keyed-test",
                                          new SourceDefinition(null, null, null),
                                          List.of(new LevelDefinition("out",
-                                                                     new GroupingDefinition.Keyed("category", "size", 5000L),
+                                                                     new GroupingDefinition.Keyed("category", "done", 5000L),
                                                                      new SummariserDefinition("pass-through", null, Map.of()),
                                                                      null, List.of())),
                                          null);
@@ -200,7 +200,7 @@ class PipelineCompilerTest {
 
         pipeline.inputBus().publish(new LevelEvent<>(Map.of("category", (Object) "A", "value", (Object) 1), 100L, INPUT_LEVEL, null));
         pipeline.inputBus().publish(new LevelEvent<>(Map.of("category", (Object) "A", "value", (Object) 2), 200L, INPUT_LEVEL, null));
-        pipeline.inputBus().publish(new LevelEvent<>(Map.of("category", (Object) "A", "value", (Object) 3), 300L, INPUT_LEVEL, null));
+        pipeline.inputBus().publish(new LevelEvent<>(Map.of("category", (Object) "A", "value", (Object) 3, "done", (Object) true), 300L, INPUT_LEVEL, null));
         pipeline.tick(400L).toCompletableFuture().join();
 
         assertThat(output).isNotEmpty();
