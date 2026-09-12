@@ -31,6 +31,11 @@ public class EventAccumulator<E> {
         return false;
     }
 
+
+    public synchronized List<LevelEvent<E>> peekBuffer() {
+        return List.copyOf(buffer);
+    }
+
     public synchronized List<LevelEvent<E>> drain() {
         var result = List.copyOf(buffer);
         buffer.clear();

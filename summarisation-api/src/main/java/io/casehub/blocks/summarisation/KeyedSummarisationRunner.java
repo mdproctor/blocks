@@ -18,8 +18,9 @@ public class KeyedSummarisationRunner<K, IN, OUT> implements Tickable {
     private final EventStreamBus<OUT>            outputBus;
     private final EventLevel                     outputLevel;
     private final Consumer<List<LevelEvent<IN>>> onFailure;
-    private final ConcurrentHashMap<K, Object> keyState = new ConcurrentHashMap<>();
-
+    private final ConcurrentHashMap<K, Object>   keyState = new ConcurrentHashMap<>();
+    private final StateStore<?>                  stateStore;
+    private final OutputProcessor<OUT, ?>        outputProcessor;
 
     public KeyedSummarisationRunner(Function<LevelEvent<IN>, K> keyExtractor,
                                     Predicate<List<LevelEvent<IN>>> completionTest,
@@ -58,23 +59,42 @@ public class KeyedSummarisationRunner<K, IN, OUT> implements Tickable {
                                     EventStreamBus<OUT> outputBus,
                                     EventLevel outputLevel,
                                     Consumer<List<LevelEvent<IN>>> onFailure) {
-        this.accumulator = new KeyedAccumulator<>(keyExtractor, completionTest, staleTimeout);
-        this.compactor   = compactor;
-        this.summariser  = summariser;
-        this.outputBus   = outputBus;
-        this.outputLevel = outputLevel;
-        this.onFailure   = onFailure;
+        this.accumulator     = new KeyedAccumulator<>(keyExtractor, completionTest, staleTimeout);
+        this.compactor       = compactor;
+        this.summariser      = summariser;
+        this.outputBus       = outputBus;
+        this.outputLevel     = outputLevel;
+        this.onFailure       = onFailure;
+        this.stateStore      = null;
+        this.outputProcessor = null;
+    }
+
+    KeyedSummarisationRunner(Builder<K, IN, OUT> b) {
+        this.accumulator     = new KeyedAccumulator<>(b.keyExtractor, b.completionTest, b.staleTimeout);
+        this.compactor       = b.compactor;
+        this.summariser      = b.summariser;
+        this.outputBus       = b.outputBus;
+        this.outputLevel     = b.outputLevel;
+        this.onFailure       = b.onFailure;
+        this.stateStore      = b.stateStore;
+        this.outputProcessor = b.outputProcessor;
+    }
+
+    public static <K, IN, OUT> Builder<K, IN, OUT> builder(
+            Function<LevelEvent<IN>, K> keyExtractor,
+            Predicate<List<LevelEvent<IN>>> completionTest,
+            long staleTimeout,
+            Summariser<IN, OUT> summariser,
+            EventStreamBus<OUT> outputBus,
+            EventLevel outputLevel) {
+        return new Builder<>(keyExtractor, completionTest, staleTimeout,
+                             summariser, outputBus, outputLevel);
     }
 
     public void collect(LevelEvent<IN> event) {
         accumulator.collect(event);
     }
 
-    /**
-     * Drains completed/stale groups, applies compaction, and submits each to the summariser.
-     * Synchronized — concurrent tick() calls are serialized. The hot path
-     * (no groups ready) acquires and releases the lock without blocking.
-     */
     public synchronized CompletionStage<Void> tick(long now) {
         var groups = accumulator.drain(now);
         if (groups.isEmpty()) {return CompletableFuture.completedFuture(null);}
@@ -99,11 +119,6 @@ public class KeyedSummarisationRunner<K, IN, OUT> implements Tickable {
         return CompletableFuture.allOf(futures);
     }
 
-
-    /**
-     * Unconditional drain — bypasses completion test and stale timeout.
-     * Use at shutdown to capture all remaining buffered events.
-     */
     public synchronized CompletionStage<Void> flush() {
         var groups = accumulator.drainAll();
         if (groups.isEmpty()) {return CompletableFuture.completedFuture(null);}
@@ -129,24 +144,42 @@ public class KeyedSummarisationRunner<K, IN, OUT> implements Tickable {
         return CompletableFuture.allOf(futures);
     }
 
-
     @SuppressWarnings("unchecked")
     private CompletionStage<Void> invokeSummariser(List<LevelEvent<IN>> batch, K key, long now) {
         String tenancyId = batch.isEmpty() ? null : batch.get(0).tenancyId();
         if (summariser instanceof StatefulSummariser<IN, OUT, ?> stateful) {
             var    typedStateful = (StatefulSummariser<IN, OUT, Object>) stateful;
             Object prevState     = key != null ? keyState.get(key) : null;
+            if (prevState == null && key != null && stateStore != null) {
+                prevState = ((StateStore<Object>) stateStore).load(key.toString());
+                if (prevState != null) {
+                    keyState.put(key, prevState);
+                }
+            }
             return typedStateful.summarise(batch, prevState).thenAccept(result -> {
                 if (result.newState() != null && key != null) {
                     keyState.put(key, result.newState());
+                    if (stateStore != null) {
+                        ((StateStore<Object>) stateStore).store(key.toString(), result.newState());
+                    }
                 }
-                for (var payload : result.outputs()) {
+                var outputs = result.outputs();
+                if (outputProcessor != null) {
+                    outputs = ((OutputProcessor<OUT, Object>) outputProcessor)
+                                      .process(outputs, result.newState());
+                }
+                for (var payload : outputs) {
                     outputBus.publish(new LevelEvent<>(payload, now, outputLevel, tenancyId));
                 }
             });
         }
         return summariser.summarise(batch).thenAccept(results -> {
-            for (var payload : results) {
+            var outputs = results;
+            if (outputProcessor != null) {
+                outputs = ((OutputProcessor<OUT, Object>) outputProcessor)
+                                  .process(outputs, null);
+            }
+            for (var payload : outputs) {
                 outputBus.publish(new LevelEvent<>(payload, now, outputLevel, tenancyId));
             }
         });
@@ -168,4 +201,54 @@ public class KeyedSummarisationRunner<K, IN, OUT> implements Tickable {
         keyState.remove(key);
     }
 
+    public static class Builder<K, IN, OUT> {
+        final Function<LevelEvent<IN>, K>     keyExtractor;
+        final Predicate<List<LevelEvent<IN>>> completionTest;
+        final long                            staleTimeout;
+        final Summariser<IN, OUT>             summariser;
+        final EventStreamBus<OUT>             outputBus;
+        final EventLevel                      outputLevel;
+        StateStore<?>                  stateStore;
+        OutputProcessor<OUT, ?>        outputProcessor;
+        Compactor<IN>                  compactor;
+        Consumer<List<LevelEvent<IN>>> onFailure;
+
+        Builder(Function<LevelEvent<IN>, K> keyExtractor,
+                Predicate<List<LevelEvent<IN>>> completionTest,
+                long staleTimeout,
+                Summariser<IN, OUT> summariser,
+                EventStreamBus<OUT> outputBus,
+                EventLevel outputLevel) {
+            this.keyExtractor   = keyExtractor;
+            this.completionTest = completionTest;
+            this.staleTimeout   = staleTimeout;
+            this.summariser     = summariser;
+            this.outputBus      = outputBus;
+            this.outputLevel    = outputLevel;
+        }
+
+        public <S> Builder<K, IN, OUT> stateStore(StateStore<S> store) {
+            this.stateStore = store;
+            return this;
+        }
+
+        public <S> Builder<K, IN, OUT> outputProcessor(OutputProcessor<OUT, S> processor) {
+            this.outputProcessor = processor;
+            return this;
+        }
+
+        public Builder<K, IN, OUT> compactor(Compactor<IN> compactor) {
+            this.compactor = compactor;
+            return this;
+        }
+
+        public Builder<K, IN, OUT> onFailure(Consumer<List<LevelEvent<IN>>> onFailure) {
+            this.onFailure = onFailure;
+            return this;
+        }
+
+        public KeyedSummarisationRunner<K, IN, OUT> build() {
+            return new KeyedSummarisationRunner<>(this);
+        }
+    }
 }
