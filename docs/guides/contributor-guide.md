@@ -36,6 +36,7 @@ Single module -- `casehub-blocks` is a flat library, not a multi-module reactor.
 Tests mirror source layout under `src/test/java/`. Integration test examples exist in:
 - `summarisation/examples/clinical/` -- L1-L4 clinical pipeline (vital readings -> care phases -> narratives)
 - `summarisation/examples/logistics/` -- L1-L4 logistics pipeline (package scans -> anomalies -> hub phases -> narratives)
+- `summarisation/examples/decision/` -- two-level decision narrative pipeline (trading signals -> step summaries -> trade narratives)
 - `summarisation/examples/channel/` -- tiered channel summary end-to-end
 - `summarisation/examples/multiagent/` -- multi-agent observation pipeline with partitioned observation service
 - `agentic/decomposition/examples/incident/` -- HTN hybrid decomposition for incident response
@@ -178,11 +179,13 @@ Domain repos override these by providing `@ApplicationScoped` beans without `@De
 
 **Core pipeline:** `EventAccumulator` (synchronized buffer) -> optional `Compactor<E>` (pre-processing) -> `Summariser<IN, OUT>` (async transformation) -> `EventStreamBus` (pub/sub distribution).
 
-`SummarisationRunner` orchestrates this for flat event streams. `KeyedSummarisationRunner` adds grouping via `KeyedAccumulator` (groups by key, drains completed/stale groups independently).
+`SummarisationRunner` orchestrates this for flat event streams. `KeyedSummarisationRunner` adds grouping via `KeyedAccumulator` (groups by key, drains completed/stale groups independently). Both implement `Tickable` -- the common `tick()`/`flush()` contract used by `CompiledPipeline` for polymorphic runner dispatch.
+
+**Stateful summarisation:** Both runners detect `StatefulSummariser` via `instanceof` and manage per-partition (SummarisationRunner, keyed by `tenancyId`) or per-key (KeyedSummarisationRunner, keyed by group key `K`) state in a `ConcurrentHashMap`. `ContentSummariser<T, R>.asSummariser()` bridges to `StatefulSummariser<T, R, R>` -- the `R previous` parameter carries accumulated state across batches. `KeyedSummarisationRunner.evictState(K)` removes per-key state for explicit lifecycle cleanup (e.g. case close).
 
 **Tick semantics:** `tick(now)` checks if the `WindowPolicy` is satisfied (by age or count), drains if ready, runs compactor + summariser, publishes to output bus. `flush()` does an unconditional drain regardless of policy -- use at shutdown. Both return `CompletionStage<Void>` for async summarisers.
 
-**Content summarisation layer:** `ContentSummariser<T>` is a higher-level contract decoupled from `LevelEvent` wrappers. `ContentSummariserToSummariser<T>` adapts it to `Summariser<T, String>`. `TieredContentSummariser<T>` routes to different strategies based on batch size. `VerbatimContentSummariser<T>` renders each item as a bullet point (no LLM). `LlmContentSummariser<T>` uses `AgentProvider` with configurable EDIT/APPEND mode.
+**Content summarisation layer:** `ContentSummariser<T, R>` is a higher-level contract decoupled from `LevelEvent` wrappers. Generified result type `R` (not tied to `SummaryResult`). `asSummariser()` bridges to `StatefulSummariser` for pipeline use with state. `TieredContentSummariser<T>` routes to different strategies based on batch size. `VerbatimContentSummariser<T>` renders each item as a bullet point (no LLM). `LlmContentSummariser<T>` uses `AgentProvider` with configurable EDIT/APPEND mode.
 
 ### Summarisation Observation Pipeline
 
