@@ -32,27 +32,28 @@ import io.casehub.engine.internal.executor.WorkerRuntimeFactory;
 import io.casehub.engine.plan.PlanningConstraints;
 import io.casehub.worker.api.WorkerFunction;
 import io.casehub.worker.api.WorkerResult;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.inject.Instance;
-import jakarta.inject.Inject;
+import java.util.List;
 import java.util.Map;
-import org.jboss.logging.Logger;
+import java.util.Optional;
 
-@ApplicationScoped
 public class PatternWorkerFunctionHandler implements WorkerFunctionHandler {
 
-  private static final Logger LOG = Logger.getLogger(PatternWorkerFunctionHandler.class);
+  private static final System.Logger LOG = System.getLogger(PatternWorkerFunctionHandler.class.getName());
 
   private final WorkerRuntimeFactory workerRuntimeFactory;
   private final PatternCheckpointStore checkpointStore;
-  @Inject Instance<ChatModelProvider> chatModelProviderInstance;
-  @Inject Instance<io.casehub.api.spi.judgment.JudgmentVerifier> judgmentVerifierInstance;
+  private final Optional<ChatModelProvider> chatModelProvider;
+  private final List<io.casehub.api.spi.judgment.JudgmentVerifier> judgmentVerifiers;
 
-  @Inject
   public PatternWorkerFunctionHandler(
-      WorkerRuntimeFactory workerRuntimeFactory, PatternCheckpointStore checkpointStore) {
+      WorkerRuntimeFactory workerRuntimeFactory,
+      PatternCheckpointStore checkpointStore,
+      Optional<ChatModelProvider> chatModelProvider,
+      List<io.casehub.api.spi.judgment.JudgmentVerifier> judgmentVerifiers) {
     this.workerRuntimeFactory = workerRuntimeFactory;
     this.checkpointStore = checkpointStore;
+    this.chatModelProvider = chatModelProvider;
+    this.judgmentVerifiers = judgmentVerifiers;
   }
 
   @Override
@@ -243,28 +244,28 @@ public class PatternWorkerFunctionHandler implements WorkerFunctionHandler {
   @SuppressWarnings("unchecked")
   private <T> JudgmentPhase<T> resolveJudgmentPhase(PatternJudgmentConfig config) {
     if (config.callerConfig() instanceof CallerConfig.Llm) {
-      if (!chatModelProviderInstance.isResolvable()) {
-        LOG.warn("No ChatModelProvider — skipping pattern judgment phase");
+      if (chatModelProvider.isEmpty()) {
+        LOG.log(System.Logger.Level.WARNING, "No ChatModelProvider — skipping pattern judgment phase");
         return null;
       }
       var verifier = resolveVerifier(config.verifierStrategy());
       return (JudgmentPhase<T>)
-          new LlmJudgmentPhase<>(chatModelProviderInstance.get(), config, verifier);
+          new LlmJudgmentPhase<>(chatModelProvider.get(), config, verifier);
     }
-    LOG.warnf(
-        "Unsupported caller type for pattern judgment: %s",
-        config.callerConfig().getClass().getSimpleName());
+    LOG.log(System.Logger.Level.WARNING,
+        "Unsupported caller type for pattern judgment: " + config.callerConfig().getClass().getSimpleName());
     return null;
   }
 
   private io.casehub.api.spi.judgment.JudgmentVerifier resolveVerifier(String strategyId) {
     if (strategyId == null) return null;
-    for (var verifier : judgmentVerifierInstance) {
+    for (var verifier : judgmentVerifiers) {
       if (strategyId.equals(verifier.id())) {
         return verifier;
       }
     }
-    LOG.warnf("JudgmentVerifier '%s' not found — proceeding without verification", strategyId);
+    LOG.log(System.Logger.Level.WARNING,
+        "JudgmentVerifier '" + strategyId + "' not found — proceeding without verification");
     return null;
   }
 

@@ -20,19 +20,19 @@ import io.casehub.api.spi.judgment.Evidence;
 import io.casehub.api.spi.judgment.JudgmentVerifier;
 import io.casehub.api.spi.judgment.VerificationContext;
 import io.casehub.api.spi.judgment.VerificationResult;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.inject.Instance;
-import jakarta.inject.Inject;
 import java.util.ArrayList;
 import java.util.List;
-import org.jboss.logging.Logger;
+import java.util.Optional;
 
-@ApplicationScoped
 public class LlmEvaluationVerifier implements JudgmentVerifier {
 
-  private static final Logger LOG = Logger.getLogger(LlmEvaluationVerifier.class);
+  private static final System.Logger LOG = System.getLogger(LlmEvaluationVerifier.class.getName());
 
-  @Inject Instance<ChatModelProvider> chatModelProviderInstance;
+  private final Optional<ChatModelProvider> chatModelProvider;
+
+  public LlmEvaluationVerifier(Optional<ChatModelProvider> chatModelProvider) {
+    this.chatModelProvider = chatModelProvider;
+  }
 
   @Override
   public String id() {
@@ -41,21 +41,22 @@ public class LlmEvaluationVerifier implements JudgmentVerifier {
 
   @Override
   public VerificationResult verify(VerificationContext context) {
-    if (!chatModelProviderInstance.isResolvable()) {
-      LOG.warn("No ChatModelProvider on classpath — accepting response without LLM evaluation");
+    if (chatModelProvider.isEmpty()) {
+      LOG.log(System.Logger.Level.WARNING,
+          "No ChatModelProvider on classpath — accepting response without LLM evaluation");
       return new VerificationResult.Accepted();
     }
 
     try {
       return evaluate(context);
     } catch (Exception e) {
-      LOG.warnf(e, "LLM evaluation failed — accepting response as fallback");
+      LOG.log(System.Logger.Level.WARNING, "LLM evaluation failed — accepting response as fallback", e);
       return new VerificationResult.Accepted();
     }
   }
 
   private VerificationResult evaluate(VerificationContext context) {
-    ChatModelProvider provider = chatModelProviderInstance.get();
+    ChatModelProvider provider = chatModelProvider.get();
     dev.langchain4j.model.chat.ChatModel chatModel = provider.get();
 
     String evaluationPrompt = buildEvaluationPrompt(context);

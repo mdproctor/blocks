@@ -17,52 +17,50 @@ package io.casehub.engine.agentic.judgment;
 
 import io.casehub.api.model.JudgmentTarget;
 import io.casehub.api.model.ai.ChatModelProvider;
-import io.casehub.api.spi.judgment.CallerConfig;
-import io.casehub.api.spi.judgment.EvidenceRequirement;
-import io.casehub.engine.common.internal.event.EventBusAddresses;
 import io.casehub.engine.common.internal.event.JudgmentCompletedEvent;
 import io.casehub.engine.common.spi.JudgmentPayload;
 import io.casehub.engine.common.spi.JudgmentRequest;
 import io.casehub.engine.common.spi.JudgmentResponse;
 import io.casehub.engine.common.spi.JudgmentScheduleRequest;
 import io.casehub.engine.common.spi.JudgmentScheduler;
-import io.vertx.mutiny.core.eventbus.EventBus;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.inject.Instance;
-import jakarta.inject.Inject;
 import java.util.ArrayList;
 import java.util.Map;
-import org.jboss.logging.Logger;
+import java.util.Optional;
+import java.util.function.Consumer;
 
-@ApplicationScoped
 public class LlmJudgmentScheduler implements JudgmentScheduler {
 
-  private static final Logger LOG = Logger.getLogger(LlmJudgmentScheduler.class);
+  private static final System.Logger LOG = System.getLogger(LlmJudgmentScheduler.class.getName());
 
-  @Inject Instance<ChatModelProvider> chatModelProviderInstance;
-  @Inject EventBus eventBus;
+  private final Optional<ChatModelProvider> chatModelProvider;
+  private final Consumer<JudgmentCompletedEvent> judgmentCompletedPublisher;
+
+  public LlmJudgmentScheduler(
+      Optional<ChatModelProvider> chatModelProvider,
+      Consumer<JudgmentCompletedEvent> judgmentCompletedPublisher) {
+    this.chatModelProvider = chatModelProvider;
+    this.judgmentCompletedPublisher = judgmentCompletedPublisher;
+  }
 
   @Override
   @SuppressWarnings("removal")
   public void schedule(JudgmentScheduleRequest request) {
-    LOG.debugf("LlmJudgmentScheduler does not handle legacy JudgmentScheduleRequest — skipping");
+    LOG.log(System.Logger.Level.DEBUG,
+        "LlmJudgmentScheduler does not handle legacy JudgmentScheduleRequest — skipping");
   }
 
   @Override
   public void schedule(JudgmentRequest request) {
     if (!(request.payload() instanceof JudgmentPayload.BindingPayload bp)) {
-      LOG.debugf("LlmJudgmentScheduler skipping non-binding payload: caseId=%s", request.caseId());
+      LOG.log(System.Logger.Level.DEBUG, () ->
+          "LlmJudgmentScheduler skipping non-binding payload: caseId=" + request.caseId());
       return;
     }
 
-    if (!(bp.target().routingConfig() instanceof io.casehub.api.model.RoutingConfig)) {
-      // Check if the target has an LLM-oriented caller config context
-    }
-
-    if (!chatModelProviderInstance.isResolvable()) {
-      LOG.warnf(
-          "No ChatModelProvider on classpath — cannot schedule LLM judgment for caseId=%s binding=%s",
-          request.caseId(), request.bindingName());
+    if (chatModelProvider.isEmpty()) {
+      LOG.log(System.Logger.Level.WARNING, () ->
+          "No ChatModelProvider on classpath — cannot schedule LLM judgment for caseId=" + request.caseId()
+              + " binding=" + request.bindingName());
       return;
     }
 
@@ -71,24 +69,21 @@ public class LlmJudgmentScheduler implements JudgmentScheduler {
           try {
             executeLlmJudgment(request, bp);
           } catch (Exception e) {
-            LOG.errorf(
-                e,
-                "LLM judgment failed for caseId=%s binding=%s",
-                request.caseId(),
-                request.bindingName());
+            LOG.log(System.Logger.Level.ERROR,
+                "LLM judgment failed for caseId=" + request.caseId()
+                    + " binding=" + request.bindingName(), e);
           }
         });
   }
 
   private void executeLlmJudgment(JudgmentRequest request, JudgmentPayload.BindingPayload bp) {
     JudgmentTarget target = bp.target();
-    ChatModelProvider provider = chatModelProviderInstance.get();
+    ChatModelProvider provider = chatModelProvider.get();
 
     String prompt = buildPrompt(target, bp);
 
-    LOG.infof(
-        "Executing LLM judgment: caseId=%s binding=%s",
-        request.caseId(), request.bindingName());
+    LOG.log(System.Logger.Level.INFO, () ->
+        "Executing LLM judgment: caseId=" + request.caseId() + " binding=" + request.bindingName());
 
     dev.langchain4j.model.chat.ChatModel chatModel = provider.get();
     var messages = new ArrayList<dev.langchain4j.data.message.ChatMessage>();
@@ -112,14 +107,13 @@ public class LlmJudgmentScheduler implements JudgmentScheduler {
             modelName,
             "llm");
 
-    eventBus.publish(
-        EventBusAddresses.JUDGMENT_COMPLETED,
+    judgmentCompletedPublisher.accept(
         new JudgmentCompletedEvent(
             request.caseId(), request.bindingName(), request.tenancyId(), response));
 
-    LOG.infof(
-        "LLM judgment response published: caseId=%s binding=%s",
-        request.caseId(), request.bindingName());
+    LOG.log(System.Logger.Level.INFO, () ->
+        "LLM judgment response published: caseId=" + request.caseId()
+            + " binding=" + request.bindingName());
   }
 
   private String buildPrompt(JudgmentTarget target, JudgmentPayload.BindingPayload bp) {

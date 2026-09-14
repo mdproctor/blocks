@@ -20,13 +20,10 @@ import io.casehub.api.model.event.CaseHubEventType;
 import io.casehub.engine.common.internal.history.EventLog;
 import io.casehub.engine.common.spi.EventLogRepository;
 import io.casehub.engine.plan.execution.PatternExecutionCheckpoint;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
-@ApplicationScoped
 public class PatternCheckpointStore {
 
   private static final System.Logger LOG = System.getLogger(PatternCheckpointStore.class.getName());
@@ -34,7 +31,6 @@ public class PatternCheckpointStore {
   private final EventLogRepository eventLogRepository;
   private final ObjectMapper objectMapper;
 
-  @Inject
   public PatternCheckpointStore(EventLogRepository eventLogRepository, ObjectMapper objectMapper) {
     this.eventLogRepository = eventLogRepository;
     this.objectMapper = objectMapper;

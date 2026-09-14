@@ -23,11 +23,9 @@ import io.casehub.api.spi.judgment.EvidenceType;
 import io.casehub.blocks.agentic.model.PatternType;
 import io.casehub.engine.agentic.judgment.PatternJudgmentConfig;
 import io.casehub.worker.api.WorkerFunction;
-import jakarta.enterprise.context.ApplicationScoped;
 import java.util.ArrayList;
 import java.util.List;
 
-@ApplicationScoped
 public class PatternWorkerFunctionProvider implements WorkerFunctionProvider {
 
   @Override

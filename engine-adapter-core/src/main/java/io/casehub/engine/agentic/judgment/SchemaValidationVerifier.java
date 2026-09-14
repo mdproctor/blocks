@@ -20,10 +20,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.api.spi.judgment.JudgmentVerifier;
 import io.casehub.api.spi.judgment.VerificationContext;
 import io.casehub.api.spi.judgment.VerificationResult;
-import jakarta.enterprise.context.ApplicationScoped;
 import java.util.List;
 
-@ApplicationScoped
 public class SchemaValidationVerifier implements JudgmentVerifier {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
