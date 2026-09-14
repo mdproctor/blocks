@@ -38,7 +38,7 @@ import io.casehub.engine.internal.worker.NoOpGoalDecomposer;
 import io.casehub.engine.internal.worker.NoOpPlanAdaptationEvaluator;
 import io.casehub.engine.internal.worker.NoOpPlanItemStore;
 import io.casehub.engine.internal.worker.NoOpVocabularyRegistry;
-import io.casehub.engine.internal.worker.NoOpWorkerProvisioner;
+import io.casehub.api.spi.ProvisionResult;
 import io.casehub.engine.internal.worker.NoOpWorkerStatusListener;
 import io.casehub.engine.internal.context.InMemoryCaseContextStoreFactory;
 import io.casehub.persistence.memory.InMemoryCaseInstanceRepository;
@@ -124,7 +124,21 @@ public class IntegrationTestBeans {
   @Produces
   @DefaultBean
   WorkerProvisioner workerProvisioner() {
-    return new NoOpWorkerProvisioner();
+    return new WorkerProvisioner() {
+      @Override
+      public ProvisionResult provision(java.util.Set<String> capabilities,
+          io.casehub.api.model.ProvisionContext context) {
+        return ProvisionResult.empty();
+      }
+
+      @Override
+      public void terminate(String workerId, String tenancyId) {}
+
+      @Override
+      public java.util.Set<String> getCapabilities() {
+        return java.util.Set.of();
+      }
+    };
   }
 
   @Produces
