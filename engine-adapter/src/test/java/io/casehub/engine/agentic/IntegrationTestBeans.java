@@ -58,15 +58,31 @@ public class IntegrationTestBeans {
   @Produces
   @DefaultBean
   @Singleton
-  EventLogRepository eventLogRepository() {
+  InMemoryEventLogRepository eventLogRepository() {
     return new InMemoryEventLogRepository();
   }
 
   @Produces
   @DefaultBean
   @Singleton
-  CaseInstanceRepository caseInstanceRepository(EventLogRepository eventLogRepository) {
+  @io.casehub.engine.common.qualifier.CrossTenant
+  CrossTenantEventLogRepository crossTenantEventLogRepository(InMemoryEventLogRepository shared) {
+    return shared;
+  }
+
+  @Produces
+  @DefaultBean
+  @Singleton
+  InMemoryCaseInstanceRepository caseInstanceRepository(InMemoryEventLogRepository eventLogRepository) {
     return new InMemoryCaseInstanceRepository(eventLogRepository);
+  }
+
+  @Produces
+  @DefaultBean
+  @Singleton
+  @io.casehub.engine.common.qualifier.CrossTenant
+  CrossTenantCaseInstanceRepository crossTenantCaseInstanceRepository(InMemoryCaseInstanceRepository shared) {
+    return shared;
   }
 
   @Produces
@@ -201,14 +217,17 @@ public class IntegrationTestBeans {
     return new AgentRoutingStrategy() {
       @Override
       public String id() {
-        return "noop";
+        return "first-candidate";
       }
 
       @Override
       public RoutingResult select(
           io.casehub.api.spi.routing.AgentRoutingContext context,
           List<io.casehub.api.spi.routing.AgentCandidate> candidates) {
-        return RoutingResult.unresolvable("no-op test strategy");
+        if (candidates.isEmpty()) {
+          return RoutingResult.unresolvable("no candidates");
+        }
+        return RoutingResult.assigned(candidates.get(0).workerId(), "test: first candidate");
       }
     };
   }
@@ -239,52 +258,4 @@ public class IntegrationTestBeans {
     return InMemoryCaseContextStoreFactory.INSTANCE;
   }
 
-  @Produces
-  @DefaultBean
-  CrossTenantCaseInstanceRepository crossTenantCaseInstanceRepository() {
-    return caseId -> null;
-  }
-
-  @Produces
-  @DefaultBean
-  CrossTenantEventLogRepository crossTenantEventLogRepository() {
-    return new CrossTenantEventLogRepository() {
-      @Override
-      public List<io.casehub.engine.common.internal.history.EventLog> findByTypes(
-          java.util.Collection<io.casehub.api.model.event.CaseHubEventType> types) {
-        return Collections.emptyList();
-      }
-
-      @Override
-      public List<io.casehub.engine.common.internal.history.EventLog> findByCaseAndTypes(
-          java.util.UUID caseId,
-          java.util.Collection<io.casehub.api.model.event.CaseHubEventType> types) {
-        return Collections.emptyList();
-      }
-
-      @Override
-      public List<String> findSubmittedWorkWithoutCompletion() {
-        return Collections.emptyList();
-      }
-
-      @Override
-      public List<io.casehub.engine.common.internal.history.EventLog> findByWorkerAndTypeAcrossTenants(
-          String workerId, io.casehub.api.model.event.CaseHubEventType type) {
-        return Collections.emptyList();
-      }
-
-      @Override
-      public io.casehub.engine.common.internal.history.EventLog findById(Long id) {
-        return null;
-      }
-
-      @Override
-      public List<io.casehub.engine.common.internal.history.EventLog> findByCaseAndWorkerAndType(
-          java.util.UUID caseId,
-          String workerId,
-          io.casehub.api.model.event.CaseHubEventType type) {
-        return Collections.emptyList();
-      }
-    };
-  }
 }
