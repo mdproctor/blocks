@@ -28,9 +28,6 @@ import io.casehub.eidos.api.AgentGraphQuery;
 import io.casehub.ledger.api.spi.TrustScoreSource;
 import io.casehub.ledger.routing.TrustCandidateClassifier;
 import io.casehub.ledger.routing.TrustCandidateClassifier.ScoredCandidate;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.inject.Instance;
-import jakarta.inject.Inject;
 import org.jspecify.annotations.Nullable;
 
 import java.util.HashMap;
@@ -39,18 +36,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/**
- * {@link AgentRoutingStrategy} that uses case-based reasoning (CBR) to select agents based on
- * historical success patterns, with optional trust-based classification and filtering.
- *
- * <p>Reads pre-retrieved experiences from {@link AgentRoutingContext#experiences()} — the engine's
- * {@code CbrRetrievalService} populates these based on the case definition's {@code CbrConfig}.
- * This strategy analyses plan traces from retrieved experiences to identify which workers have the
- * highest historical success rate for the target capability.
- *
- * <p>Falls back to {@link AgentGraphQuery} when CBR produces no match.
- */
-@ApplicationScoped
 public class CbrAgentRoutingStrategy implements AgentRoutingStrategy {
 
   private static final System.Logger LOG =
@@ -63,23 +48,7 @@ public class CbrAgentRoutingStrategy implements AgentRoutingStrategy {
   private final CbrOutcomeWeights outcomeWeights;
   private final @Nullable RoutingSignalAssembler signalAssembler;
 
-  @Inject
   public CbrAgentRoutingStrategy(
-      final Instance<AgentGraphQuery> graphQuery,
-      final Instance<TrustCandidateClassifier> classifier,
-      final Instance<TrustScoreSource> scoreSource,
-      final Instance<TrustRoutingPolicyProvider> policyProvider,
-      final CbrOutcomeWeights outcomeWeights,
-      final Instance<RoutingSignalAssembler> signalAssembler) {
-    this.graphQuery = graphQuery.isUnsatisfied() ? null : graphQuery.get();
-    this.classifier = classifier.isUnsatisfied() ? null : classifier.get();
-    this.scoreSource = scoreSource.isUnsatisfied() ? null : scoreSource.get();
-    this.policyProvider = policyProvider.isUnsatisfied() ? null : policyProvider.get();
-    this.outcomeWeights = outcomeWeights;
-    this.signalAssembler = signalAssembler.isUnsatisfied() ? null : signalAssembler.get();
-  }
-
-  CbrAgentRoutingStrategy(
       @Nullable AgentGraphQuery graphQuery,
       @Nullable TrustCandidateClassifier classifier,
       @Nullable TrustScoreSource scoreSource,

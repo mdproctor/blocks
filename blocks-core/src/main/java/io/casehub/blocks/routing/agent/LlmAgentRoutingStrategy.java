@@ -27,53 +27,10 @@ import io.casehub.ledger.api.spi.TrustScoreSource;
 import io.casehub.ledger.routing.TrustCandidateClassifier;
 import io.casehub.ledger.routing.TrustCandidateClassifier.ScoredCandidate;
 import io.casehub.platform.agent.AgentProvider;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.inject.Instance;
-import jakarta.inject.Inject;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
-/**
- * {@link AgentRoutingStrategy} that uses LLM reasoning to select agents from a candidate pool,
- * with optional trust-based classification and filtering.
- *
- * <h3>Operation modes</h3>
- *
- * <ul>
- *   <li><b>Pure LLM mode</b>: when trust services are unavailable, delegates selection entirely to
- *       the LLM. Never escalates to oversight.
- *   <li><b>Trust-filtered LLM mode</b>: when {@link TrustCandidateClassifier}, {@link
- *       TrustScoreSource}, and {@link TrustRoutingPolicyProvider} are available, applies
- *       trust-based pre-screening before LLM selection.
- * </ul>
- *
- * <h3>Trust classification flow</h3>
- * <p>
- * When trust services are present, follows the four-phase trust maturity model:
- *
- * <ol>
- *   <li>Classify all candidates via {@link TrustCandidateClassifier}.
- *   <li>Apply bootstrap guard: if {@code bootstrapEscalationRequired} is {@code true} and only
- *       BOOTSTRAP candidates exist, escalate with {@link EscalationReason#NO_QUALIFIED_AGENT}.
- *   <li>Filter eligible candidates: exclude BORDERLINE, EXCLUDED_PHASE2B, and EXCLUDED_PHASE3.
- *       Also exclude BOOTSTRAP when {@code bootstrapEscalationRequired} is {@code true}.
- *   <li>If eligible pool is empty after filtering, delegate escalation decision to {@link
- *       TrustCandidateClassifier#decide}.
- *   <li>Otherwise, invoke LLM with the filtered pool.
- * </ol>
- *
- * <h3>LLM invocation</h3>
- * <p>
- * Delegates to {@link RoutingSupport} for prompt construction, LLM invocation, and response
- * parsing. Returns {@link AgentAssignment.Unresolvable} on LLM failure, unparseable response, or
- * unknown agent selection.
- *
- * <p>All blocking work runs on {@code Infrastructure.getDefaultWorkerPool()} via {@code
- * Uni.emitOn()}.
- */
-@ApplicationScoped
 public class LlmAgentRoutingStrategy implements AgentRoutingStrategy {
 
     private static final System.Logger LOG =
@@ -85,24 +42,23 @@ public class LlmAgentRoutingStrategy implements AgentRoutingStrategy {
     private final @Nullable TrustRoutingPolicyProvider policyProvider;
     private final           RoutingPromptAssembler     promptAssembler;
     private final @Nullable SystemPromptCustomiser     systemPromptCustomiser;
-    @ConfigProperty(name = "casehub.blocks.routing.llm.prompt-budget-chars", defaultValue = "2147483647")
-    int promptBudgetChars;
+    private final int promptBudgetChars;
 
-
-    @Inject
     public LlmAgentRoutingStrategy(
-            final Instance<AgentProvider> agentProvider,
-            final Instance<TrustCandidateClassifier> classifier,
-            final Instance<TrustScoreSource> scoreSource,
-            final Instance<TrustRoutingPolicyProvider> policyProvider,
+            final @Nullable AgentProvider agentProvider,
+            final @Nullable TrustCandidateClassifier classifier,
+            final @Nullable TrustScoreSource scoreSource,
+            final @Nullable TrustRoutingPolicyProvider policyProvider,
             final RoutingPromptAssembler promptAssembler,
-            final Instance<SystemPromptCustomiser> systemPromptCustomiser) {
-        this.agentProvider          = agentProvider.isUnsatisfied() ? null : agentProvider.get();
-        this.classifier             = classifier.isUnsatisfied() ? null : classifier.get();
-        this.scoreSource            = scoreSource.isUnsatisfied() ? null : scoreSource.get();
-        this.policyProvider         = policyProvider.isUnsatisfied() ? null : policyProvider.get();
+            final @Nullable SystemPromptCustomiser systemPromptCustomiser,
+            final int promptBudgetChars) {
+        this.agentProvider          = agentProvider;
+        this.classifier             = classifier;
+        this.scoreSource            = scoreSource;
+        this.policyProvider         = policyProvider;
         this.promptAssembler        = promptAssembler;
-        this.systemPromptCustomiser = systemPromptCustomiser.isUnsatisfied() ? null : systemPromptCustomiser.get();
+        this.systemPromptCustomiser = systemPromptCustomiser;
+        this.promptBudgetChars      = promptBudgetChars;
     }
 
     public LlmAgentRoutingStrategy(
@@ -112,13 +68,8 @@ public class LlmAgentRoutingStrategy implements AgentRoutingStrategy {
             final @Nullable TrustRoutingPolicyProvider policyProvider,
             final RoutingPromptAssembler promptAssembler,
             final @Nullable SystemPromptCustomiser systemPromptCustomiser) {
-        this.agentProvider          = agentProvider;
-        this.classifier             = classifier;
-        this.scoreSource            = scoreSource;
-        this.policyProvider         = policyProvider;
-        this.promptAssembler        = promptAssembler;
-        this.systemPromptCustomiser = systemPromptCustomiser;
-        this.promptBudgetChars      = Integer.MAX_VALUE;
+        this(agentProvider, classifier, scoreSource, policyProvider,
+             promptAssembler, systemPromptCustomiser, Integer.MAX_VALUE);
     }
 
     @Override
@@ -151,7 +102,6 @@ public class LlmAgentRoutingStrategy implements AgentRoutingStrategy {
         final var proceed  = (RoutingSupport.TrustFilterOutcome.Proceed) trustOutcome;
         final var eligible = proceed.eligible();
 
-        // NullNode case context filtering — avoid sending "null" as context to the LLM
         final String caseContextSummary = context.caseContext() != null
                                           && !context.caseContext().isNull()
                                           ? context.caseContext().toString()

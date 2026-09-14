@@ -22,6 +22,7 @@
     <module>cloudevents</module>
     <module>summarisation-yaml</module>
     <module>summarisation-yaml-deployment</module>
+    <module>blocks-core</module>
     <module>blocks</module>
     <module>agentic-yaml</module>
     <module>agentic-yaml-deployment</module>

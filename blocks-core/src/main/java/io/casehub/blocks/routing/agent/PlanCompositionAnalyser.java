@@ -20,9 +20,6 @@ import io.casehub.api.spi.routing.AgentRoutingContext;
 import io.casehub.api.spi.routing.RetrievedExperience;
 import io.casehub.api.spi.routing.RoutingSignal;
 import io.casehub.api.spi.routing.RoutingSignalProvider;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.inject.Instance;
-import jakarta.inject.Inject;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,28 +27,11 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 
-/**
- * {@link RoutingSignalProvider} that scores candidates based on case-level outcomes in multi-step
- * plans.
- *
- * <p>For each retrieved experience with {@code planTrace.size() >= 2}, this analyser examines
- * which eligible candidates appeared in multi-step plans and weights their contribution by the
- * case-level outcome (COMPLETED, FAULTED, CANCELLED) and the experience's similarity score.
- *
- * <p>Returns {@code null} when no multi-step plan data exists or no eligible candidates appear
- * in any trace.
- */
-@ApplicationScoped
 public class PlanCompositionAnalyser implements RoutingSignalProvider {
 
   private final CbrCaseOutcomeWeights caseOutcomeWeights;
 
-  @Inject
-  public PlanCompositionAnalyser(Instance<CbrCaseOutcomeWeights> caseOutcomeWeights) {
-    this.caseOutcomeWeights = caseOutcomeWeights.get();
-  }
-
-  PlanCompositionAnalyser(CbrCaseOutcomeWeights caseOutcomeWeights) {
+  public PlanCompositionAnalyser(CbrCaseOutcomeWeights caseOutcomeWeights) {
     this.caseOutcomeWeights = caseOutcomeWeights;
   }
 

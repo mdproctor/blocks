@@ -6,9 +6,6 @@ import io.casehub.api.spi.routing.ExperiencePlanStep;
 import io.casehub.api.spi.routing.RetrievedExperience;
 import io.casehub.api.spi.routing.RoutingSignal;
 import io.casehub.api.spi.routing.RoutingSignalProvider;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.inject.Instance;
-import jakarta.inject.Inject;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Comparator;
@@ -18,26 +15,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/**
- * {@link RoutingSignalProvider} that scores candidates based on immediate predecessor context
- * in historical plan traces.
- *
- * <p>For each retrieved experience with {@code planTrace.size() >= 2}, this analyser sorts steps
- * by priority, finds steps matching the target capability, and scores each eligible candidate
- * based on the case outcome weighted by similarity — recording the immediate predecessor's
- * (capability, worker) pair for observability.
- */
-@ApplicationScoped
 public class PredecessorAnalyser implements RoutingSignalProvider {
 
     private final CbrCaseOutcomeWeights caseOutcomeWeights;
 
-    @Inject
-    public PredecessorAnalyser(Instance<CbrCaseOutcomeWeights> caseOutcomeWeights) {
-        this.caseOutcomeWeights = caseOutcomeWeights.get();
-    }
-
-    PredecessorAnalyser(CbrCaseOutcomeWeights caseOutcomeWeights) {
+    public PredecessorAnalyser(CbrCaseOutcomeWeights caseOutcomeWeights) {
         this.caseOutcomeWeights = caseOutcomeWeights;
     }
 
