@@ -17,6 +17,10 @@
   <description>Parent POM for CaseHub Blocks modules</description>
   <url>https://github.com/casehubio/blocks</url>
 
+  <properties>
+    <spring-boot.version>3.4.5</spring-boot.version>
+  </properties>
+
   <modules>
     <module>summarisation-api</module>
     <module>cloudevents</module>
@@ -28,6 +32,8 @@
     <module>agentic-yaml-deployment</module>
     <module>engine-adapter-core</module>
     <module>engine-adapter</module>
+    <module>blocks-spring</module>
+    <module>engine-adapter-spring</module>
     <module>speech-api</module>
     <module>speech-ws</module>
     <module>annotations</module>
@@ -50,6 +56,18 @@
       </modules>
     </profile>
   </profiles>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-dependencies</artifactId>
+        <version>${spring-boot.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 
   <repositories>
     <repository>
