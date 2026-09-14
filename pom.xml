@@ -13,13 +13,13 @@
   <artifactId>casehub-blocks-parent</artifactId>
   <packaging>pom</packaging>
 
+  <properties>
+    <spring-boot.version>4.1.0</spring-boot.version>
+  </properties>
+
   <name>casehub-blocks-parent</name>
   <description>Parent POM for CaseHub Blocks modules</description>
   <url>https://github.com/casehubio/blocks</url>
-
-  <properties>
-    <spring-boot.version>3.4.5</spring-boot.version>
-  </properties>
 
   <modules>
     <module>summarisation-api</module>
