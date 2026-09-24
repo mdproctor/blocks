@@ -14,4 +14,5 @@ public record CognitionDefinition(
         @Nullable GoalEscalationConfigSpec goalEscalation,
         @Nullable NormDetectionConfigSpec normDetection,
         @Nullable CollectiveGoalConfigSpec collectiveGoal,
-        @Nullable RetentionConfigSpec retention) {}
+        @Nullable RetentionConfigSpec retention,
+        @Nullable CognitiveGoalConfigSpec cognitiveGoal) {}
