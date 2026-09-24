@@ -1,5 +1,7 @@
 package io.casehub.blocks.agentic.social;
 
+import io.casehub.blocks.agent.StructuredAgentInvoker;
+import io.casehub.blocks.agent.StructuredAgentInvoker.InvocationResult;
 import io.casehub.blocks.agentic.social.drive.DriveOrchestrator;
 import io.casehub.blocks.agentic.social.goal.GoalProposalOrchestrator;
 import io.casehub.blocks.agentic.social.narrative.NarrativeOrchestrator;
@@ -22,10 +24,8 @@ import io.casehub.blocks.speech.PromptSection;
 import io.casehub.eidos.api.AgentDescriptor;
 import io.casehub.eidos.api.ConstraintSeverity;
 import io.casehub.neocortex.memory.engagement.EngagementEvent;
-import io.casehub.neocortex.mindmap.MindMapStore;
 import io.casehub.neocortex.memory.relationship.QualitySignal;
-import io.casehub.blocks.agent.StructuredAgentInvoker;
-import io.casehub.blocks.agent.StructuredAgentInvoker.InvocationResult;
+import io.casehub.neocortex.mindmap.MindMapStore;
 import io.casehub.platform.agent.AgentProvider;
 import io.casehub.platform.agent.AgentSessionConfig;
 import org.jspecify.annotations.Nullable;
@@ -56,6 +56,8 @@ public class CognitionCore {
     private final java.util.Map<CognitionPhase, java.util.List<CognitionTickParticipant>> customParticipants = new java.util.EnumMap<>(CognitionPhase.class);
     private final @Nullable MindMapStore mindMapStore;
     private final java.util.Map<String, java.util.Set<NeedTier>> needTierMapping;
+    private java.util.function.UnaryOperator<java.util.List<PromptSection>> sectionCustomizer;
+
 
     private volatile @Nullable AgentDescriptor lastDescriptor;
 
@@ -401,10 +403,14 @@ public class CognitionCore {
         if (config.needsPyramidEnabled() && mindMapStore != null) {
             sections.add(new NeedsPyramidPromptSection(mindMapStore, needTierMapping));
         }
+        if (sectionCustomizer != null) {
+            sections = new ArrayList<>(sectionCustomizer.apply(sections));
+        }
         if (config.directivePrompts()) {
             return sections.stream().map(DirectiveSection::wrap).toList();
         }
-        return sections;}
+        return sections;
+    }
 
     public CognitionConfig config() { return config; }
 
@@ -426,6 +432,11 @@ public class CognitionCore {
         }
         customParticipants.computeIfAbsent(phase, k -> new java.util.ArrayList<>()).add(participant);
     }
+
+    public void setSectionCustomizer(java.util.function.UnaryOperator<java.util.List<PromptSection>> customizer) {
+        this.sectionCustomizer = customizer;
+    }
+
 
     private void runCustomParticipants(CognitionPhase phase, CognitionTickContext context) {
         var participants = customParticipants.get(phase);
