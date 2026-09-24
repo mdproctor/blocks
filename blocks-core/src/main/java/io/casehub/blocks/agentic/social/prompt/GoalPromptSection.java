@@ -40,9 +40,11 @@ public class GoalPromptSection implements PromptSection {
 
         var unified = new ArrayList<UnifiedGoal>();
 
-        driveGoals.currentProposals(agentId, tenantId)
-                  .ifPresent(proposals -> proposals.forEach(p ->
-                                                                    unified.add(UnifiedGoal.fromDrive(p, config.driveWeight()))));
+        if (driveGoals != null) {
+            driveGoals.currentProposals(agentId, tenantId)
+                      .ifPresent(proposals -> proposals.forEach(p ->
+                                                                        unified.add(UnifiedGoal.fromDrive(p, config.driveWeight()))));
+        }
 
         if (cognitiveGoals != null) {
             cognitiveGoals.currentState(agentId, tenantId)
