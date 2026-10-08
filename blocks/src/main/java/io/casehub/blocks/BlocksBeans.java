@@ -137,6 +137,7 @@ public class BlocksBeans {
     @Inject Instance<io.casehub.neocortex.memory.CaseMemoryStore> caseMemoryStoreInstance;
     @Inject Instance<io.casehub.neocortex.cognitive.index.CognitiveProfile> cognitiveProfileInstance;
     @Inject Instance<io.casehub.neocortex.cognitive.index.DomainActivation> domainActivationInstance;
+    @Inject Instance<io.casehub.neocortex.cognition.subthought.SubThoughtTickParticipant> subThoughtParticipantInstance;
     @Inject Instance<AgentGraphQuery> agentGraphQueryInstance;
     @Inject Instance<RoutingSignalAssembler> routingSignalAssemblerInstance;
     @Inject Instance<ManagedExecutor> managedExecutorInstance;
@@ -358,6 +359,8 @@ public class BlocksBeans {
                                      nullableFrom(temporalFocusOrchestratorInstance),
                                      nullableFrom(reflectionOrchestratorInstance),
                                      nullableFrom(consolidationMediatorInstance));
+
+        optionalFrom(subThoughtParticipantInstance).ifPresent(core::configureSubThoughts);
 
         io.casehub.neocortex.cognition.goal.CognitiveGoalOrchestrator cognitiveGoals = null;
         if (mindMapStoreInstance.isResolvable() && goalAppraisalInstance.isResolvable()
